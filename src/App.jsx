@@ -44,7 +44,7 @@ const App = () => {
               </div>
           </main>
           <main className={"px-4 lg:px-[5vw]"}>
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 py-4">
+<div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 py-4">
               <ProductCard creatorName={"Parsa"} productName={"3d printed parts dcsdc sddsc sdc dsc sdc sc s cs csd csd csd csd c sdc sdc ds grb frv gfv "} rating={"5"} currentPrice={"80"} originalPrice={"200"} reviewNumber={"249"}/>
               <ProductCard creatorName={"Parsa"} productName={"3d printed parts"} rating={"5"} currentPrice={"80"} originalPrice={"200"} reviewNumber={"249"}/>
               <ProductCard creatorName={"Parsa"} productName={"3d printed parts"} rating={"5"} currentPrice={"120"} originalPrice={"400"} reviewNumber={"249"}/>
