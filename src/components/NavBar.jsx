@@ -1,32 +1,66 @@
+import {useRef, useState, useEffect} from "react";
+import accountLogo from "../assets/accountLogo.svg"
+import accountLogoHover from "../assets/accountLogoHover.svg"
 export default function Navbar() {
-  return (
-    <header className="w-full bg-gray-950 shadow-sm border-b border-gray-200">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <div className="text-xl font-bold text-white">
-          3DPrintings.xyz
-        </div>
+      const [showNavbar, setShowNavbar] = useState(true);
+      const lastScrollY = useRef(0);
 
-        <ul className="hidden gap-6 text-white md:flex">
-          <li>
-            <a href="#" className="transition hover:text-green-600">
+    function showNavBar() {
+      const currentScrollY = window.scrollY
+      if (currentScrollY > window.innerHeight) {
+        if (currentScrollY - lastScrollY.current > 5){
+          setShowNavbar(false)
+        } else if (currentScrollY - lastScrollY.current < -5) {
+          setShowNavbar(true)
+        }
+    }      else {setShowNavbar(true)}
+        lastScrollY.current = currentScrollY
+    }
+
+    useEffect(() => {
+  window.addEventListener("scroll", showNavBar);
+
+  return () => {
+    window.removeEventListener("scroll", showNavBar);
+  };
+}, []);
+
+  return (
+<header className={`fixed top-0 left-0 w-full z-50 bg-gray-950 shadow-sm border-b border-gray-200 transition-transform duration-300 ${showNavbar ? "translate-y-0" : "-translate-y-full"}`}>
+  <nav className="mx-auto flex max-w-7xl items-center justify-center  py-3">
+        <a href='/home' className="text-xl font-extrabold text-white flex gap-2 transition hover:text-orange-500 pr-3">
+            3z
+        </a>
+      <a href="#" className="hidden md:block text-white px-4 transition hover:text-orange-500">
               Home
             </a>
-          </li>
-          <li>
-            <a href="#" className="transition hover:text-green-600">
-              Become a Seller
-            </a>
-          </li>
-          <li>
-            <a href="#" className="transition hover:text-green-600">
-              Log in
-            </a>
-          </li>
-        </ul>
-
-        <button className=" cursor-pointer rounded-lg bg-orange-600 px-4 py-2 text-white transition hover:bg-orange-800">
-          Sign Up
-        </button>
+      <div className="sm:w-2/5 md:w-3/5 lg:3.5/5 text-white">
+  <input
+    type="text"
+    placeholder="Search"
+    className="w-full rounded-full border-2 border-gray-300 px-4 py-2 outline-none"/>
+      </div>
+      <div>
+<button className="group flex cursor-pointer flex-col gap-1 px-4">
+  <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+  <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
+  <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+</button>
+</div>
+   <div>
+<button className="group relative h-8 w-8">
+  <img
+    src={accountLogo}
+    alt="account"
+    className="absolute inset-0 h-full w-full opacity-100 transition-opacity duration-300 group-hover:opacity-0"
+  />
+  <img
+    src={accountLogoHover}
+    alt="account hover"
+    className="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+  />
+</button>
+   </div>
       </nav>
     </header>
   );
