@@ -2,6 +2,7 @@ import {useRef, useState, useEffect} from "react";
 import accountLogo from "../assets/accountLogo.svg"
 import accountLogoHover from "../assets/accountLogoHover.svg"
 import Search from "../assets/search.svg"
+import SideMenu from "./SideMenu.jsx";
 export default function Navbar() {
       const [showNavbar, setShowNavbar] = useState(true);
       const lastScrollY = useRef(0);
@@ -26,7 +27,10 @@ export default function Navbar() {
   };
 }, []);
 
+    const [menuOpen, setMenuOpen] = useState(false);
+
   return (
+      <>
 <header className={`fixed top-0 left-0 w-full z-50 bg-gray-950 shadow-sm border-b border-gray-200 transition-transform duration-300 ${showNavbar ? "translate-y-0" : "-translate-y-full"}`}>
   <nav className="mx-auto flex max-w-7xl items-center justify-center  py-3">
         <a href='/home' className="text-xl font-extrabold text-white flex gap-2 transition hover:text-orange-500 pr-3">
@@ -35,8 +39,8 @@ export default function Navbar() {
       <a href="#" className="hidden md:block text-white pr-4 transition hover:text-orange-500">
               Home
             </a>
-      <div className="sm:w-2/5 md:w-2.5/5 lg:w-3/5 xl:w-4/5 text-white">
-<div className="relative w-full overflow-hidden rounded-full border-2 border-gray-300">
+      <div className="w-6/10 sm:w-7/10 md:w-7/10 lg:w-4/5 xl:w-6/8 text-white">
+<div className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition hover:border-orange-500">
   <input
     type="text"
     placeholder="Search"
@@ -48,7 +52,7 @@ export default function Navbar() {
 </div>
       </div>
       <div>
-<button className="group flex cursor-pointer flex-col gap-1 px-4">
+<button onClick={() => setMenuOpen(prev => !prev)} className="group flex cursor-pointer flex-col gap-1 px-4">
   <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
   <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
   <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
@@ -70,5 +74,7 @@ export default function Navbar() {
    </div>
       </nav>
     </header>
+          <SideMenu menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+      </>
   );
 }
