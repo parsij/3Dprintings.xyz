@@ -3,7 +3,7 @@ import accountLogo from "../assets/accountLogo.svg"
 import accountLogoHover from "../assets/accountLogoHover.svg"
 import Search from "../assets/search.svg"
 import SideMenu from "./SideMenu.jsx";
-export default function Navbar() {
+export default function Navbar({ isSingedIn }) {
       const [showNavbar, setShowNavbar] = useState(true);
       const lastScrollY = useRef(0);
 
@@ -59,18 +59,16 @@ export default function Navbar() {
 </button>
 </div>
    <div>
-<button className="group relative h-8 w-8">
+{isSingedIn ? <button className="group relative h-8 w-8 cursor-pointer">
   <img
     src={accountLogo}
     alt="account"
-    className="absolute inset-0 h-full w-full opacity-100 transition-opacity duration-300 group-hover:opacity-0"
-  />
+    className="absolute inset-0 h-full w-full opacity-100 transition-opacity duration-300 group-hover:opacity-0"/>
   <img
     src={accountLogoHover}
     alt="account hover"
-    className="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-  />
-</button>
+    className="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"/>
+</button> : <button className={"border-2 border-white rounded-2xl text-white px-4 py-0.5 transition hover:(text-orange-500 border-orange-500)"}>Sign in</button>}
    </div>
       </nav>
     </header>

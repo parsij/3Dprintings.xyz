@@ -6,7 +6,7 @@ const home = () => {
   return (
       <div className="min-h-screen bg-[#fffefc]">
           <div className={""}>
-          <Navbar/>
+          <Navbar isSingedIn={false}/>
           </div>
           <main className="w-full">
               <div className="relative w-full">
