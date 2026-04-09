@@ -33,14 +33,14 @@ export default function Navbar({ isSingedIn }) {
   return (
       <>
 <header className={`fixed top-0 left-0 w-full z-50 bg-gray-950 shadow-sm border-b border-gray-200 transition-transform duration-300 ${showNavbar ? "translate-y-0" : "-translate-y-full"}`}>
-  <nav className="mx-auto flex max-w-7xl items-center justify-center  py-3">
+  <nav className="flex max-w-7xl items-center justify-evenly py-3 ml-2">
         <a href='/home' className="text-xl font-extrabold text-white flex gap-2 transition hover:text-orange-500 pr-3">
             3z
         </a>
-      <a href="#" className="hidden md:block text-white pr-4 transition hover:text-orange-500">
+      <a href="#" className="font-bold hidden md:block text-white pr-4 transition hover:text-orange-500">
               3D prints
             </a>
-      <div className="w-6/10 sm:w-7/10 md:w-7/10 lg:w-4/5 xl:w-6/8 text-white">
+      <div className="w-5/10 sm:w-7/10 md:w-6/10 lg:w-4/6 xl:w-6/8 text-white">
 <div className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition hover:border-orange-500">
   <input
     type="text"
@@ -69,7 +69,7 @@ export default function Navbar({ isSingedIn }) {
     src={accountLogoHover}
     alt="account hover"
     className="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"/>
-</button> : <button className={"border-2 border-white rounded-2xl text-white px-4 py-0.5 transition hover:border-orange-500"}>
+</button> : <button className={"border-2 font-bold border-white rounded-2xl text-white px-4 py-0.5 transition hover:border-orange-500"}>
     <a href="/signin">
         Sign in
     </a></button>}
