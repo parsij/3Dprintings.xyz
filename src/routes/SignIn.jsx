@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg";
 import SideMenu from "../components/SideMenu.jsx";
+import SmallNavBar from "../components/SmallNavBar.jsx";
 
 export default function SignIn() {
   const [form, setForm] = useState({
@@ -16,7 +17,6 @@ export default function SignIn() {
 
   const [activeField, setActiveField] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const validators = {
     email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
@@ -56,6 +56,8 @@ export default function SignIn() {
 
   return (
       <>
+        <SmallNavBar />
+        <SideMenu />
         <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
       <section className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900/70 backdrop-blur p-6 sm:p-8 shadow-2xl">
         <div className="mb-6 text-center">
@@ -176,7 +178,6 @@ export default function SignIn() {
         </p>
       </section>
     </main>
-    <SideMenu menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
         </>
   );
 }

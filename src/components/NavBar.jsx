@@ -3,7 +3,10 @@ import accountLogo from "../assets/accountLogo.svg"
 import accountLogoHover from "../assets/accountLogoHover.svg"
 import Search from "../assets/search.svg"
 import SideMenu from "./SideMenu.jsx";
+import { useMenu } from "../MenuContext.jsx";
+
 export default function Navbar({ isSingedIn }) {
+      const { setMenuOpen } = useMenu();
       const [showNavbar, setShowNavbar] = useState(true);
       const lastScrollY = useRef(0);
 
@@ -26,8 +29,6 @@ export default function Navbar({ isSingedIn }) {
     window.removeEventListener("scroll", showNavBar);
   };
 }, []);
-
-    const [menuOpen, setMenuOpen] = useState(false);
 
   return (
       <>
@@ -75,7 +76,7 @@ export default function Navbar({ isSingedIn }) {
    </div>
       </nav>
     </header>
-          <SideMenu menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+          <SideMenu />
       </>
   );
 }

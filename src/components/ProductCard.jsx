@@ -16,7 +16,7 @@ const ProductCard = ({
   originalPrice,
 }) => {
   return (
-   <div className="flex flex-col rounded-xl bg-white overflow-hidden hover:shadow-md transition-shadow h-full">
+   <div className="flex flex-col rounded-xl bg-white overflow-hidden hover:shadow-md transition-shadow h-56">
      {/*img only it's only the image*/}<div className={"aspect-square overflow-hidden"}><img src={image_test} alt={""} className="w-full h-full object-cover"/></div>
  <section className="p-3 flex flex-col gap-1 text-left flex-1">
    <div className={"line-clamp-2 min-h-12"} title={productName}>{productName}</div>

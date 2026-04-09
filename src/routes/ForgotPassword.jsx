@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import SmallNavBar from "../components/SmallNavBar.jsx";
+import SideMenu from "../components/SideMenu.jsx";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -22,6 +24,8 @@ export default function ForgotPassword() {
 
   return (
     <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+      <SmallNavBar />
+      <SideMenu />
       <section className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900/70 backdrop-blur p-6 sm:p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-extrabold tracking-tight">

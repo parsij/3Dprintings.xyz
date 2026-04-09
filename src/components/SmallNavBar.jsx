@@ -1,6 +1,8 @@
 import React from 'react'
+import { useMenu } from '../MenuContext.jsx'
 
 export const SmallNavBar = () => {
+    const { menuOpen, setMenuOpen } = useMenu();
     return (
          <div className="fixed top-0 left-0 w-full z-50 bg-gray-950/90 backdrop-blur border-b border-gray-800">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">

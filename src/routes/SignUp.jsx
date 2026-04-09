@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg"
+import SmallNavBar from "../components/SmallNavBar.jsx";
+import SideMenu from "../components/SideMenu.jsx";
 
 export default function SignUp() {
   const [form, setForm] = useState({
@@ -64,6 +66,9 @@ export default function SignUp() {
   };
 
   return (
+      <>
+        <SmallNavBar />
+        <SideMenu />
     <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
       <section className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900/70 backdrop-blur p-6 sm:p-8 shadow-2xl">
         <div className="mb-6 text-center">
@@ -219,5 +224,6 @@ export default function SignUp() {
         </p>
       </section>
     </main>
+        </>
   );
 }

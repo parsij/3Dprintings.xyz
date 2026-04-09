@@ -1,6 +1,8 @@
 import React from "react";
+import { useMenu } from "../MenuContext.jsx";
 
-const SideMenu = ({ menuOpen, setMenuOpen }) => {
+const SideMenu = () => {
+  const { menuOpen, setMenuOpen } = useMenu();
   return (
     <>
       <div
@@ -17,7 +19,7 @@ const SideMenu = ({ menuOpen, setMenuOpen }) => {
       >
         <div className="flex items-center justify-between border-b border-gray-700 p-4">
           <h2 className="text-lg font-bold">Menu</h2>
-          <button onClick={() => setMenuOpen(false)} className="text-white">
+          <button onClick={() => setMenuOpen(false)} className="text-white cursor-pointer">
             ✕
           </button>
         </div>
