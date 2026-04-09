@@ -4,6 +4,7 @@ import Home from "./routes/Home.jsx";
 import SignIn from "./routes/SignIn.jsx";
 import SignUp from "./routes/SignUp.jsx";
 import ForgotPassword from "./routes/ForgotPassword.jsx";
+import Products from "./routes/Products.jsx";
 
 const Router = () => {
     return (
@@ -14,6 +15,7 @@ const Router = () => {
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/products" element={<Products />} />
       </Routes>
     </BrowserRouter>
     )

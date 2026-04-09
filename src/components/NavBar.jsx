@@ -37,7 +37,7 @@ export default function Navbar({ isSingedIn }) {
             3z
         </a>
       <a href="#" className="hidden md:block text-white pr-4 transition hover:text-orange-500">
-              Home
+              3D prints
             </a>
       <div className="w-6/10 sm:w-7/10 md:w-7/10 lg:w-4/5 xl:w-6/8 text-white">
 <div className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition hover:border-orange-500">
