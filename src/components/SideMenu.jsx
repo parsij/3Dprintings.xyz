@@ -24,8 +24,8 @@ const SideMenu = ({ menuOpen, setMenuOpen }) => {
 
         <div className="p-4 space-y-3">
           <a href="/home" className="block hover:text-orange-500">Home</a>
-          <a href="#" className="block hover:text-orange-500">Products</a>
-          <a href="#" className="block hover:text-orange-500">About</a>
+          <a href="#" className="block hover:text-orange-500">3D Prints</a>
+          <a href="#" className="block hover:text-orange-500">Become a seller</a>
         </div>
       </aside>
     </>
