@@ -46,7 +46,7 @@ export default function Navbar({ isSingedIn }) {
     placeholder="Search"
     className="w-full bg-transparent px-4 py-2 pr-24 outline-none"
   />
-  <button className="absolute right-0 top-0 h-full bg-orange-500 px-3 text-white">
+  <button className="absolute right-0 top-0 h-full bg-white px-3 text-white transition hover:bg-orange-500 cursor-pointer">
       <img src={Search} alt="Search" />
   </button>
 </div>
@@ -68,7 +68,10 @@ export default function Navbar({ isSingedIn }) {
     src={accountLogoHover}
     alt="account hover"
     className="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"/>
-</button> : <button className={"border-2 border-white rounded-2xl text-white px-4 py-0.5 transition hover:(text-orange-500 border-orange-500)"}>Sign in</button>}
+</button> : <button className={"border-2 border-white rounded-2xl text-white px-4 py-0.5 transition hover:border-orange-500"}>
+    <a href="/signin">
+        Sign in
+    </a></button>}
    </div>
       </nav>
     </header>
