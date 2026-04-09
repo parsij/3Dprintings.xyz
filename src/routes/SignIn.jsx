@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg";
+import SideMenu from "../components/SideMenu.jsx";
 
 export default function SignIn() {
   const [form, setForm] = useState({
@@ -15,6 +16,7 @@ export default function SignIn() {
 
   const [activeField, setActiveField] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const validators = {
     email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
@@ -53,7 +55,24 @@ export default function SignIn() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
+      <>
+    <div className="fixed top-0 left-0 w-full z-50 bg-gray-950/90 backdrop-blur border-b border-gray-800">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <a href="/home" className="text-xl font-extrabold text-white hover:text-orange-500 transition">
+          3z
+        </a>
+
+        <span className={"text-white font-bold"}>3Dprintings.xyz</span>
+        <div>
+      <button onClick={() => setMenuOpen(prev => !prev)} className="group flex cursor-pointer flex-col gap-1 px-4">
+        <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+        <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
+        <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+      </button>
+      </div>
+      </nav>
+    </div>
+        <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
       <section className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900/70 backdrop-blur p-6 sm:p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-extrabold tracking-tight">
@@ -173,5 +192,7 @@ export default function SignIn() {
         </p>
       </section>
     </main>
+    <SideMenu menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+        </>
   );
 }
