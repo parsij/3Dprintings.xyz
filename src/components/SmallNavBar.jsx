@@ -12,7 +12,7 @@ export const SmallNavBar = () => {
 
         <a className={"text-white font-bold transition hover:text-orange-500"} href={"/home"} >3Dprintings.xyz</a>
         <div>
-      <button onClick={() => setMenuOpen(prev => !prev)} className="group flex cursor-pointer flex-col gap-1 px-4">
+      <button onClick={() => setMenuOpen(prev => !prev)} className="group flex cursor-pointer flex-col gap-1 px-2">
         <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
         <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
         <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
