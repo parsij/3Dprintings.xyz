@@ -10,8 +10,8 @@ const ProductCard = ({
   originalPrice,
 }) => {
   return (
-    <div className="flex flex-col rounded-xl bg-white overflow-hidden hover:shadow-md transition-shadow">
-      <div className="h-84 overflow-hidden">
+    <div className="flex flex-col rounded-xl bg-white overflow-hidden hover:shadow-xl transition-shadow cursor-pointer text-sm">
+      <div className="h-70 overflow-hidden">
         <img
           src={image_test}
           alt=""

@@ -2,6 +2,7 @@ import {useRef, useState, useEffect} from "react";
 import accountLogo from "../assets/accountLogo.svg"
 import accountLogoHover from "../assets/accountLogoHover.svg"
 import Search from "../assets/search.svg"
+import Cart from "../assets/cart.svg"
 import SideMenu from "./SideMenu.jsx";
 import { useMenu } from "../MenuContext.jsx";
 
@@ -41,7 +42,7 @@ export default function Navbar({ isSingedIn }) {
               3D prints
             </a>
       <div className="w-5/10 sm:w-7/10 md:w-6/10 lg:w-4/6 xl:w-6/8 text-white">
-<div className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition hover:border-orange-500">
+<div className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500">
   <input
     type="text"
     placeholder="Search"
@@ -59,6 +60,9 @@ export default function Navbar({ isSingedIn }) {
   <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
 </button>
 </div>
+<a href={"/cart"} className={"cursor-pointer"}>
+<img className={"h-8 w-8 object-contain"} src={Cart} alt="Cart" />
+</a>
    <div>
 {isSingedIn ? <button className="group relative h-8 w-8 cursor-pointer">
   <img
