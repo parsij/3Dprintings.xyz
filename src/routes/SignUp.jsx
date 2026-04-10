@@ -69,13 +69,13 @@ export default function SignUp() {
       <>
         <SmallNavBar />
         <SideMenu />
-    <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-4">
-      <section className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900/70 backdrop-blur p-6 sm:p-8 shadow-2xl">
+    <main className="min-h-screen bg-orange-50 text-gray-900 flex items-center justify-center px-4">
+      <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-6 sm:p-8 shadow-xl">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-extrabold tracking-tight">
             Join <span className="text-orange-500">3Dprintings.xyz</span>
           </h1>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600">
             Create your account and join the fun.
           </p>
         </div>
@@ -83,7 +83,7 @@ export default function SignUp() {
         <form className="space-y-4" onSubmit={onSubmit} noValidate>
           {/* Username */}
           <div>
-            <label className="mb-1 block text-sm text-gray-300">Username</label>
+            <label className="mb-1 block text-sm text-gray-700">Username</label>
             <div className="relative">
               <input
                 name="username"
@@ -93,7 +93,7 @@ export default function SignUp() {
                 onFocus={() => setActiveField("username")}
                 onBlur={() => setActiveField(null)}
                 placeholder="yourname"
-                className="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
               />
               {form.username && isFieldValid("username") && (
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
@@ -111,7 +111,7 @@ export default function SignUp() {
 
           {/* Email */}
           <div>
-            <label className="mb-1 block text-sm text-gray-300">Email</label>
+            <label className="mb-1 block text-sm text-gray-700">Email</label>
             <div className="relative">
               <input
                 name="email"
@@ -121,7 +121,7 @@ export default function SignUp() {
                 onFocus={() => setActiveField("email")}
                 onBlur={() => setActiveField(null)}
                 placeholder="you@example.com"
-                className="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
               />
               {form.email && isFieldValid("email") && (
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
@@ -138,7 +138,7 @@ export default function SignUp() {
 
           {/* Password */}
           <div>
-  <label className="mb-1 block text-sm text-gray-300">Password</label>
+  <label className="mb-1 block text-sm text-gray-700">Password</label>
   <div className="relative">
     <input
       name="password"
@@ -148,7 +148,7 @@ export default function SignUp() {
       onFocus={() => setActiveField("password")}
       onBlur={() => setActiveField(null)}
       placeholder="At least 8 characters"
-      className="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 pr-12 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-12 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
     />
 
     <button
@@ -174,7 +174,7 @@ export default function SignUp() {
 </div>
           {/* Confirm Password */}
           <div>
-            <label className="mb-1 block text-sm text-gray-300">Confirm Password</label>
+            <label className="mb-1 block text-sm text-gray-700">Confirm Password</label>
             <div className="relative">
               <input
                 name="confirmPassword"
@@ -184,7 +184,7 @@ export default function SignUp() {
                 onFocus={() => setActiveField("confirmPassword")}
                 onBlur={() => setActiveField(null)}
                 placeholder="Repeat password"
-                className="w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
               />
               {form.confirmPassword && isFieldValid("confirmPassword") && (
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
@@ -206,14 +206,14 @@ export default function SignUp() {
             className={` cursor-pointer w-full rounded-xl py-3 font-semibold text-white transition ${
               isFormValid
                 ? "bg-orange-500 hover:bg-orange-400 active:scale-[0.99]"
-                : "bg-gray-700 cursor-not-allowed opacity-60"
+                : "bg-gray-300 cursor-not-allowed opacity-70"
             }`}
           >
             Create Account
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-400">
+        <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{" "}
           <Link
             to="/signin"

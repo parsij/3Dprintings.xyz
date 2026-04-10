@@ -56,21 +56,21 @@ export default function CartPage() {
       <>
           <SmallNavBar />
         <SideMenu />
-    <main className="min-h-screen bg-gray-950 text-white px-4 py-8 my-8">
+    <main className="min-h-screen bg-orange-50 text-gray-900 px-4 py-8 my-8">
         <div className="mx-auto max-w-7xl">
         <div className="mb-6">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
             Your <span className="text-orange-500">Cart</span>
           </h1>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600">
             Review your items before checkout.
           </p>
         </div>
 
         {cartItems.length === 0 ? (
-          <section className="rounded-2xl border border-gray-800 bg-gray-900/70 p-8 text-center">
+          <section className="rounded-2xl border border-orange-100 bg-white p-8 text-center shadow-sm">
             <p className="text-lg font-semibold">Your cart is empty.</p>
-            <p className="mt-2 text-sm text-gray-400">
+            <p className="mt-2 text-sm text-gray-600">
               Add some awesome 3D models to get started.
             </p>
             <Link
@@ -87,28 +87,28 @@ export default function CartPage() {
               {cartItems.map((item) => (
                 <article
                   key={item.id}
-                  className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 sm:p-5"
+                  className="rounded-2xl border border-orange-100 bg-white p-4 sm:p-5 shadow-sm"
                 >
                   <div className="flex gap-4">
                     <img
                       src={item.image}
                       alt={item.name}
-                      className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-cover border border-gray-800"
+                      className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-cover border border-orange-100"
                     />
 
                     <div className="flex-1 min-w-0">
                       <h2 className="font-bold text-base sm:text-lg line-clamp-2">
                         {item.name}
                       </h2>
-                      <p className="text-sm text-gray-400 mt-1">
+                      <p className="text-sm text-gray-600 mt-1">
                         By {item.creator}
                       </p>
 
                       <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <div className="flex items-center rounded-full border border-gray-700 overflow-hidden">
+                        <div className="flex items-center rounded-full border border-gray-300 overflow-hidden">
                           <button
                             onClick={() => updateQty(item.id, -1)}
-                            className="cursor-pointer px-3 py-1.5 text-lg hover:bg-gray-800 transition"
+                            className="cursor-pointer px-3 py-1.5 text-lg hover:bg-orange-100 transition"
                             aria-label="Decrease quantity"
                           >
                             −
@@ -118,7 +118,7 @@ export default function CartPage() {
                           </span>
                           <button
                             onClick={() => updateQty(item.id, 1)}
-                            className="cursor-pointer px-3 py-1.5 text-lg hover:bg-gray-800 transition"
+                            className="cursor-pointer px-3 py-1.5 text-lg hover:bg-orange-100 transition"
                             aria-label="Increase quantity"
                           >
                             +
@@ -150,23 +150,23 @@ export default function CartPage() {
             </section>
 
             {/* Right: summary */}
-            <aside className="rounded-2xl border border-gray-800 bg-gray-900/70 p-5 h-fit lg:sticky lg:top-24">
+            <aside className="rounded-2xl border border-orange-100 bg-white p-5 h-fit lg:sticky lg:top-24 shadow-sm">
               <h3 className="text-xl font-bold">Order Summary</h3>
 
               <div className="mt-4 space-y-2 text-sm">
-                <div className="flex items-center justify-between text-gray-300">
+                <div className="flex items-center justify-between text-gray-700">
                   <span>Subtotal</span>
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex items-center justify-between text-gray-300">
+                <div className="flex items-center justify-between text-gray-700">
                   <span>Shipping</span>
                   <span>${shipping.toFixed(2)}</span>
                 </div>
-                <div className="flex items-center justify-between text-gray-300">
+                <div className="flex items-center justify-between text-gray-700">
                   <span>Tax</span>
                   <span>~${tax.toFixed(2)}</span>
                 </div>
-                <div className="my-3 border-t border-gray-800" />
+                <div className="my-3 border-t border-orange-100" />
                 <div className="flex items-center justify-between font-extrabold text-base">
                   <span>Total</span>
                   <span className="text-orange-500">${total.toFixed(2)}</span>
@@ -179,7 +179,7 @@ export default function CartPage() {
 
               <Link
                 to="/products"
-                className="mt-3 inline-block w-full text-center rounded-xl border border-gray-700 py-3 text-sm font-medium text-gray-200 transition hover:border-orange-500 hover:text-orange-400"
+                className="mt-3 inline-block w-full text-center rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-700 transition hover:border-orange-500 hover:text-orange-500"
               >
                 Continue Shopping
               </Link>
