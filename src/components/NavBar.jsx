@@ -7,7 +7,7 @@ import CartHover from "../assets/CartHover.svg";
 import SideMenu from "./SideMenu.jsx";
 import { useMenu } from "../MenuContext.jsx";
 
-export default function Navbar({ isSingedIn }) {
+export default function Navbar({ isSingedIn,NoNavBarLimit }) {
   const { setMenuOpen } = useMenu();
   const [showNavbar, setShowNavbar] = useState(true);
   const lastScrollY = useRef(0);
@@ -15,10 +15,10 @@ export default function Navbar({ isSingedIn }) {
   function showNavBar() {
     const currentScrollY = window.scrollY;
 
-    if (currentScrollY > window.innerHeight) {
-      if (currentScrollY - lastScrollY.current > 5) {
+    if (currentScrollY > window.innerHeight || NoNavBarLimit) {
+      if (currentScrollY - lastScrollY.current > 7) {
         setShowNavbar(false);
-      } else if (currentScrollY - lastScrollY.current < -5) {
+      } else if (currentScrollY - lastScrollY.current < -7) {
         setShowNavbar(true);
       }
     } else {
@@ -38,7 +38,7 @@ export default function Navbar({ isSingedIn }) {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 w-full z-50 bg-black/70 backdrop-blur-lg shadow-sm border-b border-white/20 text-white transition-transform duration-300 ${
+        className={`fixed top-0 left-0 w-full z-50 bg-black/65 backdrop-blur-xs shadow-sm border-b border-white/20 text-white transition-transform duration-300 ${
           showNavbar ? "translate-y-0" : "-translate-y-full"
         }`}
       >

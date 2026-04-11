@@ -5,7 +5,6 @@ import Products from "./Products.jsx";
 const home = () => {
   return (
       <div className="min-h-screen bg-[#fffefc]">
-          <Navbar isSingedIn={false}/>
           <main className="w-full">
               <div className="relative w-full">
                   <div className={"justify-center content-center items-center"}>
@@ -40,7 +39,7 @@ const home = () => {
                   </div>
               </div>
           </main>
-          <Products />
+          <Products NoNavBarLimit={false}/>
       </div>
   );
 };
