@@ -3,6 +3,7 @@ import { useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg"
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
+import axios from "axios";
 
 export default function SignUp() {
   const [form, setForm] = useState({
@@ -48,8 +49,8 @@ export default function SignUp() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const onSubmit = (e) => {
-    e.preventDefault();
+  const onSubmit = async (event) => {
+    event.preventDefault();
 
     // Show all errors after submit click
     setTouched({
@@ -61,7 +62,18 @@ export default function SignUp() {
 
     if (!isFormValid) return;
 
-    // TODO: call your signup API
+    try {
+  const response = await axios.post("http://localhost:3000/api/signup", {
+    username: form.username,
+    email: form.email,
+    password: form.password,
+  });
+
+  console.log(response.data);
+} catch (error) {
+  console.log(error.response?.data?.message || "Signup failed");
+}
+
     console.log("Form is valid:", form);
   };
 
