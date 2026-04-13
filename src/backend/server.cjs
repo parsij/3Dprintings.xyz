@@ -12,8 +12,14 @@ app.post('/api/signup', async (req, res) => {
     const { username, email, password } = req.body;
 
     if (!username || !email || !password) {
-      return res.status(400).json({ message: 'Missing fields' });
+    return res.status(400).json({ message: 'All fields are required' });
     }
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const passwordOk = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
+
+  if (!passwordOk && username.trim().length < 3 && !emailOk)
+    return res.status(400).json({ message: 'some of the data you provided is wrong please try again and refresh the page' });
 
     const query = `
       INSERT INTO users (username, email, password)
