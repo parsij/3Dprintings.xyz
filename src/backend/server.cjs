@@ -18,7 +18,7 @@ app.post('/api/signup', async (req, res) => {
     const query = `
       INSERT INTO users (username, email, password)
       VALUES ($1, $2, $3)
-      RETURNING id, username, email
+      RETURNING username
     `;
 
     const values = [username, email, password];
