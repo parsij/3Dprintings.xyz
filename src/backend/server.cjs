@@ -103,7 +103,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-app.post("/api/model-listings/draft", upload.array("photos", MAX_PHOTOS), async (req, res) => {
+app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => {
   try {
     const { modelName = "", description = "", price, category = "", tags } = req.body;
     const photos = req.files || [];

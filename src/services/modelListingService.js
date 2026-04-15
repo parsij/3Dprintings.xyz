@@ -27,7 +27,7 @@ export async function submitModelListing({
   });
 
   try {
-    const response = await axios.post("http://localhost:3000/api/model-listings/draft", formData, {
+    const response = await axios.post("http://localhost:3000/api/create", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
