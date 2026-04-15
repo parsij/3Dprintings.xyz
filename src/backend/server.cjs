@@ -1,9 +1,12 @@
 const express = require('express');
 const app = express();
-const pool = require("./db.cjs"); // or "./db.cjs" if you rename it
+const pool = require("./db.cjs");
 const cors = require('cors');
 const bcrypt = require("bcrypt");
 const multer = require("multer");
+const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -22,27 +25,38 @@ const upload = multer({
   },
 });
 
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+}));
 app.use(express.json());
-
-
+app.use(cookieParser());
 
 app.post('/api/signup', async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
     if (!username || !email || !password) {
-    return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ message: 'All fields are required' });
     }
 
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const passwordOk = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
+    const normalizedUsername = username.trim();
+    const normalizedEmail = email.toLowerCase().trim();
 
-  if (!passwordOk || username.trim().length < 3 || !emailOk)
-    return res.status(400).json({ message: 'some of the data you provided is wrong please try again and refresh the page' });
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+    const passwordOk = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
 
+    if (!passwordOk || normalizedUsername.length < 3 || !emailOk) {
+      return res.status(400).json({
+        message: 'some of the data you provided is wrong please try again and refresh the page'
+      });
+    }
 
-  const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email.toLowerCase()]);
+    const existing = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [normalizedEmail]
+    );
+
     if (existing.rows.length > 0) {
       return res.status(409).json({ message: "Email already in use" });
     }
@@ -55,8 +69,8 @@ app.post('/api/signup', async (req, res) => {
       RETURNING username
     `;
 
-const values = [username.trim(), email.toLowerCase().trim(), hashedPassword];
-const result = await pool.query(query, values);
+    const values = [normalizedUsername, normalizedEmail, hashedPassword];
+    const result = await pool.query(query, values);
 
     return res.status(201).json({
       message: 'User created',
@@ -76,36 +90,66 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk)
-      return res.status(400).json({ message: 'Invalid email format' });
+    const normalizedEmail = email.toLowerCase().trim();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
 
- const result = await pool.query(
+    if (!emailOk) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    const result = await pool.query(
       "SELECT id, username, email, password FROM users WHERE email = $1",
-      [email.toLowerCase().trim()]);
-     if (result.rows.length === 0) {
+      [normalizedEmail]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const user = result.rows[0];
-    const ok = await bcrypt.compare(password, user.password); // plain vs hash
+    const ok = await bcrypt.compare(password, user.password);
 
     if (!ok) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-      return res.json({
+    const token = jwt.sign(
+      { id: user.id, email: user.email, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: "93d" }
+    );
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 93 * 24 * 60 * 60 * 1000,
+    });
+    return res.json({
       message: "Signed in",
-      user: {username: user.username, email: user.email },
+      user: { username: user.username, email: user.email },
     });
   } catch (err) {
     console.error('Login error:', err.message);
-     return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.get('/api/auth', async (req, res) => {
+  const token = req.cookies.token;
+
+  if (!token) {
+    return res.status(401).json({ message: "Not signed in" });
+  }
+
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+    return res.json({ user , message: 'Authentication successfully' });
+  } catch (error) {
+    return res.status(401).json({ message: "Invalid token" });
   }
 });
 
 app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => {
   try {
-    const { modelName = "", description = "", price, category = "", tags } = req.body;
+    const { modelName = "", description = "", price, category = "", tags, userId } = req.body;
     const photos = req.files || [];
     const parsedPrice = Number(price);
 
@@ -131,6 +175,10 @@ app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => 
       fieldErrors.photos = `You can upload up to ${MAX_PHOTOS} photos.`;
     }
 
+    if (!userId) {
+      fieldErrors.userId = "Missing user id.";
+    }
+
     if (Object.keys(fieldErrors).length > 0) {
       return res.status(400).json({
         message: "Validation failed.",
@@ -153,24 +201,44 @@ app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => 
       }
     }
 
+    const insertProductQuery = `
+      INSERT INTO products (
+        name,
+        description,
+        original_price,
+        current_price,
+        rating,
+        user_id
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, name, description, original_price, current_price, rating, user_id
+    `;
+
+    const productValues = [
+      modelName.trim(),
+      description.trim(),
+      parsedPrice,
+      parsedPrice,
+      null,
+      userId
+    ];
+
+    const productResult = await pool.query(insertProductQuery, productValues);
+
     return res.status(201).json({
-      message: "Listing draft received.",
-      listingDraft: {
-        modelName: modelName.trim(),
-        description: description.trim(),
-        price: parsedPrice,
-        category: category.trim() || null,
-        tags: parsedTags,
-        photoCount: photos.length,
-        photos: photos.map((file) => ({
-          originalName: file.originalname,
-          mimeType: file.mimetype,
-          size: file.size,
-        })),
-      },
+      message: "Listing saved.",
+      product: productResult.rows[0],
+      category: category.trim() || null,
+      tags: parsedTags,
+      photoCount: photos.length,
+      photos: photos.map((file) => ({
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+      })),
     });
   } catch (error) {
-    console.error("Draft listing error:", error.message);
+    console.error("Create listing error:", error.message);
     return res.status(500).json({ message: "Server error" });
   }
 });
@@ -193,5 +261,5 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(3000, () => {
-    console.log('Server is running on port 3000');
-})
+  console.log('Server is running on port 3000');
+});

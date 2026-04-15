@@ -7,7 +7,7 @@ import CartHover from "../assets/CartHover.svg";
 import SideMenu from "./SideMenu.jsx";
 import { useMenu } from "../MenuContext.jsx";
 
-export default function Navbar({ isSingedIn,NoNavBarLimit }) {
+export default function Navbar({ isSignedIn, NoNavBarLimit }) {
   const { setMenuOpen } = useMenu();
   const [showNavbar, setShowNavbar] = useState(true);
   const lastScrollY = useRef(0);
@@ -98,7 +98,7 @@ export default function Navbar({ isSingedIn,NoNavBarLimit }) {
           </a>
 
           <div className="shrink-0">
-            {isSingedIn ? (
+            {isSignedIn ? (
               <button
                 className="group relative h-6 w-6 md:h-8 md:w-8 cursor-pointer"
                 aria-label="Account"

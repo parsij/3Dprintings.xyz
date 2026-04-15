@@ -1,15 +1,19 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg";
 import SideMenu from "../components/SideMenu.jsx";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import axios from "axios";
 
-export default function SignIn() {
+export default function SignIn({ setUser }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [submitError, setSubmitError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [touched, setTouched] = useState({
     email: false,
@@ -40,28 +44,47 @@ export default function SignIn() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+ const onSubmit = async (e) => {
+  e.preventDefault();
 
-    setTouched({
-      email: true,
-      password: true,
-    });
+  setTouched({
+    email: true,
+    password: true,
+  });
 
-    if (!isFormValid) return;
+  setSubmitMessage("");
+  setSubmitError(false);
 
-    try {
-      const response = await axios.post("http://localhost:3000/api/login", {
+  if (!isFormValid) return;
+
+  try {
+    setIsSubmitting(true);
+
+    const response = await axios.post(
+      "http://localhost:3000/api/login",
+      {
         email: form.email,
         password: form.password,
-      });
+      },
+      {
+        withCredentials: true,
+      }
+    );
 
-      console.log(response.data);
-      console.log("Sign in form is valid:", form);
-    } catch (error) {
-      console.log(error.response?.data?.message || "Signin failed");
-    }
-  };
+    setUser(response.data.user);
+    setSubmitMessage(response.data?.message || "Authentication successful.");
+
+    setTimeout(() => {
+      navigate("/home");
+    }, 700);
+  } catch (error) {
+    const message = error.response?.data?.message || "Signin failed";
+    setSubmitError(true);
+    setSubmitMessage(message);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <>
@@ -153,15 +176,27 @@ export default function SignIn() {
 
             <button
               type="submit"
-              disabled={!isFormValid}
+              disabled={!isFormValid || isSubmitting}
               className={`cursor-pointer w-full rounded-xl py-3 font-semibold text-white transition ${
-                isFormValid
+                isFormValid && !isSubmitting
                   ? "bg-orange-500 hover:bg-orange-400 active:scale-[0.99]"
                   : "bg-gray-300 cursor-not-allowed opacity-70"
               }`}
             >
-              Sign In
+              {isSubmitting ? "Signing in..." : "Sign In"}
             </button>
+
+            {submitMessage && (
+              <p
+                className={`rounded-lg border px-3 py-2 text-sm ${
+                  submitError
+                    ? "border-red-200 bg-red-50 text-red-600"
+                    : "border-green-200 bg-green-50 text-green-700"
+                }`}
+              >
+                {submitMessage}
+              </p>
+            )}
           </form>
 
           <div className="my-5 flex items-center gap-3">

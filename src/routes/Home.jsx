@@ -1,8 +1,7 @@
 import React from "react";
-import Navbar from "../components/NavBar.jsx";
 import bgImage from "../assets/background.png";
 import Products from "./Products.jsx";
-const home = () => {
+const home = ({ user }) => {
   return (
       <div className="min-h-screen bg-[#fffefc]">
           <main className="w-full">
@@ -39,7 +38,7 @@ const home = () => {
                   </div>
               </div>
           </main>
-          <Products NoNavBarLimit={false}/>
+          <Products user={user} NoNavBarLimit={false}/>
       </div>
   );
 };

@@ -5,9 +5,7 @@ import App from './App.jsx'
 import { MenuProvider } from './MenuContext.jsx'
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
     <MenuProvider>
       <App />
-    </MenuProvider>
-  </StrictMode>,
+    </MenuProvider>,
 )
