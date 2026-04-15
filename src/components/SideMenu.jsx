@@ -26,8 +26,8 @@ const SideMenu = () => {
 
         <div className="p-4 space-y-3">
           <a href="/home" className="block hover:text-orange-500 transition">Home</a>
-          <a href="/products" className="block hover:text-orange-500 transition">3D Prints</a>
-          <a href="#" className="block hover:text-orange-500 transition">Become a seller</a>
+          <a href="/products" className="block hover:text-orange-500 transition">3D Printed Models</a>
+          <a href="/create" className="block hover:text-orange-500 transition">List a 3D Printed Model</a>
         </div>
       </aside>
     </>

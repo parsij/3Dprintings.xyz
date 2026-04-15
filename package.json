@@ -19,6 +19,7 @@
     "flowbite": "^4.0.1",
     "flowbite-react": "^0.12.17",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.1.1",
     "pg": "^8.20.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

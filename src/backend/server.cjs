@@ -3,6 +3,25 @@ const app = express();
 const pool = require("./db.cjs"); // or "./db.cjs" if you rename it
 const cors = require('cors');
 const bcrypt = require("bcrypt");
+const multer = require("multer");
+
+const MAX_PHOTOS = 10;
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: MAX_PHOTOS,
+    fileSize: MAX_PHOTO_SIZE,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files are allowed."));
+    }
+    cb(null, true);
+  },
+});
+
 app.use(cors());
 app.use(express.json());
 
@@ -82,6 +101,95 @@ app.post('/api/login', async (req, res) => {
     console.error('Login error:', err.message);
      return res.status(500).json({ message: "Server error" });
   }
+});
+
+app.post("/api/model-listings/draft", upload.array("photos", MAX_PHOTOS), async (req, res) => {
+  try {
+    const { modelName = "", description = "", price, category = "", tags } = req.body;
+    const photos = req.files || [];
+    const parsedPrice = Number(price);
+
+    const fieldErrors = {};
+
+    if (modelName.trim().length < 3) {
+      fieldErrors.modelName = "Model name must be at least 3 characters.";
+    }
+
+    if (description.trim().length < 20) {
+      fieldErrors.description = "Description must be at least 20 characters.";
+    }
+
+    if (!price || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+      fieldErrors.price = "Enter a valid price greater than 0.";
+    }
+
+    if (photos.length === 0) {
+      fieldErrors.photos = "Upload at least one printed model photo.";
+    }
+
+    if (photos.length > MAX_PHOTOS) {
+      fieldErrors.photos = `You can upload up to ${MAX_PHOTOS} photos.`;
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      return res.status(400).json({
+        message: "Validation failed.",
+        errors: fieldErrors,
+      });
+    }
+
+    let parsedTags = [];
+    if (typeof tags === "string" && tags.trim().length > 0) {
+      try {
+        const rawTags = JSON.parse(tags);
+        if (Array.isArray(rawTags)) {
+          parsedTags = rawTags.map((tag) => String(tag).trim()).filter(Boolean);
+        }
+      } catch {
+        parsedTags = tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean);
+      }
+    }
+
+    return res.status(201).json({
+      message: "Listing draft received.",
+      listingDraft: {
+        modelName: modelName.trim(),
+        description: description.trim(),
+        price: parsedPrice,
+        category: category.trim() || null,
+        tags: parsedTags,
+        photoCount: photos.length,
+        photos: photos.map((file) => ({
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Draft listing error:", error.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "Each photo must be 5MB or less." });
+    }
+    if (error.code === "LIMIT_FILE_COUNT") {
+      return res.status(400).json({ message: `You can upload up to ${MAX_PHOTOS} photos.` });
+    }
+  }
+
+  if (error?.message === "Only image files are allowed.") {
+    return res.status(400).json({ message: error.message });
+  }
+
+  return next(error);
 });
 
 app.listen(3000, () => {

@@ -6,6 +6,7 @@ import SignUp from "./routes/SignUp.jsx";
 import ForgotPassword from "./routes/ForgotPassword.jsx";
 import Products from "./routes/Products.jsx";
 import CartPage from "./routes/Cart.jsx";
+import SubmitModel from "./routes/SubmitModel.jsx";
 
 const Router = () => {
     return (
@@ -18,6 +19,7 @@ const Router = () => {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route path="/create" element={<SubmitModel />} />
       </Routes>
     </BrowserRouter>
     )

@@ -54,7 +54,7 @@ export default function Navbar({ isSingedIn,NoNavBarLimit }) {
             href="#"
             className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
           >
-            3D prints
+            3D Printed Models
           </a>
 
           <div className="flex-1 min-w-0">

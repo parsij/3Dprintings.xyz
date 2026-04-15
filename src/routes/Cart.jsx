@@ -71,7 +71,7 @@ export default function CartPage() {
           <section className="rounded-2xl border border-orange-100 bg-white p-8 text-center shadow-sm">
             <p className="text-lg font-semibold">Your cart is empty.</p>
             <p className="mt-2 text-sm text-gray-600">
-              Add some awesome 3D models to get started.
+              Add some awesome 3D printed models to get started.
             </p>
             <Link
               to="/home"

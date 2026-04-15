@@ -75,7 +75,7 @@ export default function SignIn() {
               <span className="text-orange-500">3Dprintings.xyz</span>
             </h1>
             <p className="mt-2 text-sm text-gray-600">
-              Sign in to continue exploring 3D models.
+              Sign in to continue shopping 3D printed models.
             </p>
           </div>
 
