@@ -113,7 +113,7 @@ export default function SignIn({ setUser }) {
                   onChange={onChange}
                   onFocus={() => setActiveField("email")}
                   onBlur={() => setActiveField(null)}
-                  placeholder="you@example.com"
+                  placeholder="email"
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
                 />
                 {form.email && isFieldValid("email") && (
@@ -149,7 +149,7 @@ export default function SignIn({ setUser }) {
                   onChange={onChange}
                   onFocus={() => setActiveField("password")}
                   onBlur={() => setActiveField(null)}
-                  placeholder="••••••••"
+                  placeholder="Password"
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-12 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
                 />
 

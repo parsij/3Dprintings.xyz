@@ -10,6 +10,8 @@ require("dotenv").config();
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -32,6 +34,38 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+function createAuthToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, username: user.username },
+    process.env.JWT_SECRET,
+    { expiresIn: "93d" }
+  );
+}
+
+function setAuthCookie(res, token) {
+  res.cookie("token", token, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 93 * 24 * 60 * 60 * 1000,
+  });
+}
+
+function clearAuthCookie(res) {
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: "lax",
+  });
+}
+
+function getAuthUserFromRequest(req) {
+  const token = req.cookies.token;
+  if (!token) {
+    return null;
+  }
+
+  return jwt.verify(token, process.env.JWT_SECRET);
+}
+
 app.post('/api/signup', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -43,8 +77,8 @@ app.post('/api/signup', async (req, res) => {
     const normalizedUsername = username.trim();
     const normalizedEmail = email.toLowerCase().trim();
 
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
-    const passwordOk = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
+    const emailOk = EMAIL_REGEX.test(normalizedEmail);
+    const passwordOk = PASSWORD_REGEX.test(password);
 
     if (!passwordOk || normalizedUsername.length < 3 || !emailOk) {
       return res.status(400).json({
@@ -66,15 +100,19 @@ app.post('/api/signup', async (req, res) => {
     const query = `
       INSERT INTO users (username, email, password)
       VALUES ($1, $2, $3)
-      RETURNING username
+      RETURNING id, username, email
     `;
 
     const values = [normalizedUsername, normalizedEmail, hashedPassword];
     const result = await pool.query(query, values);
 
+    const user = result.rows[0];
+    const token = createAuthToken(user);
+    setAuthCookie(res, token);
+
     return res.status(201).json({
       message: 'User created',
-      user: result.rows[0],
+      user,
     });
   } catch (err) {
     console.error('Signup error:', err.message);
@@ -91,7 +129,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+    const emailOk = EMAIL_REGEX.test(normalizedEmail);
 
     if (!emailOk) {
       return res.status(400).json({ message: 'Invalid email format' });
@@ -112,16 +150,8 @@ app.post('/api/login', async (req, res) => {
     if (!ok) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    const token = jwt.sign(
-      { id: user.id, email: user.email, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "93d" }
-    );
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 93 * 24 * 60 * 60 * 1000,
-    });
+    const token = createAuthToken(user);
+    setAuthCookie(res, token);
     return res.json({
       message: "Signed in",
       user: { username: user.username, email: user.email },
@@ -132,18 +162,144 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.post('/api/signout', (req, res) => {
+  clearAuthCookie(res);
+  return res.json({ message: "Signed out" });
+});
+
 app.get('/api/auth', async (req, res) => {
-  const token = req.cookies.token;
-
-  if (!token) {
-    return res.status(401).json({ message: "Not signed in" });
-  }
-
   try {
-    const user = jwt.verify(token, process.env.JWT_SECRET);
+    const user = getAuthUserFromRequest(req);
+    if (!user) {
+      return res.status(401).json({ message: "Not signed in" });
+    }
+
     return res.json({ user , message: 'Authentication successfully' });
   } catch (error) {
     return res.status(401).json({ message: "Invalid token" });
+  }
+});
+
+app.put('/api/account/profile', async (req, res) => {
+  try {
+    const authUser = getAuthUserFromRequest(req);
+    if (!authUser) {
+      return res.status(401).json({ message: "Not signed in" });
+    }
+
+    const { username, email } = req.body;
+
+    if (!username || !email) {
+      return res.status(400).json({ message: "Username and email are required" });
+    }
+
+    const normalizedUsername = String(username).trim();
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    if (normalizedUsername.length < 3) {
+      return res.status(400).json({ message: "Username must be at least 3 characters" });
+    }
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    const existingEmail = await pool.query(
+      "SELECT id FROM users WHERE email = $1 AND id <> $2",
+      [normalizedEmail, authUser.id]
+    );
+
+    if (existingEmail.rows.length > 0) {
+      return res.status(409).json({ message: "Email already in use" });
+    }
+
+    const updatedUserResult = await pool.query(
+      `
+        UPDATE users
+        SET username = $1, email = $2
+        WHERE id = $3
+        RETURNING id, username, email
+      `,
+      [normalizedUsername, normalizedEmail, authUser.id]
+    );
+
+    if (updatedUserResult.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const updatedUser = updatedUserResult.rows[0];
+    const token = createAuthToken(updatedUser);
+    setAuthCookie(res, token);
+
+    return res.json({
+      message: "Account profile updated.",
+      user: updatedUser,
+    });
+  } catch (error) {
+    if (error?.name === "JsonWebTokenError" || error?.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    console.error("Profile update error:", error.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.put('/api/account/password', async (req, res) => {
+  try {
+    const authUser = getAuthUserFromRequest(req);
+    if (!authUser) {
+      return res.status(401).json({ message: "Not signed in" });
+    }
+
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new password are required" });
+    }
+
+    if (!PASSWORD_REGEX.test(newPassword)) {
+      return res.status(400).json({
+        message: "New password must include uppercase, lowercase, number, and be at least 8 characters",
+      });
+    }
+
+    const userResult = await pool.query(
+      "SELECT id, password FROM users WHERE id = $1",
+      [authUser.id]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = userResult.rows[0];
+    const passwordMatches = await bcrypt.compare(oldPassword, user.password);
+
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    const samePassword = await bcrypt.compare(newPassword, user.password);
+    if (samePassword) {
+      return res.status(400).json({ message: "New password must be different from current password" });
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 8);
+
+    await pool.query(
+      "UPDATE users SET password = $1 WHERE id = $2",
+      [hashedNewPassword, authUser.id]
+    );
+
+    return res.json({ message: "Password updated successfully." });
+  } catch (error) {
+    if (error?.name === "JsonWebTokenError" || error?.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    console.error("Password update error:", error.message);
+    return res.status(500).json({ message: "Server error" });
   }
 });
 

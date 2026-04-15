@@ -99,8 +99,9 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
           <div className="shrink-0">
             {isSignedIn ? (
-              <button
-                className="group relative h-6 w-6 md:h-8 md:w-8 cursor-pointer"
+              <a
+                href="/account"
+                className="group relative inline-flex h-6 w-6 md:h-8 md:w-8 items-center justify-center cursor-pointer"
                 aria-label="Account"
               >
                 <img
@@ -113,13 +114,13 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                   alt="account hover"
                   className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                 />
-              </button>
+              </a>
             ) : (
               <a
-                href="/signin"
+                href="/signup"
                 className="border-2 font-bold border-orange-300 rounded-2xl px-4 py-0.5 transition hover:border-orange-500 hover:text-orange-500 shrink-0"
               >
-                Sign in
+                Sign Up
               </a>
             )}
           </div>

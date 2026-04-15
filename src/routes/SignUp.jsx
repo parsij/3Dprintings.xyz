@@ -1,11 +1,12 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg"
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import axios from "axios";
 
-export default function SignUp() {
+export default function SignUp({ setUser }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -49,33 +50,40 @@ export default function SignUp() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const onSubmit = async (event) => {
-    event.preventDefault();
+const onSubmit = async (event) => {
+  event.preventDefault();
 
-    // Show all errors after submit click
-    setTouched({
-      username: true,
-      email: true,
-      password: true,
-      confirmPassword: true,
-    });
-
-    if (!isFormValid) return;
-
-    try {
-  const response = await axios.post("http://localhost:3000/api/signup", {
-    username: form.username,
-    email: form.email,
-    password: form.password,
+  setTouched({
+    username: true,
+    email: true,
+    password: true,
+    confirmPassword: true,
   });
 
-  console.log(response.data);
-} catch (error) {
-  console.log(error.response?.data?.message || "Signup failed");
-}
+  if (!isFormValid) return;
 
-    console.log("Form is valid:", form);
-  };
+  try {
+    const response = await axios.post(
+      "http://localhost:3000/api/signup",
+      {
+        username: form.username,
+        email: form.email,
+        password: form.password,
+      },
+      {
+        withCredentials: true,
+      }
+    );
+
+    console.log(response.data);
+    setUser(response.data.user); // auto log in
+    navigate("/home", { replace: true });
+  } catch (error) {
+    console.log(error.response?.data?.message || "Signup failed");
+  }
+
+  console.log("Form is valid:", form);
+};
 
   return (
       <>
