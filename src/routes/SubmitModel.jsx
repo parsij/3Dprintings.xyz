@@ -220,7 +220,7 @@ export default function SubmitModel() {
                   type="text"
                   value={form.modelName}
                   onChange={handleChange}
-                  placeholder="e.g. Articulated Dragon"
+                  placeholder="Model's name"
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
                 />
                 {submitted && errors.modelName && <p className="mt-1 text-xs text-red-500">{errors.modelName}</p>}
@@ -287,10 +287,10 @@ export default function SubmitModel() {
                   type="text"
                   value={form.tags}
                   onChange={handleChange}
-                  placeholder="flexi, dragon, articulated"
+                  placeholder="Tags"
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
                 />
-                <p className="mt-1 text-xs text-gray-500">Separate tags with commas.</p>
+                <p className="mt-1 text-sm text-gray-500">Having accurate tags will help your model.</p>
               </div>
             </div>
 
