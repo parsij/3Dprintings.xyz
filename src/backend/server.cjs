@@ -399,6 +399,42 @@ app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => 
   }
 });
 
+app.get("/api/tags", async (req, res) => {
+  try {
+  const tag = String(req.query.tag || "").toLowerCase().trim();
+  const isLettersOnly = /^[a-z]+$/ .test(tag);
+    if (!isLettersOnly) {
+    return res.status(400).json({message: "unallowed characters"});}
+        const result = await pool.query(
+            `
+      SELECT tag_name, uses
+      FROM tags
+      WHERE tag_name ILIKE '%' || $1 || '%'
+      ORDER BY uses DESC
+      LIMIT 5
+      `,
+      [tag]
+    );
+
+    if (result.rows.length === 0) {
+  const insertResult = await pool.query(
+    `INSERT INTO tags (tag_name, uses)
+     VALUES ($1, 1)
+     RETURNING tag_name, uses`,
+    [tag]
+  )
+      return res.json({tagsAndUses:{uses:0}})
+    }
+    return res.json({
+      tagsAndUses: result.rows
+    })
+  }
+    catch (error) {
+    console.error(error)
+    return res.status(401).json({ message: "server error" });
+  }
+});
+
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {

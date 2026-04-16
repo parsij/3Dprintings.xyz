@@ -233,7 +233,7 @@ export default function SubmitModel() {
                 <input
                   id="price"
                   name="price"
-                  type="number"
+                  type="price"
                   min="0"
                   step="0.01"
                   value={form.price}
@@ -246,7 +246,7 @@ export default function SubmitModel() {
 
               <div>
                 <label htmlFor="category" className="mb-1 block text-sm font-semibold text-gray-700">
-                  Category (optional)
+                  Category *
                 </label>
                 <input
                   id="category"
