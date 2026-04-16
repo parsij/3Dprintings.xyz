@@ -45,7 +45,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
         <nav className="flex items-center gap-3 md:gap-4 max-w-7xl mx-auto px-3 md:px-4 py-3">
           <a
             href="/home"
-            className="text-xl font-extrabold flex gap-2 transition hover:text-orange-500 shrink-0"
+            className="w-10 h-10 flex items-center justify-center rounded-full border border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
           >
             3z
           </a>
