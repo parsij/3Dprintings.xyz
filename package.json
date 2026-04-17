@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start:server": "node src/backend/server.cjs",
+    "dev:server": "nodemon --watch src/backend --ext cjs,js,json,env --exec \"node src/backend/server.cjs\""
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
@@ -36,6 +38,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
-    "vite": "^8.0.1"
+    "vite": "^8.0.1",
+    "nodemon": "^3.0.1"
   }
 }

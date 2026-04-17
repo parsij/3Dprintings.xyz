@@ -46,7 +46,7 @@ const ProductCard = ({
 
         <div className="mt-auto pt-3">
           <button
-            className="w-full px-4 py-2 rounded-full border border-black text-sm font-medium transition-transform duration-200 hover:scale-105"
+            className="w-full px-4 cursor-pointer py-2 rounded-full border border-black text-sm font-medium transition-transform duration-200 hover:scale-105"
           >
             + Add to cart
           </button>

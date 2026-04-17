@@ -1,0 +1,7 @@
+{
+  "watch": ["src/backend"],
+  "ext": "cjs,js,json,env",
+  "ignore": ["node_modules", "public", "dist"],
+  "exec": "node src/backend/server.cjs"
+}
+

@@ -6,15 +6,51 @@ const bcrypt = require("bcrypt");
 const multer = require("multer");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
-require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const uploadDir = path.join(__dirname, "imgUploads");
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("Missing JWT_SECRET. Add it to src/backend/.env");
+}
+
+fs.mkdirSync(uploadDir, { recursive: true });
+
+function sanitizeFileName(fileName) {
+  return fileName
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80);
+}
+
+async function cleanupUploadedFiles(files = []) {
+  await Promise.all(
+    files
+      .filter((file) => file?.path)
+      .map((file) => fs.promises.unlink(file.path).catch(() => null))
+  );
+}
 
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const originalExt = path.extname(file.originalname || "").toLowerCase();
+      const safeName = sanitizeFileName(path.basename(file.originalname || "photo", originalExt)) || "photo";
+      const ext = originalExt || ".jpg";
+      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}${ext}`;
+      cb(null, uniqueName);
+    },
+  }),
   limits: {
     files: MAX_PHOTOS,
     fileSize: MAX_PHOTO_SIZE,
@@ -33,11 +69,12 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use("/imgUploads", express.static(uploadDir));
 
 function createAuthToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, username: user.username },
-    process.env.JWT_SECRET,
+    JWT_SECRET,
     { expiresIn: "93d" }
   );
 }
@@ -63,7 +100,7 @@ function getAuthUserFromRequest(req) {
     return null;
   }
 
-  return jwt.verify(token, process.env.JWT_SECRET);
+  return jwt.verify(token, JWT_SECRET);
 }
 
 app.post('/api/signup', async (req, res) => {
@@ -304,9 +341,10 @@ app.put('/api/account/password', async (req, res) => {
 });
 
 app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => {
+  const photos = req.files || [];
+
   try {
     const { modelName = "", description = "", price, category = "", tags, userId } = req.body;
-    const photos = req.files || [];
     const parsedPrice = Number(price);
 
     const fieldErrors = {};
@@ -336,6 +374,7 @@ app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => 
     }
 
     if (Object.keys(fieldErrors).length > 0) {
+      await cleanupUploadedFiles(photos);
       return res.status(400).json({
         message: "Validation failed.",
         errors: fieldErrors,
@@ -388,12 +427,15 @@ app.post("/api/create", upload.array("photos", MAX_PHOTOS), async (req, res) => 
       tags: parsedTags,
       photoCount: photos.length,
       photos: photos.map((file) => ({
+        fileName: file.filename,
+        url: `/imgUploads/${file.filename}`,
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
       })),
     });
   } catch (error) {
+    await cleanupUploadedFiles(photos);
     console.error("Create listing error:", error.message);
     return res.status(500).json({ message: "Server error" });
   }
@@ -411,7 +453,7 @@ app.get("/api/tags", async (req, res) => {
       FROM tags
       WHERE tag_name ILIKE '%' || $1 || '%'
       ORDER BY uses DESC
-      LIMIT 5
+      LIMIT 6
       `,
       [tag]
     );

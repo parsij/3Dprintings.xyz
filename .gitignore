@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 backend/.env
+src/backend/.env
+src/backend/imgUploads/
 dist
 dist-ssr
 *.local
