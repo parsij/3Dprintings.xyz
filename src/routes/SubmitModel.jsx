@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import { submitModelListing } from "../services/modelListingService.js";
+import Tags from "../components/Tags.jsx";
 
 const defaultForm = {
   modelName: "",
@@ -40,6 +41,7 @@ export default function SubmitModel() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
+  const [tags, setTags] = useState("");
 
   useEffect(() => {
     const urls = photos.map((file) => URL.createObjectURL(file));
@@ -277,22 +279,7 @@ export default function SubmitModel() {
                 )}
               </div>
 
-              <div className="sm:col-span-2">
-                <label htmlFor="tags" className="mb-1 block text-sm font-semibold text-gray-700">
-                  Tags (optional)
-                </label>
-                <input
-                  id="tags"
-                  name="tags"
-                  type="text"
-                  value={form.tags}
-                  onChange={handleChange}
-                  placeholder="Tags"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-                />
-                <p className="mt-1 text-sm text-gray-500">Having accurate tags will help your model.</p>
-              </div>
-            </div>
+        <Tags text={tags} handleChange={(e) => setTags(e.target.value)} />            </div>
 
             <button
               type="submit"
