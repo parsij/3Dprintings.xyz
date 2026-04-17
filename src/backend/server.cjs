@@ -417,13 +417,7 @@ app.get("/api/tags", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-  const insertResult = await pool.query(
-    `INSERT INTO tags (tag_name, uses)
-     VALUES ($1, 1)
-     RETURNING tag_name, uses`,
-    [tag]
-  )
-      return res.json({tagsAndUses:{uses:0}})
+      return res.json({tagsAndUses:[{tag_name:tag, uses: 0}]})
     }
     return res.json({
       tagsAndUses: result.rows
@@ -431,7 +425,7 @@ app.get("/api/tags", async (req, res) => {
   }
     catch (error) {
     console.error(error)
-    return res.status(401).json({ message: "server error" });
+    return res.status(500).json({ message: "server error" });
   }
 });
 

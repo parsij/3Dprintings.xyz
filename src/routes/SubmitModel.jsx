@@ -9,7 +9,7 @@ const defaultForm = {
   description: "",
   price: "",
   category: "",
-  tags: "",
+  tags: [],
 };
 
 const MAX_PHOTOS = 10;
@@ -41,7 +41,7 @@ export default function SubmitModel() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
-  const [tags, setTags] = useState("");
+
 
   useEffect(() => {
     const urls = photos.map((file) => URL.createObjectURL(file));
@@ -133,7 +133,7 @@ export default function SubmitModel() {
         description: form.description,
         price: Number(form.price),
         category: form.category,
-        tags: parsedTags,
+        tags: form.tags,
         photos,
       });
 
@@ -160,7 +160,7 @@ export default function SubmitModel() {
               List a new <span className="text-orange-500">3D printed model</span>
             </h1>
             <p className="mt-2 text-sm text-gray-600">
-              Upload photos and details so buyers can discover your printed model quickly.
+              Upload photos and details so buyers can discover your printed models.
             </p>
           </header>
 
@@ -279,7 +279,17 @@ export default function SubmitModel() {
                 )}
               </div>
 
-        <Tags text={tags} handleChange={(e) => setTags(e.target.value)} />            </div>
+                 <Tags
+              tags={form.tags}
+              setTags={(updater) =>
+                setForm((prev) => ({
+                  ...prev,
+                  tags: typeof updater === "function" ? updater(prev.tags) : updater,
+                }))
+              }
+            />
+
+            </div>
 
             <button
               type="submit"
