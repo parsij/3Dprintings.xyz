@@ -120,10 +120,6 @@ export default function SubmitModel() {
       return;
     }
 
-    const parsedTags = form.tags
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
 
     try {
       setIsSubmitting(true);

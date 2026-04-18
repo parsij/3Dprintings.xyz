@@ -27,9 +27,14 @@ export async function submitModelListing({
   });
 
   try {
-    const response = await axios.post("http://localhost:3000/api/create", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+      const response = await axios.post(
+      "http://localhost:3000/api/create",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        withCredentials: true, //sending cookies for authentication
+      }
+    );
 
     return response.data;
   } catch (error) {
