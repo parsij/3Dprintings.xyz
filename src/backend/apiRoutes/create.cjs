@@ -1,12 +1,14 @@
-const {user} = require("pg/lib/defaults");
+const fs = require('fs');
+const path = require('path');
+
 module.exports = function createRoutes(deps) {
-  const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, getAuthUserFromRequest} = deps;
+  const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, getAuthUserFromRequest } = deps;
 
   app.post('/api/create', upload.array('photos', MAX_PHOTOS), async (req, res) => {
     const photos = req.files || [];
 
     try {
-      const { modelName = '', description = '', price, category = '', tags} = req.body;
+      const { modelName = '', description = '', price, category = '', tags } = req.body;
       const parsedPrice = Number(price);
 
       const fieldErrors = {};
@@ -15,9 +17,7 @@ module.exports = function createRoutes(deps) {
         fieldErrors.modelName = 'Model name must be at least 3 characters.';
       }
 
-      if (getAuthUserFromRequest(req).id === null ||
-          getAuthUserFromRequest(req).id === '' ||
-          getAuthUserFromRequest(req).id === undefined) {
+      if (!getAuthUserFromRequest(req)?.id) {
         fieldErrors.userId = 'User not authenticated.(missing user id)';
       }
 
@@ -36,7 +36,7 @@ module.exports = function createRoutes(deps) {
       if (photos.length > MAX_PHOTOS) {
         fieldErrors.photos = `You can upload up to ${MAX_PHOTOS} photos.`;
       }
-      const userId = getAuthUserFromRequest(req).id
+      const userId = getAuthUserFromRequest(req)?.id;
 
       if (Object.keys(fieldErrors).length > 0) {
         await cleanupUploadedFiles(photos);
@@ -46,6 +46,7 @@ module.exports = function createRoutes(deps) {
         });
       }
 
+      // Parse tags
       let parsedTags = [];
       if (typeof tags === 'string' && tags.trim().length > 0) {
         try {
@@ -61,30 +62,57 @@ module.exports = function createRoutes(deps) {
         }
       }
 
+      // Insert product (without images first)
       const insertProductQuery = `
-      INSERT INTO products (
-        name,
-        description,
-        original_price,
-        current_price,
-        rating,
-        user_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, name, description, original_price, current_price, rating, user_id
-    `;
-
-      const productValues = [modelName.trim(), description.trim(), parsedPrice, parsedPrice, 0 , userId];
-
+        INSERT INTO products (
+          name,
+          description,
+          original_price,
+          current_price,
+          rating,
+          user_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, name, description, original_price, current_price, rating, user_id
+      `;
+      const productValues = [modelName.trim(), description.trim(), parsedPrice, parsedPrice, 0, userId];
       const productResult = await pool.query(insertProductQuery, productValues);
+      const product = productResult.rows[0];
+      const productId = product.id;
 
+      // Rename photo files and collect their new names
+      const renamedPhotos = await Promise.all(
+        photos.map(async (file, index) => {
+          const extension = path.extname(file.filename || file.originalname || '').toLowerCase() || '.jpg';
+          const renamedFileName = `${productId}-${index + 1}${extension}`;
+          const renamedFilePath = path.join(path.dirname(file.path), renamedFileName);
+
+          await fs.promises.rename(file.path, renamedFilePath);
+
+          file.filename = renamedFileName;
+          file.path = renamedFilePath;
+          return file;
+        })
+      );
+      const imageFileNames = renamedPhotos.map(file => file.filename);
+
+      // Update product img_path column with the array of file names
+      await pool.query(
+        `UPDATE products SET img_path = $1 WHERE id = $2`,
+        [imageFileNames, productId]
+      );
+
+      // Respond
       return res.status(201).json({
-        message: 'your model  is successfully listed.',
-        product: productResult.rows[0],
+        message: 'your model is successfully listed.',
+        product: {
+          ...product,
+          img_path: imageFileNames // include the new images in response
+        },
         category: category.trim() || null,
         tags: parsedTags,
-        photoCount: photos.length,
-        photos: photos.map((file) => ({
+        photoCount: renamedPhotos.length,
+        photos: renamedPhotos.map((file) => ({
           fileName: file.filename,
           url: `/imgUploads/${file.filename}`,
           originalName: file.originalname,
@@ -92,6 +120,7 @@ module.exports = function createRoutes(deps) {
           size: file.size,
         })),
       });
+
     } catch (error) {
       await cleanupUploadedFiles(photos);
       console.error('Create listing error:', error.message);
@@ -99,4 +128,3 @@ module.exports = function createRoutes(deps) {
     }
   });
 };
-

@@ -7,6 +7,7 @@ import {
   signOutAccount,
   updateAccountProfile,
 } from "../services/accountSettingsService.js";
+import PasswordEye from "../assets/PasswordEye.svg";
 
 const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
@@ -17,6 +18,11 @@ export default function AccountSettings({ user, setUser }) {
     oldPassword: "",
     newPassword: "",
     confirmNewPassword: "",
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    oldPassword: false,
+    newPassword: false,
+    confirmNewPassword: false,
   });
 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -283,17 +289,28 @@ export default function AccountSettings({ user, setUser }) {
                 <label htmlFor="oldPassword" className="mb-1 block text-sm text-gray-700">
                   Current password
                 </label>
-                <input
-                  id="oldPassword"
-                  name="oldPassword"
-                  type="password"
-                  value={passwordForm.oldPassword}
-                  onChange={(event) =>
-                    setPasswordForm((prev) => ({ ...prev, oldPassword: event.target.value }))
-                  }
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-                  placeholder="Enter your current password"
-                />
+                <div className="relative">
+                  <input
+                    id="oldPassword"
+                    name="oldPassword"
+                    type={showPasswords.oldPassword ? "text" : "password"}
+                    value={passwordForm.oldPassword}
+                    onChange={(event) =>
+                      setPasswordForm((prev) => ({ ...prev, oldPassword: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                    placeholder="Enter your current password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPasswords((prev) => ({ ...prev, oldPassword: !prev.oldPassword }))
+                    }
+                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                  >
+                    <img src={PasswordEye} alt="Toggle password visibility" className="h-5 w-5" />
+                  </button>
+                </div>
                 {passwordErrors.oldPassword && (
                   <p className="mt-1 text-xs text-red-500">{passwordErrors.oldPassword}</p>
                 )}
@@ -303,17 +320,28 @@ export default function AccountSettings({ user, setUser }) {
                 <label htmlFor="newPassword" className="mb-1 block text-sm text-gray-700">
                   New password
                 </label>
-                <input
-                  id="newPassword"
-                  name="newPassword"
-                  type="password"
-                  value={passwordForm.newPassword}
-                  onChange={(event) =>
-                    setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))
-                  }
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-                  placeholder="At least 8 characters"
-                />
+                <div className="relative">
+                  <input
+                    id="newPassword"
+                    name="newPassword"
+                    type={showPasswords.newPassword ? "text" : "password"}
+                    value={passwordForm.newPassword}
+                    onChange={(event) =>
+                      setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                    placeholder="At least 8 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPasswords((prev) => ({ ...prev, newPassword: !prev.newPassword }))
+                    }
+                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                  >
+                    <img src={PasswordEye} alt="Toggle password visibility" className="h-5 w-5" />
+                  </button>
+                </div>
                 {passwordErrors.newPassword && (
                   <p className="mt-1 text-xs text-red-500">{passwordErrors.newPassword}</p>
                 )}
@@ -323,17 +351,28 @@ export default function AccountSettings({ user, setUser }) {
                 <label htmlFor="confirmNewPassword" className="mb-1 block text-sm text-gray-700">
                   Confirm new password
                 </label>
-                <input
-                  id="confirmNewPassword"
-                  name="confirmNewPassword"
-                  type="password"
-                  value={passwordForm.confirmNewPassword}
-                  onChange={(event) =>
-                    setPasswordForm((prev) => ({ ...prev, confirmNewPassword: event.target.value }))
-                  }
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-                  placeholder="Repeat your new password"
-                />
+                <div className="relative">
+                  <input
+                    id="confirmNewPassword"
+                    name="confirmNewPassword"
+                    type={showPasswords.confirmNewPassword ? "text" : "password"}
+                    value={passwordForm.confirmNewPassword}
+                    onChange={(event) =>
+                      setPasswordForm((prev) => ({ ...prev, confirmNewPassword: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                    placeholder="Repeat your new password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPasswords((prev) => ({ ...prev, confirmNewPassword: !prev.confirmNewPassword }))
+                    }
+                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                  >
+                    <img src={PasswordEye} alt="Toggle password visibility" className="h-5 w-5" />
+                  </button>
+                </div>
                 {passwordErrors.confirmNewPassword && (
                   <p className="mt-1 text-xs text-red-500">{passwordErrors.confirmNewPassword}</p>
                 )}
@@ -369,4 +408,3 @@ export default function AccountSettings({ user, setUser }) {
     </>
   );
 }
-

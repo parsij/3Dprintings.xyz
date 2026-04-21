@@ -44,47 +44,49 @@ export default function SignIn({ setUser }) {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
- const onSubmit = async (e) => {
-  e.preventDefault();
+  const onSubmit = async (e) => {
+    e.preventDefault();
 
-  setTouched({
-    email: true,
-    password: true,
-  });
+    setTouched({
+      email: true,
+      password: true,
+    });
 
-  setSubmitMessage("");
-  setSubmitError(false);
+    setSubmitMessage("");
+    setSubmitError(false);
 
-  if (!isFormValid) return;
+    if (!isFormValid) return;
 
-  try {
-    setIsSubmitting(true);
+    try {
+      setIsSubmitting(true);
+      // Use window.location.hostname to dynamically find the server IP
+      const API_BASE = `http://${window.location.hostname}:3000`;
 
-    const response = await axios.post(
-      "http://localhost:3000/api/login",
-      {
-        email: form.email,
-        password: form.password,
-      },
-      {
-        withCredentials: true,
-      }
-    );
+      const response = await axios.post(
+        `${API_BASE}/api/login`,
+        {
+          email: form.email,
+          password: form.password,
+        },
+        {
+          withCredentials: true,
+        }
+      );
 
-    setUser(response.data.user);
-    setSubmitMessage(response.data?.message || "Authentication successful.");
+      setUser(response.data.user);
+      setSubmitMessage(response.data?.message || "Authentication successful.");
 
-    setTimeout(() => {
-      navigate("/home");
-    }, 700);
-  } catch (error) {
-    const message = error.response?.data?.message || "Signin failed";
-    setSubmitError(true);
-    setSubmitMessage(message);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      setTimeout(() => {
+        navigate("/home");
+      }, 700);
+    } catch (error) {
+      const message = error.response?.data?.message || "Signin failed";
+      setSubmitError(true);
+      setSubmitMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <>

@@ -64,9 +64,10 @@ const upload = multer({
 });
 
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: true, // Echoes back the requesting origin
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(cookieParser());
 app.use("/imgUploads", express.static(uploadDir));
@@ -79,19 +80,23 @@ function createAuthToken(user) {
   );
 }
 
-function
-setAuthCookie(res, token) {
+function setAuthCookie(res, token) {
+  // Use Lax for localhost/IP development without HTTPS
   res.cookie("token", token, {
     httpOnly: true,
-    sameSite: "lax",
+    secure: false, // Must be false for HTTP (IP address)
+    sameSite: "lax", // Lax works for same-site (same IP, different port)
     maxAge: 93 * 24 * 60 * 60 * 1000,
+    path: "/", // Ensure cookie is available for all paths
   });
 }
 
 function clearAuthCookie(res) {
   res.clearCookie("token", {
     httpOnly: true,
+    secure: false,
     sameSite: "lax",
+    path: "/",
   });
 }
 
@@ -108,7 +113,6 @@ function getAuthUserFromRequest(req) {
   }
 }
 
-// register route modules from apiRoutes directory (require the explicit index file)
 require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   app,
   pool,
@@ -142,6 +146,6 @@ app.use((error, req, res, next) => {
   return next(error);
 });
 
-app.listen(3000, () => {
-  console.log('Server is running on port 3000');
+app.listen(3000, '0.0.0.0', () => {
+  console.log('Server is running on http://0.0.0.0:3000');
 });

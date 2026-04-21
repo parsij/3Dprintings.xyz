@@ -50,200 +50,191 @@ export default function SignUp({ setUser }) {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-const onSubmit = async (event) => {
-  event.preventDefault();
+  const onSubmit = async (event) => {
+    event.preventDefault();
 
-  setTouched({
-    username: true,
-    email: true,
-    password: true,
-    confirmPassword: true,
-  });
+    setTouched({
+      username: true,
+      email: true,
+      password: true,
+      confirmPassword: true,
+    });
 
-  if (!isFormValid) return;
+    if (!isFormValid) return;
 
-  try {
-    const response = await axios.post(
-      "http://localhost:3000/api/signup",
-      {
-        username: form.username,
-        email: form.email,
-        password: form.password,
-      },
-      {
-        withCredentials: true,
-      }
-    );
+    try {
+      const API_BASE = `http://${window.location.hostname}:3000`;
+      const response = await axios.post(
+        `${API_BASE}/api/signup`,
+        {
+          username: form.username,
+          email: form.email,
+          password: form.password},
+        {
+          withCredentials: true,
+        }
+      );
 
-    console.log(response.data);
-    setUser(response.data.user); // auto log in
-    navigate("/home", { replace: true });
-  } catch (error) {
-    console.log(error.response?.data?.message || "Signup failed");
-  }
-
-  console.log("Form is valid:", form);
-};
+      setUser(response.data.user); // auto log in
+      navigate("/home", { replace: true });
+    } catch (error) {
+      console.log(error.response?.data?.message || "Signup failed");
+    }
+  };
 
   return (
-      <>
-        <SmallNavBar />
-        <SideMenu />
-    <main className="min-h-screen bg-orange-50 text-gray-900 flex items-center justify-center px-4">
-      <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-6 sm:p-8 shadow-xl">
-        <div className="mb-6 text-center">
-          <h1 className="text-3xl font-extrabold tracking-tight">
-            Join <span className="text-orange-500">3Dprintings.xyz</span>
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Create your account and join the fun.
+    <>
+      <SmallNavBar />
+      <SideMenu />
+      <main className="min-h-screen bg-orange-50 text-gray-900 flex items-center justify-center px-4">
+        <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-6 sm:p-8 shadow-xl">
+          <div className="mb-6 text-center">
+            <h1 className="text-3xl font-extrabold tracking-tight">
+              Join <span className="text-orange-500">3Dprintings.xyz</span>
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Create your account and join the fun.
+            </p>
+          </div>
+
+          <form className="space-y-4" onSubmit={onSubmit} noValidate>
+            <div>
+              <label className="mb-1 block text-sm text-gray-700">Username</label>
+              <div className="relative">
+                <input
+                  name="username"
+                  type="text"
+                  value={form.username}
+                  onChange={onChange}
+                  onFocus={() => setActiveField("username")}
+                  onBlur={() => setActiveField(null)}
+                  placeholder="yourname"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                />
+                {form.username && isFieldValid("username") && (
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 min-h-[16px] text-xs text-red-400">
+                {((activeField === "username") || touched.username) &&
+                !isFieldValid("username")
+                  ? fieldErrors.username
+                  : ""}
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm text-gray-700">Email</label>
+              <div className="relative">
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={onChange}
+                  onFocus={() => setActiveField("email")}
+                  onBlur={() => setActiveField(null)}
+                  placeholder="you@example.com"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                />
+                {form.email && isFieldValid("email") && (
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 min-h-[16px] text-xs text-red-400">
+                {((activeField === "email") || touched.email) && !isFieldValid("email")
+                  ? fieldErrors.email
+                  : ""}
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm text-gray-700">Password</label>
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPasswords ? "text" : "password"}
+                  value={form.password}
+                  onChange={onChange}
+                  onFocus={() => setActiveField("password")}
+                  onBlur={() => setActiveField(null)}
+                  placeholder="At least 8 characters"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-12 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                >
+                  <img src={PasswordEye} alt="Password visibility changer" className="h-5 w-5" />
+                </button>
+                {form.password && isFieldValid("password") && (
+                  <span className="pointer-events-none absolute right-10 top-1/2 -translate-y-1/2 text-green-400 font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-red-400">
+                {((activeField === "password") || touched.password) && !isFieldValid("password")
+                  ? fieldErrors.password
+                  : ""}
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm text-gray-700">Confirm Password</label>
+              <div className="relative">
+                <input
+                  name="confirmPassword"
+                  type={showPasswords ? "text" : "password"}
+                  value={form.confirmPassword}
+                  onChange={onChange}
+                  onFocus={() => setActiveField("confirmPassword")}
+                  onBlur={() => setActiveField(null)}
+                  placeholder="Repeat password"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                />
+                {form.confirmPassword && isFieldValid("confirmPassword") && (
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 min-h-4 text-xs text-red-400">
+                {((activeField === "confirmPassword") || touched.confirmPassword) &&
+                !isFieldValid("confirmPassword")
+                  ? fieldErrors.confirmPassword
+                  : ""}
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!isFormValid}
+              className={` cursor-pointer w-full rounded-xl py-3 font-semibold text-white transition ${
+                isFormValid
+                  ? "bg-orange-500 hover:bg-orange-400 active:scale-[0.99]"
+                  : "bg-gray-300 cursor-not-allowed opacity-70"
+              }`}
+            >
+              Create Account
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-gray-600">
+            Already have an account?{" "}
+            <Link
+              to="/signin"
+              className="font-semibold text-orange-500 hover:text-orange-400"
+            >
+              Sign in
+            </Link>
           </p>
-        </div>
-
-        <form className="space-y-4" onSubmit={onSubmit} noValidate>
-          {/* Username */}
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">Username</label>
-            <div className="relative">
-              <input
-                name="username"
-                type="text"
-                value={form.username}
-                onChange={onChange}
-                onFocus={() => setActiveField("username")}
-                onBlur={() => setActiveField(null)}
-                placeholder="yourname"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-              />
-              {form.username && isFieldValid("username") && (
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
-                  ✓
-                </span>
-              )}
-            </div>
-            <p className="mt-1 min-h-[16px] text-xs text-red-400">
-              {((activeField === "username") || touched.username) &&
-              !isFieldValid("username")
-                ? fieldErrors.username
-                : ""}
-            </p>
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">Email</label>
-            <div className="relative">
-              <input
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={onChange}
-                onFocus={() => setActiveField("email")}
-                onBlur={() => setActiveField(null)}
-                placeholder="you@example.com"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-              />
-              {form.email && isFieldValid("email") && (
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
-                  ✓
-                </span>
-              )}
-            </div>
-            <p className="mt-1 min-h-[16px] text-xs text-red-400">
-              {((activeField === "email") || touched.email) && !isFieldValid("email")
-                ? fieldErrors.email
-                : ""}
-            </p>
-          </div>
-
-          {/* Password */}
-          <div>
-  <label className="mb-1 block text-sm text-gray-700">Password</label>
-  <div className="relative">
-    <input
-      name="password"
-      type={showPasswords ? "text" : "password"}
-      value={form.password}
-      onChange={onChange}
-      onFocus={() => setActiveField("password")}
-      onBlur={() => setActiveField(null)}
-      placeholder="At least 8 characters"
-      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-12 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-    />
-
-    <button
-      type="button"
-      onClick={() => setShowPasswords((prev) => !prev)}
-      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
-    >
-      <img src={PasswordEye} alt="Password visibility changer" className="h-5 w-5" />
-    </button>
-
-    {form.password && isFieldValid("password") && (
-      <span className="pointer-events-none absolute right-10 top-1/2 -translate-y-1/2 text-green-400 font-bold">
-        ✓
-      </span>
-    )}
-  </div>
-
-  <p className="mt-1 text-xs text-red-400">
-    {((activeField === "password") || touched.password) && !isFieldValid("password")
-      ? fieldErrors.password
-      : ""}
-  </p>
-</div>
-          {/* Confirm Password */}
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">Confirm Password</label>
-            <div className="relative">
-              <input
-                name="confirmPassword"
-                type={showPasswords ? "text" : "password"}
-                value={form.confirmPassword}
-                onChange={onChange}
-                onFocus={() => setActiveField("confirmPassword")}
-                onBlur={() => setActiveField(null)}
-                placeholder="Repeat password"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-              />
-              {form.confirmPassword && isFieldValid("confirmPassword") && (
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-400 font-bold">
-                  ✓
-                </span>
-              )}
-            </div>
-            <p className="mt-1 min-h-4 text-xs text-red-400">
-              {((activeField === "confirmPassword") || touched.confirmPassword) &&
-              !isFieldValid("confirmPassword")
-                ? fieldErrors.confirmPassword
-                : ""}
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={!isFormValid}
-            className={` cursor-pointer w-full rounded-xl py-3 font-semibold text-white transition ${
-              isFormValid
-                ? "bg-orange-500 hover:bg-orange-400 active:scale-[0.99]"
-                : "bg-gray-300 cursor-not-allowed opacity-70"
-            }`}
-          >
-            Create Account
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Already have an account?{" "}
-          <Link
-            to="/signin"
-            className="font-semibold text-orange-500 hover:text-orange-400"
-          >
-            Sign in
-          </Link>
-        </p>
-      </section>
-    </main>
-        </>
+        </section>
+      </main>
+    </>
   );
 }
