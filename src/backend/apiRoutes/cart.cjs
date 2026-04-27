@@ -5,9 +5,7 @@ module.exports = function cartRoutes(deps) {
     try {
       const result = isAuthenticatedAnIisValid(req, res, "cart");
       if (!result || result.userId == null) return;
-      const { productId, userId } = result;
-      const productIdInt = parseInt(productId, 10);
-      const { quantity } = req.body;
+      const { productId, userId, quantity } = result;
       const qty = quantity && Number.isInteger(quantity) && quantity > 0 ? quantity : 1;
 
       // Fetch current cart
@@ -17,7 +15,7 @@ module.exports = function cartRoutes(deps) {
       let cart = selectResult.rows[0]?.cart_json || {};
 
       // If product already in cart, increment quantity, else set to qty
-      cart[productIdInt] = (cart[productIdInt] || 0) + qty;
+      cart[productId] = (cart[productId] || 0) + qty;
 
       // Update cart in DB
       const updateQuery = `

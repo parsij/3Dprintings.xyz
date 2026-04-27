@@ -93,10 +93,12 @@ function setAuthCookie(res, token) {
 
 function isAuthenticatedAnIisValid(req, res, type = "cart") {
   try {
-    const { productId } = req.body;
+    const productId = parseInt(req.body.productId, 10);
     const userId = getAuthUserFromRequest(req)?.id;
+    const quantity = parseInt(req.body.quantity, 10);
     let rejexValue;
     switch (type) {
+
       case "cart":
         rejexValue = /^\d+$/;
         break;
@@ -105,10 +107,10 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
         console.error("Unknown type: " + type);
         rejexValue = /.*/; // fallback regex that matches anything
     }
-    if (!userId || !productId || !rejexValue.test(productId)) {
+    if (!userId || !productId || !rejexValue.test(productId.toString()) || !rejexValue.test(quantity.toString())) {
       return res.status(401).json({ message: 'User not authenticated or invalid productId.' });
     }
-  return { userId, productId, rejexValue };
+  return { userId, productId, rejexValue, quantity };
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Server error' });
