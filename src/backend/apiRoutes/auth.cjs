@@ -105,8 +105,12 @@ module.exports = function authRoutes(deps) {
   });
 
   app.post('/api/signout', (req, res) => {
+
+    if (!getAuthUserFromRequest(req)) {
+      return res.status(401).json({message: 'User not authenticated.'});
+    }
     clearAuthCookie(res);
-    return res.json({ message: 'Signed out' });
+    return res.json({message: 'Signed out'});
   });
 
   app.get('/api/auth', async (req, res) => {

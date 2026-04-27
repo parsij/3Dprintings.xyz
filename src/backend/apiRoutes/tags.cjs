@@ -1,8 +1,11 @@
 module.exports = function tagsRoutes(deps) {
-  const { app, pool } = deps;
+  const { app, pool,getAuthUserFromRequest} = deps;
 
   app.get('/api/tags', async (req, res) => {
     try {
+      if (!getAuthUserFromRequest(req)) {
+  return res.status(401).json({ message: 'User not authenticated.' });
+}
       const tag = String(req.query.tag || '').toLowerCase().trim();
       const isLettersOnly = /^[a-z]+$/.test(tag);
       if (!isLettersOnly) {

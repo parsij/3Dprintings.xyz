@@ -91,6 +91,30 @@ function setAuthCookie(res, token) {
   });
 }
 
+function isAuthenticatedAnIisValid(req, res, type = "cart") {
+  try {
+    const { productId } = req.body;
+    const userId = getAuthUserFromRequest(req)?.id;
+    let rejexValue;
+    switch (type) {
+      case "cart":
+        rejexValue = /^\d+$/;
+        break;
+      // More cases later if I want
+      default:
+        console.error("Unknown type: " + type);
+        rejexValue = /.*/; // fallback regex that matches anything
+    }
+    if (!userId || !productId || !rejexValue.test(productId)) {
+      return res.status(401).json({ message: 'User not authenticated or invalid productId.' });
+    }
+  return { userId, productId, rejexValue };
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
 function clearAuthCookie(res) {
   res.clearCookie("token", {
     httpOnly: true,
@@ -123,6 +147,7 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   setAuthCookie,
   clearAuthCookie,
   getAuthUserFromRequest,
+  isAuthenticatedAnIisValid,
   EMAIL_REGEX,
   PASSWORD_REGEX,
   MAX_PHOTOS,

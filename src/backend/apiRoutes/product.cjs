@@ -1,5 +1,5 @@
 module.exports = function productRoutes(deps) {
-  const { app, pool } = deps;
+  const { app, pool,getAuthUserFromRequest } = deps;
 
   app.get('/api/products', async (req, res) => {
     try {
@@ -25,7 +25,6 @@ module.exports = function productRoutes(deps) {
 
         return {
           ...p,
-          // We provide the full URL for the frontend
           image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null
         };
       });
@@ -40,3 +39,4 @@ module.exports = function productRoutes(deps) {
     }
   });
 };
+// possible bug maybe when giving the full access to the photos for the frontend maybe it gets the whole data and use a lot more bandwidth and waste internet or give a lot of unnecessary access to the photos for the frontend

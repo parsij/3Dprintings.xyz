@@ -8,6 +8,11 @@ module.exports = function createRoutes(deps) {
     const photos = req.files || [];
 
     try {
+          const userId = getAuthUserFromRequest(req)?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated.' });
+    }
       const { modelName = '', description = '', price, category = '', tags } = req.body;
       const parsedPrice = Number(price);
 
@@ -36,8 +41,6 @@ module.exports = function createRoutes(deps) {
       if (photos.length > MAX_PHOTOS) {
         fieldErrors.photos = `You can upload up to ${MAX_PHOTOS} photos.`;
       }
-      const userId = getAuthUserFromRequest(req)?.id;
-
       if (Object.keys(fieldErrors).length > 0) {
         await cleanupUploadedFiles(photos);
         return res.status(400).json({
@@ -74,6 +77,7 @@ module.exports = function createRoutes(deps) {
         )
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, name, description, original_price, current_price, rating, user_id
+--         remove unnecessary userID
       `;
       const productValues = [modelName.trim(), description.trim(), parsedPrice, parsedPrice, 0, userId];
       const productResult = await pool.query(insertProductQuery, productValues);
