@@ -93,21 +93,23 @@ function setAuthCookie(res, token) {
 
 function isAuthenticatedAnIisValid(req, res, type = "cart") {
   try {
-    const productId = parseInt(req.body.productId, 10);
     const userId = getAuthUserFromRequest(req)?.id;
-    const quantity = parseInt(req.body.quantity, 10);
     let rejexValue;
+    let productId;
+    let quantity;
     switch (type) {
 
       case "cart":
         rejexValue = /^\d+$/;
+            productId = req.body.productId.toString();
+            quantity = parseInt(req.body.quantity, 10);
         break;
       // More cases later if I want
       default:
         console.error("Unknown type: " + type);
         rejexValue = /.*/; // fallback regex that matches anything
     }
-    if (!userId || !productId || !rejexValue.test(productId.toString()) || !rejexValue.test(quantity.toString())) {
+    if (!userId || !productId || !rejexValue.test(productId) || !rejexValue.test(quantity.toString())) {
       return res.status(401).json({ message: 'User not authenticated or invalid productId.' });
     }
   return { userId, productId, rejexValue, quantity };
