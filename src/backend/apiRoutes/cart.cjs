@@ -4,7 +4,7 @@ module.exports = function cartRoutes(deps) {
   app.post('/api/cart', async (req, res) => {
     try {
       const result = isAuthenticatedAnIisValid(req, res, "cart");
-      if (!result || result.userId == null) return;
+      if (!result || result.userId == null) return res.status(500).json({ message: 'Server error' });
       const { productId, userId, quantity } = result;
       const qty = quantity && Number.isInteger(quantity) && quantity > 0 ? quantity : 1;
 
@@ -16,6 +16,8 @@ module.exports = function cartRoutes(deps) {
 
       // If product already in cart, increment quantity, else set to qty
       cart[productId] = (cart[productId] || 0) + qty;
+      console.log(cart);
+      console.log(cart[productId]);
 
       // Update cart in DB
       const updateQuery = `
@@ -36,7 +38,7 @@ module.exports = function cartRoutes(deps) {
   app.delete('/api/cart', async (req, res) => {
     try {
       const result = isAuthenticatedAnIisValid(req, res, "cart");
-      if (!result || result.userId == null) return;
+      if (!result || result.userId == null) return res.status(500).json({ message: 'Server error' });
       const { productId, userId } = result;
       const productIdInt = parseInt(productId, 10);
       const { quantity } = req.body;
@@ -77,7 +79,7 @@ module.exports = function cartRoutes(deps) {
   app.get('/api/cart', async (req, res) => {
     try {
       const result = isAuthenticatedAnIisValid(req, res, "cart");
-      if (!result || result.userId == null) return;
+      if (!result || result.userId == null) return res.status(500).json({ message: 'Server error' });
       const { userId } = result;
       const query = `SELECT cart_json FROM users WHERE id = $1`;
       const values = [userId];

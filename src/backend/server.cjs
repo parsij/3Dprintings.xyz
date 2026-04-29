@@ -103,15 +103,19 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
         rejexValue = /^\d+$/;
             productId = req.body.productId.toString();
             quantity = parseInt(req.body.quantity, 10);
+          if (!rejexValue.test(quantity.toString())) {
+              return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_QUANTITY' })}
         break;
       // More cases later if I want
       default:
         console.error("Unknown type: " + type);
         rejexValue = /.*/; // fallback regex that matches anything
     }
-    if (!userId || !productId || !rejexValue.test(productId) || !rejexValue.test(quantity.toString())) {
-      return res.status(401).json({ message: 'User not authenticated or invalid productId.' });
+    if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated ' });
     }
+    if(!rejexValue.test(productId)) {
+        return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_PRODUCTID' });}
   return { userId, productId, rejexValue, quantity };
   } catch (error) {
     console.error(error);
