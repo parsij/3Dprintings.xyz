@@ -1,56 +1,77 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
+import CartProductCard from "../components/CartProductCard.jsx";
+import {
+  getCart,
+  updateCartQuantity,
+  removeFromCart,
+} from "../services/cartService.js";
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      name: "Articulated Otter STL",
-      creator: "Parsa",
-      price: 12.99,
-      oldPrice: 19.99,
-      qty: 1,
-      image:
-        "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop",
-    },
-    {
-      id: 2,
-      name: "Flexi Dragon 3MF",
-      creator: "HowlPrints",
-      price: 8.5,
-      oldPrice: null,
-      qty: 2,
-      image:
-        "https://images.unsplash.com/photo-1616628182509-6f4f36f56c6f?q=80&w=1200&auto=format&fit=crop",
-    },
-  ]);
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const updateQty = (id, delta) => {
+  // Load cart on mount
+  useEffect(() => {
+    async function loadCart() {
+      setLoading(true);
+      setError(null);
+      try {
+        const items = await getCart();
+        setCartItems(items);
+      } catch (err) {
+        console.error("Error loading cart:", err);
+        setError("Failed to load cart. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCart();
+  }, []);
+
+  // Handle quantity change (when user types in input or clicks +/-)
+  const handleQuantityChange = async (productId, newQuantity) => {
+    // Validate quantity
+    const qty = Math.max(1, Number(newQuantity));
+
+    // Optimistically update UI
     setCartItems((prev) =>
-      prev
-        .map((item) =>
-          item.id === id
-            ? { ...item, qty: Math.max(1, item.qty + delta) }
-            : item
-        )
-        .filter(Boolean)
+      prev.map((item) =>
+        item.id === productId ? { ...item, quantity: qty } : item
+      )
     );
+
+    // Send update to API
+    try {
+      await updateCartQuantity(productId, qty);
+    } catch (err) {
+      console.error("Error updating quantity:", err);
+      setError("Failed to update quantity.");
+      // Reload cart on error
+      const items = await getCart();
+      setCartItems(items);
+    }
   };
 
-  const removeItem = (id) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
+  // Handle product deletion
+  const handleRemoveItem = async (productId) => {
+    // Optimistically remove from UI
+    setCartItems((prev) => prev.filter((item) => item.id !== productId));
+
+    // Send delete to API
+    try {
+      await removeFromCart(productId);
+    } catch (err) {
+      console.error("Error removing item:", err);
+      setError("Failed to remove item. Please try again.");
+      // Reload cart on error
+      const items = await getCart();
+      setCartItems(items);
+    }
   };
-
-  const subtotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.price * item.qty, 0),
-    [cartItems]
-  );
-
-  const shipping = subtotal > 0 ? 4.99 : 0;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
 
   return (
       <>
@@ -67,6 +88,18 @@ export default function CartPage() {
           </p>
         </div>
 
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-100 border border-red-400 p-4 text-red-700">
+            {error}
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500"></div>
+          </div>
+        )}
+
         {cartItems.length === 0 ? (
           <section className="rounded-2xl border border-orange-100 bg-white p-8 text-center shadow-sm">
             <p className="text-lg font-semibold">Your cart is empty.</p>
@@ -81,109 +114,25 @@ export default function CartPage() {
             </Link>
           </section>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left: cart items */}
-            <section className="lg:col-span-2 space-y-4">
-              {cartItems.map((item) => (
-                <article
-                  key={item.id}
-                  className="rounded-2xl border border-orange-100 bg-white p-4 sm:p-5 shadow-sm"
-                >
-                  <div className="flex gap-4">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-cover border border-orange-100"
-                    />
-
-                    <div className="flex-1 min-w-0">
-                      <h2 className="font-bold text-base sm:text-lg line-clamp-2">
-                        {item.name}
-                      </h2>
-                      <p className="text-sm text-gray-600 mt-1">
-                        By {item.creator}
-                      </p>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <div className="flex items-center rounded-full border border-gray-300 overflow-hidden">
-                          <button
-                            onClick={() => updateQty(item.id, -1)}
-                            className="cursor-pointer px-3 py-1.5 text-lg hover:bg-orange-100 transition"
-                            aria-label="Decrease quantity"
-                          >
-                            −
-                          </button>
-                          <span className="px-4 text-sm font-semibold">
-                            {item.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(item.id, 1)}
-                            className="cursor-pointer px-3 py-1.5 text-lg hover:bg-orange-100 transition"
-                            aria-label="Increase quantity"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="cursor-pointer text-sm text-red-400 hover:text-red-300 transition"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <p className="font-bold text-lg">
-                        ${(item.price * item.qty).toFixed(2)}
-                      </p>
-                      {item.oldPrice && (
-                        <p className="text-sm text-gray-500 line-through">
-                          ${(item.oldPrice * item.qty).toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </section>
-
-            {/* Right: summary */}
-            <aside className="rounded-2xl border border-orange-100 bg-white p-5 h-fit lg:sticky lg:top-24 shadow-sm">
-              <h3 className="text-xl font-bold">Order Summary</h3>
-
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex items-center justify-between text-gray-700">
-                  <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-gray-700">
-                  <span>Shipping</span>
-                  <span>${shipping.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-gray-700">
-                  <span>Tax</span>
-                  <span>~${tax.toFixed(2)}</span>
-                </div>
-                <div className="my-3 border-t border-orange-100" />
-                <div className="flex items-center justify-between font-extrabold text-base">
-                  <span>Total</span>
-                  <span className="text-orange-500">${total.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <button className="cursor-pointer mt-5 w-full rounded-xl bg-orange-500 py-3 font-semibold text-white transition hover:bg-orange-400 active:scale-[0.99]">
-                Proceed to Checkout
-              </button>
-
-              <Link
-                to="/products"
-                className="mt-3 inline-block w-full text-center rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-700 transition hover:border-orange-500 hover:text-orange-500"
-              >
-                Continue Shopping
-              </Link>
-            </aside>
+          <div className="space-y-4">
+            {cartItems.map((item) => (
+              <CartProductCard
+                key={item.id}
+                productId={item.id}
+                productName={item.name}
+                creatorName={item.creator_name}
+                currentPrice={item.current_price}
+                originalPrice={item.original_price}
+                rating={item.rating}
+                reviewNumber={item.reviews_count}
+                imageUrl={item.image_url}
+                quantity={item.quantity}
+                onIncrease={() => handleQuantityChange(item.id, item.quantity + 1)}
+                onDecrease={() => handleQuantityChange(item.id, Math.max(1, item.quantity - 1))}
+                onQuantityChange={(newQty) => handleQuantityChange(item.id, newQty)}
+                onRemove={() => handleRemoveItem(item.id)}
+              />
+            ))}
           </div>
         )}
       </div>

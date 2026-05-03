@@ -4,6 +4,7 @@ import SignIn from "./routes/SignIn.jsx";
 import SignUp from "./routes/SignUp.jsx";
 import ForgotPassword from "./routes/ForgotPassword.jsx";
 import Products from "./routes/Products.jsx";
+import ProductPage from "./routes/ProductPage.jsx";
 import CartPage from "./routes/Cart.jsx";
 import SubmitModel from "./routes/SubmitModel.jsx";
 import AccountSettings from "./routes/AccountSettings.jsx";
@@ -18,6 +19,7 @@ const Router = ({ user, setUser }) => {
         <Route path="/signup" element={<SignUp setUser={setUser} />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/products" element={<Products user={user} />} />
+        <Route path="/product/:id" element={<ProductPage user={user} />} />
         <Route path="/cart" element={<CartPage user={user} />} />
         <Route path="/create" element={<SubmitModel user={user} />} />
         <Route

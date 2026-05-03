@@ -1,6 +1,11 @@
 import React, {useEffect, useRef, useState} from "react";
 import axios from "axios";
 
+const axiosWithCredentials = axios.create({
+  baseURL: "http://localhost:3000",
+  withCredentials: true,
+});
+
 const Tags = ({ tags, setTags }) => {
   const [text, setText] = useState("");
   const itemRefs = useRef([]);
@@ -24,8 +29,8 @@ const Tags = ({ tags, setTags }) => {
 
     const timer = setTimeout(async () => {
       try {
-        const response = await axios.get(
-          `http://localhost:3000/api/tags?tag=${encodeURIComponent(text)}`
+        const response = await axiosWithCredentials.get(
+          `/api/tags?tag=${encodeURIComponent(text)}`
         );
 
         const results = response.data.tagsAndUses || [];

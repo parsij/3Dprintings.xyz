@@ -38,5 +38,43 @@ module.exports = function productRoutes(deps) {
       res.status(500).json({ message: 'Server error' });
     }
   });
+
+  app.get('/api/products/:id', async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      if (!Number.isInteger(productId) || productId <= 0) {
+        return res.status(400).json({ message: 'Invalid product ID' });
+      }
+
+      const result = await pool.query(
+        `SELECT p.*, u.username as creator_name
+         FROM products p
+         LEFT JOIN users u ON p.user_id = u.id
+         WHERE p.id = $1`,
+        [productId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      const p = result.rows[0];
+      const images = Array.isArray(p.img_path) && p.img_path.length > 0
+        ? p.img_path.map(img => `http://localhost:3000/imgUploads/${img}`)
+        : [];
+      const firstImage = images.length > 0 ? images[0] : null;
+
+      const product = {
+        ...p,
+        image_url: firstImage,
+        images: images
+      };
+
+      res.json(product);
+    } catch (err) {
+      console.error('Error fetching product:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 };
 // possible bug maybe when giving the full access to the photos for the frontend maybe it gets the whole data and use a lot more bandwidth and waste internet or give a lot of unnecessary access to the photos for the frontend
