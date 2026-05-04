@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
 import Navbar from "../components/NavBar.jsx";
+import backIcon from "../assets/back.svg";
 
 const SearchResults = ({ user }) => {
   const [searchParams] = useSearchParams();
@@ -77,37 +78,45 @@ const SearchResults = ({ user }) => {
       if (value.trim()) {
         navigate(`/search?q=${encodeURIComponent(value)}`);
       }
-    }, 300);
+    }, 150);
   };
 
   return (
     <div className="min-h-screen bg-[#f2f2f2]">
       <Navbar isSignedIn={!!user} />
       <main className="px-4 lg:px-[5vw] pt-24 pb-12">
+        {/* Back button */}
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 p-2 rounded-lg hover:bg-gray-300 transition-all duration-300 cursor-pointer hover:scale-110 active:scale-90 shadow-sm hover:shadow-md"
+        >
+          <img src={backIcon} alt="Back" className="h-9 w-9" />
+        </button>
+
         {/* Search box on the page */}
-        <div className="mb-8">
-          <div className="relative w-full max-w-2xl mx-auto mb-6">
+        <div className="mb-8 animate-fade-in-up">
+          <div className="relative w-full max-w-2xl mx-auto mb-6 group">
             <input
               type="text"
               placeholder="Search for 3D models..."
               value={searchInput}
               onChange={handleSearchChange}
-              className="w-full bg-white text-gray-900 placeholder:text-gray-400 px-4 py-3 rounded-xl border-2 border-gray-300 outline-none focus:border-orange-500 transition-colors duration-300"
+              className="w-full bg-white text-gray-900 placeholder:text-gray-400 px-4 py-3 rounded-xl border-2 border-gray-300 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 shadow-sm focus:shadow-lg transition-all duration-300 hover:border-gray-400"
             />
           </div>
 
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-extrabold text-gray-900">
-              Search Results for "<span className="text-orange-500">{query}</span>"
+          <div className="transition-all duration-500 ease-in-out transform hover:translate-x-2">
+            <h1 className="text-3xl lg:text-4xl font-extrabold text-gray-900 transition-colors duration-300">
+              Search Results for "<span className="text-orange-500 hover:text-orange-600 transition-colors">{query}</span>"
             </h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600 mt-2 animate-pulse">
               {products.length > 0 ? `Found ${products.length} products` : "No products found"}
             </p>
           </div>
         </div>
 
         {products.length === 0 && !loading ? (
-          <div className="text-center py-20">
+          <div className="text-center py-20 animate-bounce">
             <p className="text-gray-500 text-lg">No products match your search.</p>
             <p className="text-gray-400 text-sm mt-2">Try searching for something else.</p>
           </div>
@@ -138,8 +147,9 @@ const SearchResults = ({ user }) => {
         )}
 
         {loading && (
-          <div className="flex justify-center py-10">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500"></div>
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="h-20 w-20 animate-spin rounded-full border-4 border-solid border-orange-500 border-t-transparent"></div>
+            <p className="mt-4 text-lg font-semibold text-gray-600">Loading...</p>
           </div>
         )}
 

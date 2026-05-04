@@ -76,29 +76,32 @@ const Products = ({ user, NoNavBarLimit }) => {
              };
 
             return isLastElement ? (
-              <div ref={lastProductElementRef} key={product.id}>
+              <div ref={lastProductElementRef} key={product.id} style={{ animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both` }}>
                 <ProductCard {...cardProps} />
               </div>
             ) : (
-              <ProductCard key={product.id} {...cardProps} />
+              <div key={product.id} style={{ animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both` }}>
+                <ProductCard {...cardProps} />
+              </div>
             );
           })}
         </div>
         
         {loading && (
-          <div className="flex justify-center py-10">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-black"></div>
+          <div className="flex flex-col items-center justify-center py-10">
+            <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-orange-500 border-t-transparent"></div>
+            <p className="mt-4 text-lg font-semibold text-gray-600 animate-pulse">Loading products...</p>
           </div>
         )}
         
         {!hasMore && products.length > 0 && (
-          <div className="text-center py-12 text-gray-400 font-medium">
+          <div className="text-center py-12 text-gray-400 font-medium animate-fade-in-up transition-all duration-300 hover:text-gray-600">
             You've seen all the listings.
           </div>
         )}
 
         {products.length === 0 && !loading && (
-          <div className="text-center py-20 text-gray-500">
+          <div className="text-center py-20 text-gray-500 animate-bounce transition-all duration-300 hover:text-gray-700">
             No products found.
           </div>
         )}
