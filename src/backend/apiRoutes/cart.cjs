@@ -19,28 +19,22 @@ module.exports = function cartRoutes(deps) {
       const qty = Number.isInteger(rawQty) && rawQty > 0 ? rawQty : 1;
       console.log('[POST /api/cart] Normalized qty:', qty);
 
-      // Fetch current cart
-      const selectQuery = `SELECT cart_json FROM users WHERE id = $1`;
-      const selectValues = [userId];
-      const selectResult = await pool.query(selectQuery, selectValues);
-      let cart = selectResult.rows[0]?.cart_json || {};
-      console.log('[POST /api/cart] Current cart:', cart);
-
-      // If product already in cart, increment quantity, else set to qty
+      // Atomic JSONB Upsert/Increment
       const key = String(productIdNum);
-      const current = Number(cart[key]) || 0;
-      cart[key] = current + qty;
-      console.log('[POST /api/cart] Updated cart:', cart);
-
-      // Update cart in DB
       const updateQuery = `
         UPDATE users
-        SET cart_json = $1
-        WHERE id = $2
+        SET cart_json = jsonb_set(
+          COALESCE(cart_json::jsonb, '{}'::jsonb),
+          ARRAY[$1::text],
+          to_jsonb(COALESCE((cart_json::jsonb->>$1::text)::int, 0) + $2::int)
+        )
+        WHERE id = $3
+        RETURNING cart_json
       `;
-      const updateValues = [cart, userId];
-      await pool.query(updateQuery, updateValues);
-      console.log('[POST /api/cart] Cart saved to DB');
+      const updateValues = [key, qty, userId];
+      const result = await pool.query(updateQuery, updateValues);
+      const cart = result.rows[0]?.cart_json || {};
+      console.log('[POST /api/cart] Cart saved atomically to DB:', cart);
 
       return res.status(200).json({ message: 'Added to cart.', cart });
     } catch (error) {
@@ -63,31 +57,24 @@ module.exports = function cartRoutes(deps) {
         return res.status(400).json({ message: 'Invalid productId' });
       }
 
-      // Fetch current cart
-      const selectQuery = `SELECT cart_json FROM users WHERE id = $1`;
-      const selectValues = [userId];
-      const selectResult = await pool.query(selectQuery, selectValues);
-      let cart = selectResult.rows[0]?.cart_json || {};
-      console.log('[DELETE /api/cart] Current cart:', cart);
-
+      // Atomic JSONB Delete
       const key = String(productIdNum);
-      if (!cart[key]) {
-        console.log('[DELETE /api/cart] Product not found in cart');
-        return res.status(404).json({ message: 'Product not found in cart.' });
-      }
-      // Remove entire product
-      delete cart[key];
-      console.log('[DELETE /api/cart] Updated cart:', cart);
-
-      // Update cart in DB
       const updateQuery = `
         UPDATE users
-        SET cart_json = $1
-        WHERE id = $2
+        SET cart_json = COALESCE(cart_json::jsonb, '{}'::jsonb) - $1::text
+        WHERE id = $2 AND COALESCE(cart_json::jsonb, '{}'::jsonb) ? $1::text
+        RETURNING cart_json
       `;
-      const updateValues = [cart, userId];
-      await pool.query(updateQuery, updateValues);
-      console.log('[DELETE /api/cart] Cart saved to DB');
+      const updateValues = [key, userId];
+      const result = await pool.query(updateQuery, updateValues);
+
+      if (result.rowCount === 0) {
+        console.log('[DELETE /api/cart] Product not found in cart or user invalid');
+        return res.status(404).json({ message: 'Product not found in cart.' });
+      }
+      
+      const cart = result.rows[0].cart_json;
+      console.log('[DELETE /api/cart] Cart atomic delete saved to DB:', cart);
 
       return res.status(200).json({ message: 'Product removed from cart successfully.', cart });
     } catch (error) {
@@ -113,31 +100,28 @@ module.exports = function cartRoutes(deps) {
       const qty = Number.isInteger(rawQty) && rawQty > 0 ? rawQty : 1;
       console.log('[PATCH /api/cart] Normalized qty:', qty);
 
-      // Fetch current cart
-      const selectQuery = `SELECT cart_json FROM users WHERE id = $1`;
-      const selectValues = [userId];
-      const selectResult = await pool.query(selectQuery, selectValues);
-      let cart = selectResult.rows[0]?.cart_json || {};
-      console.log('[PATCH /api/cart] Current cart:', cart);
-
+      // Atomic JSONB Exact Set
       const key = String(productIdNum);
-      if (!cart[key]) {
+      const updateQuery = `
+        UPDATE users
+        SET cart_json = jsonb_set(
+          COALESCE(cart_json::jsonb, '{}'::jsonb),
+          ARRAY[$1::text],
+          to_jsonb($2::int)
+        )
+        WHERE id = $3 AND COALESCE(cart_json::jsonb, '{}'::jsonb) ? $1::text
+        RETURNING cart_json
+      `;
+      const updateValues = [key, qty, userId];
+      const result = await pool.query(updateQuery, updateValues);
+
+      if (result.rowCount === 0) {
         console.log('[PATCH /api/cart] Product not found in cart');
         return res.status(404).json({ message: 'Product not found in cart.' });
       }
-      // Set exact quantity
-      cart[key] = qty;
-      console.log('[PATCH /api/cart] Updated cart:', cart);
-
-      // Update cart in DB
-      const updateQuery = `
-        UPDATE users
-        SET cart_json = $1
-        WHERE id = $2
-      `;
-      const updateValues = [cart, userId];
-      await pool.query(updateQuery, updateValues);
-      console.log('[PATCH /api/cart] Cart saved to DB');
+      
+      const cart = result.rows[0].cart_json;
+      console.log('[PATCH /api/cart] Cart atomic set saved to DB:', cart);
 
       return res.status(200).json({ message: 'Quantity updated successfully.', cart });
     } catch (error) {
@@ -152,16 +136,20 @@ module.exports = function cartRoutes(deps) {
       const userId = getAuthUserFromRequest(req)?.id;
       console.log('[GET /api/cart] userId:', userId);
       if (!userId) return res.status(401).json({ message: 'User not authenticated' });
-      const query = `SELECT cart_json FROM users WHERE id = $1`;
+      
+      const query = `SELECT COALESCE(cart_json::jsonb, '{}'::jsonb) as cart_json FROM users WHERE id = $1`;
       const values = [userId];
       const dbResult = await pool.query(query, values);
+      
       console.log('[GET /api/cart] Query result rows:', dbResult.rows.length);
       if (dbResult.rows.length === 0) {
         console.log('[GET /api/cart] No cart found');
         return res.status(404).json({ message: 'Cart not found.' });
       }
-      console.log('[GET /api/cart] Returning cart:', dbResult.rows[0].cart_json);
-      return res.status(200).json({ cart: dbResult.rows[0].cart_json || {} });
+      
+      const cart = dbResult.rows[0].cart_json || {};
+      console.log('[GET /api/cart] Returning cart:', cart);
+      return res.status(200).json({ cart });
     } catch (error) {
       console.error('[GET /api/cart] Error:', error);
       return res.status(500).json({ message: 'Server error' });

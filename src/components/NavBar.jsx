@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import accountLogo from "../assets/accountLogo.svg";
 import accountLogoHover from "../assets/accountLogoHover.svg";
 import Search from "../assets/search.svg";
@@ -9,7 +10,9 @@ import { useMenu } from "../MenuContext.jsx";
 
 export default function Navbar({ isSignedIn, NoNavBarLimit }) {
   const { setMenuOpen } = useMenu();
+  const navigate = useNavigate();
   const [showNavbar, setShowNavbar] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const lastScrollY = useRef(0);
 
   function showNavBar() {
@@ -35,6 +38,14 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
     };
   }, []);
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchInput.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchInput)}`);
+      setSearchInput("");
+    }
+  };
+
   return (
     <>
       <header
@@ -58,16 +69,21 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
           </a>
 
           <div className="flex-1 min-w-0">
-            <div className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
+            <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
               <input
                 type="text"
                 placeholder="Search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="w-full bg-transparent text-white placeholder:text-gray-300 px-4 py-2 pr-14 md:pr-16 outline-none"
               />
-              <button className="absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center">
+              <button 
+                type="submit"
+                className="absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center"
+              >
                 <img src={Search} alt="Search" className="h-4 w-4 md:h-5 md:w-5" />
               </button>
-            </div>
+            </form>
           </div>
 
           <button

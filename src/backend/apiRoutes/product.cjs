@@ -39,6 +39,44 @@ module.exports = function productRoutes(deps) {
     }
   });
 
+  app.get('/api/products/search', async (req, res) => {
+    try {
+      const q = req.query.q || '';
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 12;
+      const offset = (page - 1) * limit;
+
+      const result = await pool.query(
+        `SELECT p.*, u.username as creator_name
+         FROM products p
+         LEFT JOIN users u ON p.user_id = u.id
+         WHERE p.name ILIKE $1
+         ORDER BY p.id DESC
+         LIMIT $2 OFFSET $3`,
+        [`%${q}%`, limit, offset]
+      );
+
+      const products = result.rows.map(p => {
+        const firstImage = Array.isArray(p.img_path) && p.img_path.length > 0
+          ? p.img_path[0]
+          : null;
+
+        return {
+          ...p,
+          image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null
+        };
+      });
+
+      res.json({
+        products,
+        hasMore: result.rows.length === limit
+      });
+    } catch (err) {
+      console.error('Error searching products:', err);
+      res.status(500).json({ message: 'Server error during search' });
+    }
+  });
+
   app.get('/api/products/:id', async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
