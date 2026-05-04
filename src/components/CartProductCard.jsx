@@ -19,6 +19,7 @@ const CartProductCard = ({
   onQuantityChange,
 }) => {
   const [inputValue, setInputValue] = useState(String(quantity));
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Helper function to format price: remove .00 but keep other decimals like .50
   const formatPrice = (price) => {
@@ -58,6 +59,32 @@ const CartProductCard = ({
   const handleInputKeyDown = (e) => {
     if (e.key === "Enter") {
       handleInputBlur();
+    }
+  };
+
+  // Handle decrease button
+  const handleDecreaseClick = () => {
+    if (quantity === 1) {
+      // Show modal if quantity is 1
+      setShowDeleteModal(true);
+    } else if (onDecrease) {
+      // Otherwise decrease normally
+      onDecrease();
+    }
+  };
+
+  // Handle delete button - delete immediately without confirmation
+  const handleDeleteClick = () => {
+    if (onRemove) {
+      onRemove();
+    }
+  };
+
+  // Handle confirmed deletion
+  const handleConfirmDelete = () => {
+    setShowDeleteModal(false);
+    if (onRemove) {
+      onRemove();
     }
   };
 
@@ -102,7 +129,7 @@ const CartProductCard = ({
             {/* Remove (trash) icon */}
             <button
               type="button"
-              onClick={onRemove}
+              onClick={handleDeleteClick}
               className="shrink-0 rounded-lg p-2 text-red-600 hover:bg-red-50"
               aria-label="Remove item"
               title="Remove"
@@ -158,9 +185,9 @@ const CartProductCard = ({
             <div className="flex items-center rounded-full bg-white/70 px-3 py-2 shadow-sm">
               <button
                 type="button"
-                onClick={onDecrease}
+                onClick={handleDecreaseClick}
                 className="h-7 w-7 rounded-full text-black/80 cursor-pointer hover:bg-black/5 disabled:opacity-40"
-                disabled={!onDecrease}
+                disabled={!onDecrease && quantity > 1}
                 aria-label="Decrease quantity"
               >
                 -
@@ -197,6 +224,41 @@ const CartProductCard = ({
           ) : null}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Delete Item?
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to remove <span className="font-semibold">{productName}</span> from your cart?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 px-4 py-2 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all duration-200"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
