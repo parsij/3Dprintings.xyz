@@ -11,7 +11,6 @@ import AccountSettings from "./routes/AccountSettings.jsx";
 import SearchResults from "./routes/SearchResults.jsx";
 import LikedProducts from "./routes/LikedProducts.jsx";
 import SavedProducts from "./routes/SavedProducts.jsx";
-import SavedProducts from "./routes/SavedProducts.jsx";
 
 const Router = ({ user, setUser }) => {
   return (
