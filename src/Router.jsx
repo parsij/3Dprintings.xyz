@@ -9,6 +9,9 @@ import CartPage from "./routes/Cart.jsx";
 import SubmitModel from "./routes/SubmitModel.jsx";
 import AccountSettings from "./routes/AccountSettings.jsx";
 import SearchResults from "./routes/SearchResults.jsx";
+import LikedProducts from "./routes/LikedProducts.jsx";
+import SavedProducts from "./routes/SavedProducts.jsx";
+import SavedProducts from "./routes/SavedProducts.jsx";
 
 const Router = ({ user, setUser }) => {
   return (
@@ -21,6 +24,8 @@ const Router = ({ user, setUser }) => {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/products" element={<Products user={user} />} />
         <Route path="/search" element={<SearchResults user={user} />} />
+        <Route path="/liked-products" element={<LikedProducts user={user} />} />
+        <Route path="/saved-products" element={<SavedProducts user={user} />} />
         <Route path="/product/:id" element={<ProductPage user={user} />} />
         <Route path="/cart" element={<CartPage user={user} />} />
         <Route path="/create" element={<SubmitModel user={user} />} />

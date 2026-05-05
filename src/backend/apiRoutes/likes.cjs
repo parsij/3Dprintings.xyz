@@ -34,11 +34,11 @@ module.exports = function likesSavesRoutes(deps) {
         likedProducts.push(productId);
       }
 
-      // Update database
-      await pool.query(
-        'UPDATE users SET liked_products = $1 WHERE id = $2',
-        [likedProducts, authUser.id]
-      );
+       // Update database
+       await pool.query(
+         'UPDATE users SET liked_products = $1::jsonb WHERE id = $2',
+         [JSON.stringify(likedProducts), authUser.id]
+       );
 
       res.json({
         message: isLiked ? 'Product unliked' : 'Product liked',
@@ -84,11 +84,11 @@ module.exports = function likesSavesRoutes(deps) {
         savedProducts.push(productId);
       }
 
-      // Update database
-      await pool.query(
-        'UPDATE users SET saved_products = $1 WHERE id = $2',
-        [savedProducts, authUser.id]
-      );
+       // Update database
+       await pool.query(
+         'UPDATE users SET saved_products = $1::jsonb WHERE id = $2',
+         [JSON.stringify(savedProducts), authUser.id]
+       );
 
       res.json({
         message: isSaved ? 'Product unsaved' : 'Product saved',

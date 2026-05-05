@@ -261,14 +261,14 @@ const ProductPage = ({ user }) => {
                 {product.name}
               </h1>
               <div className="flex gap-2 pt-1 shrink-0">
-                <button onClick={toggleLikeClick} className="p-2.5 rounded-full bg-gray-100 hover:bg-red-100 transition-colors duration-200 text-red-500 cursor-pointer">
+                <button onClick={toggleLikeClick} className="p-2.5 rounded-full bg-gray-100 hover:bg-red-100 hover:scale-110 active:scale-95 transition-all duration-200 text-red-500 cursor-pointer">
                   {isLiked ? (
                     <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                   ) : (
                     <svg className="w-5 h-5 fill-transparent stroke-current stroke-2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                   )}
                 </button>
-                <button onClick={toggleSaveClick} className="p-2.5 rounded-full bg-gray-100 hover:bg-blue-100 transition-colors duration-200 text-blue-600 cursor-pointer">
+                <button onClick={toggleSaveClick} className="p-2.5 rounded-full bg-gray-100 hover:bg-blue-100 hover:scale-110 active:scale-95 transition-all duration-200 text-blue-600 cursor-pointer">
                   {isSaved ? (
                     <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
                   ) : (
@@ -318,7 +318,7 @@ const ProductPage = ({ user }) => {
               {product.description && product.description.split('\n').length > 2 && (
                 <button
                   onClick={() => setDescriptionExpanded(!descriptionExpanded)}
-                  className="mt-2 text-orange-500 hover:text-orange-600 font-semibold text-sm transition-colors duration-200 cursor-pointer"
+                  className="mt-2 text-orange-500 hover:text-orange-600 hover:scale-105 active:scale-95 font-semibold text-sm transition-all duration-200 cursor-pointer"
                 >
                   {descriptionExpanded ? "Show Less" : "Show More"}
                 </button>
@@ -345,15 +345,35 @@ const ProductPage = ({ user }) => {
                 <div className="flex items-center border-2 border-gray-300 rounded-lg overflow-hidden">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-3 py-2 text-gray-600 hover:bg-gray-100 transition-colors duration-200 cursor-pointer disabled:opacity-50"
+                    className="px-3 py-2 text-gray-600 hover:bg-gray-100 hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={quantity <= 1}
                   >
                     −
                   </button>
-                  <span className="px-4 py-2 font-semibold text-gray-900 min-w-12 text-center">{quantity}</span>
+                  <input
+                    type="text"
+                    min="1"
+                    value={quantity}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || value === '0') {
+                        setQuantity('');
+                      } else {
+                        const numValue = Math.max(1, parseInt(value) || 1);
+                        setQuantity(numValue);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (quantity === '' || quantity < 1) {
+                        setQuantity(1);
+                      }
+                    }}
+                    className="px-4 py-2 font-semibold text-gray-900 min-w-12 text-center border-0 outline-none w-16"
+                    placeholder="1"
+                  />
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="px-3 py-2 text-gray-600 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                    onClick={() => setQuantity(quantity + 1 || 2)}
+                    className="px-3 py-2 text-gray-600 hover:bg-gray-100 hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer"
                   >
                     +
                   </button>
@@ -364,7 +384,7 @@ const ProductPage = ({ user }) => {
                 <button
                   onClick={handleAddToCart}
                   disabled={isAddingToCart}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg transition-colors duration-350 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center text-lg gap-2 cursor-pointer"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 hover:scale-105 active:scale-95 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center text-lg gap-2 cursor-pointer"
                 >
                   {isAddingToCart ? (
                     <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -435,7 +455,7 @@ const ProductPage = ({ user }) => {
 
             <button
               onClick={() => setIsFullscreen(false)}
-              className="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-6 py-2.5 rounded-full font-medium transition-colors duration-200 flex items-center gap-2 border border-white/20 hover:border-white/40 cursor-pointer shadow-lg"
+              className="bg-white/10 hover:bg-white/20 hover:scale-110 active:scale-95 backdrop-blur-md text-white px-6 py-2.5 rounded-full font-medium transition-all duration-300 flex items-center gap-2 border border-white/20 hover:border-white/40 cursor-pointer shadow-lg hover:shadow-xl"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               Close Fullscreen
