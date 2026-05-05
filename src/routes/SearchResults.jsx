@@ -116,9 +116,9 @@ const SearchResults = ({ user }) => {
         </div>
 
         {products.length === 0 && !loading ? (
-          <div className="text-center py-20 animate-bounce">
-            <p className="text-gray-500 text-lg">No products match your search.</p>
-            <p className="text-gray-400 text-sm mt-2">Try searching for something else.</p>
+          <div className="text-center py-20 animate-bounce" style={{animationDuration: '2.0s', animationIterationCount: 1}}>
+            <p className="text-gray-500 text-lg scale-125 transition-transform duration-300">No products match your search.</p>
+            <p className="text-gray-400 text-sm mt-2 scale-110 transition-transform duration-300">Try searching for something else.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

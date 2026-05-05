@@ -182,9 +182,20 @@ export default function AccountSettings({ user, setUser }) {
       <main className="min-h-screen bg-orange-50 px-4 pb-12 pt-24 text-gray-900">
         <section className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-2">
           <article className="animate-fade-in-up rounded-2xl border border-orange-100 bg-white p-6 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 sm:p-8">
-            <h1 className="text-3xl font-extrabold tracking-tight hover:text-orange-600 transition-colors duration-300">
-              Account <span className="text-orange-500">settings</span>
-            </h1>
+          <h1 className="text-3xl font-extrabold tracking-tight overflow-visible pb-2">
+            {['A', 'c', 'c', 'o', 'u', 'n', 't', ' '].map((char, idx) => (
+              <span key={`account-${idx}`} className="wave-char" style={{animationDelay: `${idx * 0.1}s`}}>
+                {char}
+              </span>
+            ))}
+            <span className="text-orange-500">
+              {['s', 'e', 't', 't', 'i', 'n', 'g', 's'].map((char, idx) => (
+                <span key={`settings-${idx}`} className="wave-char" style={{animationDelay: `${(idx + 8) * 0.1}s`}}>
+                  {char}
+                </span>
+              ))}
+            </span>
+          </h1>
             <p className="mt-2 text-sm text-gray-600">
               Update your username and email used for your marketplace account.
             </p>

@@ -14,7 +14,7 @@ export const SmallNavBar = () => {
         <div>
       <button onClick={() => setMenuOpen(prev => !prev)} className="group flex cursor-pointer flex-col gap-1 px-2">
         <span className="h-0.5 w-6 bg-gray-800 transition group-hover:bg-orange-500"></span>
-        <span className="h-0.5 w-6 bg-gray-800 transition group-hover:bg-orange-300"></span>
+        <span className="h-0.5 w-6 bg-gray-800 transition group-hover:bg-gray-600"></span>
         <span className="h-0.5 w-6 bg-gray-800 transition group-hover:bg-orange-500"></span>
       </button>
       </div>

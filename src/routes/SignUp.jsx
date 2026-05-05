@@ -89,7 +89,7 @@ export default function SignUp({ setUser }) {
       <main className="min-h-screen bg-orange-50 text-gray-900 flex items-center justify-center px-4">
         <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-6 sm:p-8 shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] animate-fade-in-up">
           <div className="mb-6 text-center group">
-            <h1 className="text-3xl font-extrabold tracking-tight transition-all duration-300 group-hover:-translate-y-0.5">
+            <h1 className="text-3xl font-extrabold tracking-tight transition-all duration-300 group-hover:translate-y-[-2px]">
               Join{" "}
               <span className="text-orange-500 group-hover:text-orange-600 transition-colors duration-300">
                 3Dprintings.xyz
@@ -122,7 +122,7 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${((activeField === "username") || touched.username) && !isFieldValid("username") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "username") || touched.username) && !isFieldValid("username") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
                 {((activeField === "username") || touched.username) &&
                 !isFieldValid("username")
                   ? fieldErrors.username
@@ -151,7 +151,7 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${((activeField === "email") || touched.email) && !isFieldValid("email") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "email") || touched.email) && !isFieldValid("email") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
                 {((activeField === "email") || touched.email) && !isFieldValid("email")
                   ? fieldErrors.email
                   : ""}

@@ -6,5 +6,6 @@ module.exports = function registerApiRoutes(deps) {
   require('./tags.cjs')(deps);
   require('./product.cjs')(deps);
   require('./cart.cjs')(deps);
+  require('./likes.cjs')(deps);
 };
 

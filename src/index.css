@@ -25,6 +25,17 @@
   .animate-fade-in-up {
     animation: fadeInUp 0.5s ease-out forwards;
   }
+  .wave-text {
+    display: inline-block;
+  }
+  
+  .wave-char {
+    display: inline-block;
+    animation: textWave 0.6s ease-in-out forwards;
+  }
+  .animate-bounce-once {
+    animation: bounceOnce 0.6s ease-in-out;
+  }
 }
 
 @keyframes fadeInUp {
@@ -38,3 +49,22 @@
   }
 }
 
+@keyframes textWave {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    color: inherit;
+  }
+  50% {
+    transform: translateY(-8px) scale(1.2);
+    color: #ea580c;
+  }
+}
+
+@keyframes bounceOnce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
