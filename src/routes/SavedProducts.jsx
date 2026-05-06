@@ -15,11 +15,10 @@ const SavedProducts = ({ user }) => {
     const fetchSavedProducts = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`http://localhost:3000/api/likes/saved-products`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+        const response = await axios.get(
+          `http://localhost:3000/api/likes/saved-products`,
+          { withCredentials: true }
+        );
         setProducts(response.data.products || []);
       } catch (err) {
         console.error("Error fetching saved products:", err);

@@ -8,6 +8,7 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const path = require("path");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const MAX_PHOTOS = 10;
@@ -36,6 +37,16 @@ async function cleanupUploadedFiles(files = []) {
       .filter((file) => file?.path)
       .map((file) => fs.promises.unlink(file.path).catch(() => null))
   );
+}
+
+async function calculateTax(req, res,address) {
+isAuthenticatedAnIisValid(req, res, "nothing");
+  try {
+
+  } catch (error) {
+    console.error('Error calculating tax:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 }
 
 const upload = multer({
@@ -105,8 +116,11 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
             quantity = parseInt(req.body.quantity, 10);
           if (!rejexValue.test(quantity.toString())) {
               return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_QUANTITY' })}
-        break;
-      // More cases later if I want
+          break;
+          case "nothing" :
+            rejexValue = /^[\s\S]*$/;
+            break;
+        // More cases later if I want
       default:
         console.error("Unknown type: " + type);
         rejexValue = /.*/; // fallback regex that matches anything
@@ -114,7 +128,7 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
     if (!userId) {
         return res.status(401).json({ message: 'User not authenticated ' });
     }
-    if(!rejexValue.test(productId)) {
+    if(!rejexValue.test(productId) && type !== "nothing") {
         return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_PRODUCTID' });}
   return { userId, productId, rejexValue, quantity };
   } catch (error) {
@@ -161,6 +175,8 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   MAX_PHOTOS,
   MAX_PHOTO_SIZE,
 });
+
+
 
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {

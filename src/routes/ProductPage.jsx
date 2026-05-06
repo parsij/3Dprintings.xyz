@@ -352,7 +352,6 @@ const ProductPage = ({ user }) => {
                   </button>
                   <input
                     type="text"
-                    min="1"
                     value={quantity}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -361,11 +360,6 @@ const ProductPage = ({ user }) => {
                       } else {
                         const numValue = Math.max(1, parseInt(value) || 1);
                         setQuantity(numValue);
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (quantity === '' || quantity < 1) {
-                        setQuantity(1);
                       }
                     }}
                     className="px-4 py-2 font-semibold text-gray-900 min-w-12 text-center border-0 outline-none w-16"

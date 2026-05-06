@@ -15,11 +15,10 @@ const LikedProducts = ({ user }) => {
     const fetchLikedProducts = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`http://localhost:3000/api/likes/liked-products`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+        const response = await axios.get(
+          `http://localhost:3000/api/likes/liked-products`,
+          { withCredentials: true }
+        );
         setProducts(response.data.products || []);
       } catch (err) {
         console.error("Error fetching liked products:", err);
