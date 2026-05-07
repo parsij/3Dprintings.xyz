@@ -1,5 +1,5 @@
 module.exports = function productRoutes(deps) {
-  const { app, pool,getAuthUserFromRequest } = deps;
+  const { app, pool } = deps;
 
   app.get('/api/products', async (req, res) => {
     try {

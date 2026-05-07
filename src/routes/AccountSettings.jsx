@@ -4,7 +4,9 @@ import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import {
   changeAccountPassword,
+  getAccountAddress,
   signOutAccount,
+  updateAccountAddress,
   updateAccountProfile,
 } from "../services/accountSettingsService.js";
 import PasswordEye from "../assets/PasswordEye.svg";
@@ -14,6 +16,13 @@ const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 export default function AccountSettings({ user, setUser }) {
   const navigate = useNavigate();
   const [profileForm, setProfileForm] = useState({ username: "", email: "" });
+  const [addressForm, setAddressForm] = useState({
+    street_address: "",
+    city: "",
+    state_province: "",
+    postal_code: "",
+    country_code: "",
+  });
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: "",
     newPassword: "",
@@ -26,11 +35,14 @@ export default function AccountSettings({ user, setUser }) {
   });
 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState(false);
+  const [addressMessage, setAddressMessage] = useState("");
+  const [addressError, setAddressError] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState(false);
   const [signOutMessage, setSignOutMessage] = useState("");
@@ -42,6 +54,34 @@ export default function AccountSettings({ user, setUser }) {
       username: user.username || "",
       email: user.email || "",
     });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let isCancelled = false;
+    (async () => {
+      try {
+        const data = await getAccountAddress();
+        if (isCancelled) return;
+        const addr = data?.address || {};
+        setAddressForm({
+          street_address: addr.street_address || "",
+          city: addr.city || "",
+          state_province: addr.state_province || "",
+          postal_code: addr.postal_code || "",
+          country_code: addr.country_code || "",
+        });
+      } catch (error) {
+        if (isCancelled) return;
+        setAddressError(true);
+        setAddressMessage(error.message || "Could not load address.");
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [user]);
 
   const profileErrors = useMemo(() => {
@@ -58,6 +98,27 @@ export default function AccountSettings({ user, setUser }) {
 
     return errors;
   }, [profileForm]);
+
+  const addressErrors = useMemo(() => {
+    const errors = {};
+    const cc = addressForm.country_code.trim();
+    if (cc && !/^[A-Za-z]{2}$/.test(cc)) {
+      errors.country_code = "Country code must be 2 letters (e.g., US).";
+    }
+    if (addressForm.street_address.length > 200) {
+      errors.street_address = "Street address is too long.";
+    }
+    if (addressForm.city.length > 120) {
+      errors.city = "City is too long.";
+    }
+    if (addressForm.state_province.length > 120) {
+      errors.state_province = "State/Province is too long.";
+    }
+    if (addressForm.postal_code.length > 30) {
+      errors.postal_code = "Postal code is too long.";
+    }
+    return errors;
+  }, [addressForm]);
 
   const passwordErrors = useMemo(() => {
     const errors = {};
@@ -83,6 +144,7 @@ export default function AccountSettings({ user, setUser }) {
   }, [passwordForm]);
 
   const canSubmitProfile = Object.keys(profileErrors).length === 0;
+  const canSubmitAddress = Object.keys(addressErrors).length === 0;
   const canSubmitPassword = Object.keys(passwordErrors).length === 0;
 
   async function onProfileSubmit(event) {
@@ -116,6 +178,47 @@ export default function AccountSettings({ user, setUser }) {
       setProfileMessage(error.message || "Profile update failed.");
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  async function onAddressSubmit(event) {
+    event.preventDefault();
+
+    setAddressMessage("");
+    setAddressError(false);
+
+    if (!canSubmitAddress) {
+      setAddressError(true);
+      setAddressMessage("Please fix the address fields and try again.");
+      return;
+    }
+
+    try {
+      setIsSavingAddress(true);
+      const data = await updateAccountAddress({
+        street_address: addressForm.street_address,
+        city: addressForm.city,
+        state_province: addressForm.state_province,
+        postal_code: addressForm.postal_code,
+        country_code: addressForm.country_code,
+      });
+
+      const addr = data?.address || {};
+      setAddressForm({
+        street_address: addr.street_address || "",
+        city: addr.city || "",
+        state_province: addr.state_province || "",
+        postal_code: addr.postal_code || "",
+        country_code: addr.country_code || "",
+      });
+
+      setAddressError(false);
+      setAddressMessage(data?.message || "Address updated.");
+    } catch (error) {
+      setAddressError(true);
+      setAddressMessage(error.message || "Address update failed.");
+    } finally {
+      setIsSavingAddress(false);
     }
   }
 
@@ -302,6 +405,148 @@ export default function AccountSettings({ user, setUser }) {
           </article>
 
           <article className="animate-fade-in-up rounded-2xl border border-orange-100 bg-white p-6 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 sm:p-8" style={{ animationDelay: "0.1s" }}>
+            <h2 className="text-2xl font-extrabold tracking-tight hover:text-orange-600 transition-colors duration-300">
+              Shipping <span className="text-orange-500">address</span>
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              This is used for tax calculation and checkout.
+            </p>
+
+            <form className="mt-6 space-y-4" onSubmit={onAddressSubmit} noValidate>
+              <div className="transform transition-all duration-300 hover:translate-x-1">
+                <label htmlFor="street_address" className="mb-1 block text-sm text-gray-700 font-semibold">
+                  Street address
+                </label>
+                <input
+                  id="street_address"
+                  name="street_address"
+                  type="text"
+                  value={addressForm.street_address}
+                  onChange={(event) =>
+                    setAddressForm((prev) => ({ ...prev, street_address: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
+                  placeholder="123 Main St Apt 4B"
+                />
+                {addressErrors.street_address && (
+                  <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.street_address}</p>
+                )}
+              </div>
+
+              <div className="transform transition-all duration-300 hover:translate-x-1">
+                <label htmlFor="city" className="mb-1 block text-sm text-gray-700 font-semibold">
+                  City
+                </label>
+                <input
+                  id="city"
+                  name="city"
+                  type="text"
+                  value={addressForm.city}
+                  onChange={(event) => setAddressForm((prev) => ({ ...prev, city: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
+                  placeholder="San Francisco"
+                />
+                {addressErrors.city && (
+                  <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.city}</p>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="transform transition-all duration-300 hover:translate-x-1">
+                  <label htmlFor="state_province" className="mb-1 block text-sm text-gray-700 font-semibold">
+                    State / Province
+                  </label>
+                  <input
+                    id="state_province"
+                    name="state_province"
+                    type="text"
+                    value={addressForm.state_province}
+                    onChange={(event) =>
+                      setAddressForm((prev) => ({ ...prev, state_province: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
+                    placeholder="CA"
+                  />
+                  {addressErrors.state_province && (
+                    <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.state_province}</p>
+                  )}
+                </div>
+
+                <div className="transform transition-all duration-300 hover:translate-x-1">
+                  <label htmlFor="postal_code" className="mb-1 block text-sm text-gray-700 font-semibold">
+                    Postal code
+                  </label>
+                  <input
+                    id="postal_code"
+                    name="postal_code"
+                    type="text"
+                    value={addressForm.postal_code}
+                    onChange={(event) =>
+                      setAddressForm((prev) => ({ ...prev, postal_code: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
+                    placeholder="94107"
+                  />
+                  {addressErrors.postal_code && (
+                    <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.postal_code}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="transform transition-all duration-300 hover:translate-x-1">
+                <label htmlFor="country_code" className="mb-1 block text-sm text-gray-700 font-semibold">
+                  Country code
+                </label>
+                <input
+                  id="country_code"
+                  name="country_code"
+                  type="text"
+                  value={addressForm.country_code}
+                  onChange={(event) =>
+                    setAddressForm((prev) => ({ ...prev, country_code: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
+                  placeholder="US"
+                />
+                {addressErrors.country_code && (
+                  <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.country_code}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={!canSubmitAddress || isSavingAddress}
+                className={`w-full cursor-pointer rounded-xl py-3 font-semibold text-white transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:scale-100 ${
+                  canSubmitAddress && !isSavingAddress
+                    ? "bg-orange-500 hover:bg-orange-400 shadow-md hover:shadow-lg"
+                    : "cursor-not-allowed bg-gray-300 opacity-50"
+                }`}
+              >
+                {isSavingAddress ? (
+                  <span className="inline-flex items-center">
+                    <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                    Saving address...
+                  </span>
+                ) : (
+                  "Save address"
+                )}
+              </button>
+
+              {addressMessage && (
+                <p
+                  className={`rounded-lg border px-3 py-2 text-sm animate-fade-in-up transition-all duration-300 ${
+                    addressError
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-green-200 bg-green-50 text-green-700"
+                  }`}
+                >
+                  {addressMessage}
+                </p>
+              )}
+            </form>
+          </article>
+
+          <article className="animate-fade-in-up rounded-2xl border border-orange-100 bg-white p-6 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 sm:p-8 lg:col-span-2" style={{ animationDelay: "0.15s" }}>
             <h2 className="text-2xl font-extrabold tracking-tight hover:text-orange-600 transition-colors duration-300">
               Change <span className="text-orange-500">password</span>
             </h2>

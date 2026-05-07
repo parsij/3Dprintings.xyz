@@ -11,6 +11,112 @@ module.exports = function accountRoutes(deps) {
     PASSWORD_REGEX,
   } = deps;
 
+  app.get('/api/account/address', async (req, res) => {
+    try {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser) {
+        return res.status(401).json({ message: 'Not signed in' });
+      }
+
+      const result = await pool.query(
+        `SELECT street_address, city, state_province, postal_code, country_code
+         FROM users
+         WHERE id = $1`,
+        [authUser.id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      return res.json({ address: result.rows[0] });
+    } catch (error) {
+      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
+
+      console.error('Address fetch error:', error.message);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  app.put('/api/account/address', async (req, res) => {
+    try {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser) {
+        return res.status(401).json({ message: 'Not signed in' });
+      }
+
+      const {
+        street_address = '',
+        city = '',
+        state_province = '',
+        postal_code = '',
+        country_code = '',
+      } = req.body || {};
+
+      const normalizedStreet = String(street_address).trim();
+      const normalizedCity = String(city).trim();
+      const normalizedState = String(state_province).trim();
+      const normalizedPostal = String(postal_code).trim();
+      const normalizedCountry = String(country_code).trim().toUpperCase();
+
+      if (normalizedStreet.length > 200) {
+        return res.status(400).json({ message: 'Street address is too long' });
+      }
+      if (normalizedCity.length > 120) {
+        return res.status(400).json({ message: 'City is too long' });
+      }
+      if (normalizedState.length > 120) {
+        return res.status(400).json({ message: 'State/Province is too long' });
+      }
+      if (normalizedPostal.length > 30) {
+        return res.status(400).json({ message: 'Postal code is too long' });
+      }
+      if (normalizedCountry && !/^[A-Z]{2}$/.test(normalizedCountry)) {
+        return res.status(400).json({ message: 'Country code must be a 2-letter code (e.g., US)' });
+      }
+
+      const updated = await pool.query(
+        `
+        UPDATE users
+        SET
+          street_address = $1,
+          city = $2,
+          state_province = $3,
+          postal_code = $4,
+          country_code = $5
+        WHERE id = $6
+        RETURNING street_address, city, state_province, postal_code, country_code
+      `,
+        [
+          normalizedStreet || null,
+          normalizedCity || null,
+          normalizedState || null,
+          normalizedPostal || null,
+          normalizedCountry || null,
+          authUser.id,
+        ]
+      );
+
+      if (updated.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      return res.json({
+        message: 'Address updated.',
+        address: updated.rows[0],
+      });
+    } catch (error) {
+      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
+
+      console.error('Address update error:', error.message);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  });
+
   app.put('/api/account/profile', async (req, res) => {
     try {
       const authUser = getAuthUserFromRequest(req);

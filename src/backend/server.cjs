@@ -39,13 +39,93 @@ async function cleanupUploadedFiles(files = []) {
   );
 }
 
-async function calculateTax(req, res,address) {
-isAuthenticatedAnIisValid(req, res, "nothing");
-  try {
+async function calculateTaxAndAuthentication(req, res) {
+  const auth = isAuthenticatedAnIisValid(req, res, "cart");
+  if (!auth?.userId) return;
+  const userId = auth.userId;
 
+  try {
+    const address = req.body?.address;
+    if (!address || typeof address !== "object") {
+      return res.status(400).json({ message: "Missing address." });
+    }
+    const { zip, state, country } = address;
+    if (!zip || !state || !country) {
+      return res.status(400).json({ message: "Invalid address." });
+    }
+
+    const cartResult = await pool.query(
+      `SELECT COALESCE(cart_json::jsonb, '{}'::jsonb) as cart_json FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    if (cartResult.rows.length === 0) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const cart = cartResult.rows[0].cart_json || {};
+    const productIdNum = Number(auth.productId);
+    const qty = auth.quantity === undefined ? 1 : Number(auth.quantity);
+
+    const productResult = await pool.query(
+      `SELECT id, name, current_price FROM products WHERE id = $1`,
+      [productIdNum]
+    );
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const product = productResult.rows[0];
+    const unitPrice = Number(product.current_price);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      return res.status(500).json({ message: "Invalid product price." });
+    }
+
+    const itemPrice = Math.round(unitPrice * 100) * qty;
+
+    // use server side payment do not trust the user for price
+    const calculation = await stripe.tax.calculations.create({
+      currency: 'usd',
+      line_items: [
+        {
+          amount: itemPrice, // e.g., 2500 for $25.00
+          reference: String(productIdNum),
+          tax_code: 'txcd_99999999', // The "Physical Goods" code
+        },
+      ],
+      customer_details: {
+        address: {
+          postal_code: zip,
+          state: state,
+          country: country,
+        },
+        address_source: 'shipping',
+      },
+    });
+
+    const tax = calculation.tax_amount_exclusive;
+    const subtotal = itemPrice + tax;
+    console.log(calculation);
+    console.log(calculation.tax_breakdown);
+
+    // Make the customer pay the exact fee (2.9% + 30c)
+    const grandTotal = Math.ceil((subtotal + 30) / (1 - 0.029));
+    const fee = grandTotal - subtotal;
+
+    return res.json({
+      cart,
+      productId: productIdNum,
+      quantity: qty,
+      unitPrice,
+      productPrice: itemPrice,
+      salesTax: tax,
+      processingFee: fee,
+      totalToPay: grandTotal
+    });
   } catch (error) {
-    console.error('Error calculating tax:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error calculating tax:');
+    console.log(error);
+    return res.status(500).json({ message: 'Server error' });
   }
 }
 
@@ -108,14 +188,32 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
     let rejexValue;
     let productId;
     let quantity;
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated ' });
+    }
     switch (type) {
 
       case "cart":
         rejexValue = /^\d+$/;
-            productId = req.body.productId.toString();
-            quantity = parseInt(req.body.quantity, 10);
-          if (!rejexValue.test(quantity.toString())) {
-              return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_QUANTITY' })}
+            productId = req.body?.productId?.toString?.();
+            if (!productId || !rejexValue.test(productId)) {
+              return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_PRODUCTID' });
+            }
+            if (parseInt(productId, 10) <= 0) {
+              return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_PRODUCTID' });
+            }
+
+            if (req.body?.quantity !== undefined) {
+              quantity = parseInt(req.body.quantity, 10);
+              if (!rejexValue.test(quantity.toString())) {
+                return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_QUANTITY' });
+              }
+              if (quantity <= 0) {
+                return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_QUANTITY' });
+              }
+            } else {
+              quantity = undefined;
+            }
           break;
           case "nothing" :
             rejexValue = /^[\s\S]*$/;
@@ -125,11 +223,6 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
         console.error("Unknown type: " + type);
         rejexValue = /.*/; // fallback regex that matches anything
     }
-    if (!userId) {
-        return res.status(401).json({ message: 'User not authenticated ' });
-    }
-    if(!rejexValue.test(productId) && type !== "nothing") {
-        return res.status(401).json({ message: 'Invalid Values TYPE_ERROR_PRODUCTID' });}
   return { userId, productId, rejexValue, quantity };
   } catch (error) {
     console.error(error);
@@ -170,6 +263,7 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   clearAuthCookie,
   getAuthUserFromRequest,
   isAuthenticatedAnIisValid,
+  calculateTax: calculateTaxAndAuthentication,
   EMAIL_REGEX,
   PASSWORD_REGEX,
   MAX_PHOTOS,

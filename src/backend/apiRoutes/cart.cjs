@@ -1,23 +1,16 @@
 module.exports = function cartRoutes(deps) {
-  const { app, pool, isAuthenticatedAnIisValid, getAuthUserFromRequest } = deps;
+  const { app, pool, isAuthenticatedAnIisValid } = deps;
 
   app.post('/api/cart', async (req, res) => {
     try {
       console.log('[POST /api/cart] Request body:', req.body);
-      const userId = getAuthUserFromRequest(req)?.id;
+      const auth = isAuthenticatedAnIisValid(req, res, "cart");
+      if (!auth?.userId) return;
+      const userId = auth.userId;
+      const productIdNum = Number(auth.productId);
+      const qty = auth.quantity === undefined ? 1 : Number(auth.quantity);
       console.log('[POST /api/cart] userId:', userId);
-      if (!userId) return res.status(401).json({ message: 'User not authenticated' });
-      const { productId, quantity } = req.body;
-      console.log('[POST /api/cart] productId:', productId, 'quantity:', quantity);
-      // normalize productId and quantity; accept numeric strings too
-      const productIdNum = Number(productId);
-      if (!Number.isInteger(productIdNum) || productIdNum <= 0) {
-        console.log('[POST /api/cart] Invalid productId');
-        return res.status(400).json({ message: 'Invalid productId' });
-      }
-      const rawQty = quantity === undefined ? 1 : Number(quantity);
-      const qty = Number.isInteger(rawQty) && rawQty > 0 ? rawQty : 1;
-      console.log('[POST /api/cart] Normalized qty:', qty);
+      console.log('[POST /api/cart] productId:', productIdNum, 'quantity:', qty);
 
       // Atomic JSONB Upsert/Increment
       const key = String(productIdNum);
@@ -46,16 +39,12 @@ module.exports = function cartRoutes(deps) {
   app.delete('/api/cart', async (req, res) => {
     try {
       console.log('[DELETE /api/cart] Request body:', req.body);
-      const userId = getAuthUserFromRequest(req)?.id;
+      const auth = isAuthenticatedAnIisValid(req, res, "cart");
+      if (!auth?.userId) return;
+      const userId = auth.userId;
+      const productIdNum = Number(auth.productId);
       console.log('[DELETE /api/cart] userId:', userId);
-      if (!userId) return res.status(401).json({ message: 'User not authenticated' });
-      const { productId } = req.body;
-      console.log('[DELETE /api/cart] productId:', productId);
-      const productIdNum = Number(productId);
-      if (!Number.isInteger(productIdNum) || productIdNum <= 0) {
-        console.log('[DELETE /api/cart] Invalid productId');
-        return res.status(400).json({ message: 'Invalid productId' });
-      }
+      console.log('[DELETE /api/cart] productId:', productIdNum);
 
       // Atomic JSONB Delete
       const key = String(productIdNum);
@@ -86,19 +75,13 @@ module.exports = function cartRoutes(deps) {
   app.patch('/api/cart', async (req, res) => {
     try {
       console.log('[PATCH /api/cart] Request body:', req.body);
-      const userId = getAuthUserFromRequest(req)?.id;
+      const auth = isAuthenticatedAnIisValid(req, res, "cart");
+      if (!auth?.userId) return;
+      const userId = auth.userId;
+      const productIdNum = Number(auth.productId);
+      const qty = auth.quantity === undefined ? 1 : Number(auth.quantity);
       console.log('[PATCH /api/cart] userId:', userId);
-      if (!userId) return res.status(401).json({ message: 'User not authenticated' });
-      const { productId, quantity } = req.body;
-      console.log('[PATCH /api/cart] productId:', productId, 'quantity:', quantity);
-      const productIdNum = Number(productId);
-      if (!Number.isInteger(productIdNum) || productIdNum <= 0) {
-        console.log('[PATCH /api/cart] Invalid productId');
-        return res.status(400).json({ message: 'Invalid productId' });
-      }
-      const rawQty = Number(quantity);
-      const qty = Number.isInteger(rawQty) && rawQty > 0 ? rawQty : 1;
-      console.log('[PATCH /api/cart] Normalized qty:', qty);
+      console.log('[PATCH /api/cart] productId:', productIdNum, 'quantity:', qty);
 
       // Atomic JSONB Exact Set
       const key = String(productIdNum);
@@ -133,9 +116,10 @@ module.exports = function cartRoutes(deps) {
   app.get('/api/cart', async (req, res) => {
     try {
       console.log('[GET /api/cart] Request received');
-      const userId = getAuthUserFromRequest(req)?.id;
+      const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+      if (!auth?.userId) return;
+      const userId = auth.userId;
       console.log('[GET /api/cart] userId:', userId);
-      if (!userId) return res.status(401).json({ message: 'User not authenticated' });
       
       const query = `SELECT COALESCE(cart_json::jsonb, '{}'::jsonb) as cart_json FROM users WHERE id = $1`;
       const values = [userId];

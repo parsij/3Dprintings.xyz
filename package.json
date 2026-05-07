@@ -21,6 +21,7 @@
     "express": "^5.2.1",
     "flowbite": "^4.0.1",
     "flowbite-react": "^0.12.17",
+    "geocodio-library-node": "^1.15.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "pg": "^8.20.0",

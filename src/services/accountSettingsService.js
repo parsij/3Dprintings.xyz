@@ -64,3 +64,33 @@ export async function signOutAccount() {
     throw new Error(message);
   }
 }
+
+export async function getAccountAddress() {
+  try {
+    const response = await axios.get(`${API_BASE}/api/account/address`, {
+      withCredentials: true,
+    });
+
+    return response.data;
+  } catch (error) {
+    const message =
+      error?.response?.data?.message ||
+      "Could not load your address right now. Please try again.";
+    throw new Error(message);
+  }
+}
+
+export async function updateAccountAddress(address) {
+  try {
+    const response = await axios.put(`${API_BASE}/api/account/address`, address, {
+      withCredentials: true,
+    });
+
+    return response.data;
+  } catch (error) {
+    const message =
+      error?.response?.data?.message ||
+      "Could not update your address right now. Please try again.";
+    throw new Error(message);
+  }
+}
