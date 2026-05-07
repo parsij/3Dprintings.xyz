@@ -1,4 +1,6 @@
 const bcrypt = require('bcrypt');
+const Geocodio = require('geocodio-library-node');
+const axios = require('axios');
 
 module.exports = function accountRoutes(deps) {
   const {
@@ -10,6 +12,10 @@ module.exports = function accountRoutes(deps) {
     EMAIL_REGEX,
     PASSWORD_REGEX,
   } = deps;
+
+  const geocodioApiKey = process.env.GEOCODIO_API_KEY;
+  const geocoder = geocodioApiKey ? new Geocodio(geocodioApiKey) : null;
+  const geoapifyApiKey = process.env.GEOAPIFY_API_KEY;
 
   app.get('/api/account/address', async (req, res) => {
     try {
@@ -37,6 +43,139 @@ module.exports = function accountRoutes(deps) {
 
       console.error('Address fetch error:', error.message);
       return res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  app.get('/api/account/address/suggest', async (req, res) => {
+    try {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser) {
+        return res.status(401).json({ message: 'Not signed in' });
+      }
+
+      if (!geocoder) {
+        return res.status(500).json({ message: 'Missing GEOCODIO_API_KEY on server.' });
+      }
+
+      const q = String(req.query?.q || '').trim();
+      const limitRaw = String(req.query?.limit || '5').trim();
+      const limit = Math.min(10, Math.max(1, Number.parseInt(limitRaw, 10) || 5));
+
+      if (q.length < 3) {
+        return res.json({ suggestions: [] });
+      }
+
+      const response = await geocoder.geocode(q, [], limit);
+      const results = Array.isArray(response?.results) ? response.results : [];
+
+      const suggestions = results
+        .map((r) => {
+          const ac = r?.address_components || {};
+          const number = ac.number ? String(ac.number).trim() : '';
+          const predir = ac.predirectional ? String(ac.predirectional).trim() : '';
+          const street = ac.street ? String(ac.street).trim() : '';
+          const suffix = ac.suffix ? String(ac.suffix).trim() : '';
+          const city = ac.city ? String(ac.city).trim() : '';
+          const state = ac.state ? String(ac.state).trim() : '';
+          const zip = ac.zip ? String(ac.zip).trim() : '';
+          const country = ac.country ? String(ac.country).trim() : '';
+
+          const street_address = [number, predir, street, suffix].filter(Boolean).join(' ');
+          const formatted = r?.formatted_address ? String(r.formatted_address) : '';
+
+          return {
+            formatted_address: formatted || [street_address, city, state, zip, country].filter(Boolean).join(', '),
+            address: {
+              street_address,
+              city,
+              state_province: state,
+              postal_code: zip,
+              country_code: country,
+            },
+          };
+        })
+        .filter((s) => s.formatted_address);
+
+      return res.json({ suggestions });
+    } catch (error) {
+      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
+
+      console.error('Address suggest error:', error?.message || error);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  app.get('/api/address/autocomplete', async (req, res) => {
+    try {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser) {
+        return res.status(401).json({ message: 'Not signed in' });
+      }
+
+      if (!geoapifyApiKey) {
+        return res.status(500).json({ message: 'Missing GEOAPIFY_API_KEY on server.' });
+      }
+
+      const q = String(req.query?.q || '').trim();
+      const limitRaw = String(req.query?.limit || '6').trim();
+      const limit = Math.min(10, Math.max(1, Number.parseInt(limitRaw, 10) || 6));
+
+      if (q.length < 3) {
+        return res.json({ suggestions: [] });
+      }
+
+      const { data } = await axios.get('https://api.geoapify.com/v1/geocode/autocomplete', {
+        params: {
+          text: q,
+          limit,
+          filter: 'countrycode:us',
+          bias: 'countrycode:us',
+          apiKey: geoapifyApiKey,
+        },
+        timeout: 8000,
+      });
+
+      const features = Array.isArray(data?.features) ? data.features : [];
+      const suggestions = features
+        .map((f) => {
+          const p = f?.properties || {};
+
+          const houseNumber = p.housenumber ? String(p.housenumber) : '';
+          const street = p.street ? String(p.street) : '';
+          const city = p.city ? String(p.city) : '';
+          const state = p.state_code ? String(p.state_code) : p.state ? String(p.state) : '';
+          const postcode = p.postcode ? String(p.postcode) : '';
+
+          const line1 = [houseNumber, street].filter(Boolean).join(' ');
+          const displayAddress = [line1, city, state, postcode, 'US'].filter(Boolean).join(', ');
+
+          return {
+            displayAddress,
+            houseNumber,
+            street,
+            city,
+            state,
+            postcode,
+          };
+        })
+        .filter((s) => s.displayAddress);
+
+      return res.json({ suggestions });
+    } catch (error) {
+      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
+
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'Server error';
+
+      console.error('Geoapify autocomplete error:', message);
+      return res.status(500).json({ message: 'Could not autocomplete address right now.' });
     }
   });
 

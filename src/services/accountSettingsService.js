@@ -94,3 +94,19 @@ export async function updateAccountAddress(address) {
     throw new Error(message);
   }
 }
+
+export async function suggestAccountAddress(query, { limit = 5, signal } = {}) {
+  try {
+    const response = await axios.get(`${API_BASE}/api/address/autocomplete`, {
+      params: { q: query, limit },
+      withCredentials: true,
+      signal,
+    });
+    return response.data;
+  } catch (error) {
+    const message =
+      error?.response?.data?.message ||
+      "Could not suggest an address right now. Please try again.";
+    throw new Error(message);
+  }
+}
