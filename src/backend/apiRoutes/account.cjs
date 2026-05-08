@@ -2,7 +2,92 @@ const bcrypt = require('bcrypt');
 const Geocodio = require('geocodio-library-node');
 const axios = require('axios');
 
-module.exports = function accountRoutes(deps) {
+const US_STATE_CODE_REGEX = /^[A-Z]{2}$/;
+const US_POSTAL_CODE_REGEX = /^\d{5}(?:-\d{4})?$/;
+const COARSE_GEOAPIFY_RESULT_TYPES = new Set([
+  'country',
+  'state',
+  'city',
+  'postcode',
+  'county',
+  'district',
+  'suburb',
+  'region',
+]);
+
+function normalizeText(value) {
+  return value ? String(value).trim() : '';
+}
+
+function buildGeocodioSuggestion(result) {
+  const ac = result?.address_components || {};
+  const number = normalizeText(ac.number);
+  const predir = normalizeText(ac.predirectional);
+  const street = normalizeText(ac.street);
+  const suffix = normalizeText(ac.suffix);
+  const city = normalizeText(ac.city);
+  const state = normalizeText(ac.state).toUpperCase();
+  const zip = normalizeText(ac.zip);
+  const country = normalizeText(ac.country).toUpperCase();
+
+  const streetAddress = [number, predir, street, suffix].filter(Boolean).join(' ');
+  if (!streetAddress || !number || !street || !city || !state || !zip) {
+    return null;
+  }
+  if (!US_STATE_CODE_REGEX.test(state) || !US_POSTAL_CODE_REGEX.test(zip)) {
+    return null;
+  }
+  if (country && country !== 'US') {
+    return null;
+  }
+
+  const formatted = normalizeText(result?.formatted_address);
+  return {
+    formatted_address: formatted || [streetAddress, city, state, zip, 'US'].join(', '),
+    address: {
+      street_address: streetAddress,
+      city,
+      state_province: state,
+      postal_code: zip,
+      country_code: 'US',
+    },
+  };
+}
+
+function buildGeoapifySuggestion(feature) {
+  const properties = feature?.properties || {};
+  const resultType = normalizeText(properties.result_type).toLowerCase();
+  if (resultType && COARSE_GEOAPIFY_RESULT_TYPES.has(resultType)) {
+    return null;
+  }
+
+  const houseNumber = normalizeText(properties.housenumber);
+  const street = normalizeText(properties.street);
+  const city = normalizeText(properties.city || properties.town || properties.village);
+  const state = normalizeText(properties.state_code || properties.state).toUpperCase();
+  const postcode = normalizeText(properties.postcode);
+  const addressLine1 = normalizeText(properties.address_line1);
+
+  const streetLine = addressLine1 || [houseNumber, street].filter(Boolean).join(' ');
+  if (!streetLine || !houseNumber || !street || !city || !state || !postcode) {
+    return null;
+  }
+  if (!US_STATE_CODE_REGEX.test(state) || !US_POSTAL_CODE_REGEX.test(postcode)) {
+    return null;
+  }
+
+  return {
+    displayAddress: [streetLine, city, state, postcode, 'US'].join(', '),
+    houseNumber,
+    street,
+    streetLine,
+    city,
+    state,
+    postcode,
+  };
+}
+
+function accountRoutes(deps) {
   const {
     app,
     pool,
@@ -68,33 +153,7 @@ module.exports = function accountRoutes(deps) {
       const response = await geocoder.geocode(q, [], limit);
       const results = Array.isArray(response?.results) ? response.results : [];
 
-      const suggestions = results
-        .map((r) => {
-          const ac = r?.address_components || {};
-          const number = ac.number ? String(ac.number).trim() : '';
-          const predir = ac.predirectional ? String(ac.predirectional).trim() : '';
-          const street = ac.street ? String(ac.street).trim() : '';
-          const suffix = ac.suffix ? String(ac.suffix).trim() : '';
-          const city = ac.city ? String(ac.city).trim() : '';
-          const state = ac.state ? String(ac.state).trim() : '';
-          const zip = ac.zip ? String(ac.zip).trim() : '';
-          const country = ac.country ? String(ac.country).trim() : '';
-
-          const street_address = [number, predir, street, suffix].filter(Boolean).join(' ');
-          const formatted = r?.formatted_address ? String(r.formatted_address) : '';
-
-          return {
-            formatted_address: formatted || [street_address, city, state, zip, country].filter(Boolean).join(', '),
-            address: {
-              street_address,
-              city,
-              state_province: state,
-              postal_code: zip,
-              country_code: country,
-            },
-          };
-        })
-        .filter((s) => s.formatted_address);
+      const suggestions = results.map(buildGeocodioSuggestion).filter(Boolean);
 
       return res.json({ suggestions });
     } catch (error) {
@@ -138,29 +197,7 @@ module.exports = function accountRoutes(deps) {
       });
 
       const features = Array.isArray(data?.features) ? data.features : [];
-      const suggestions = features
-        .map((f) => {
-          const p = f?.properties || {};
-
-          const houseNumber = p.housenumber ? String(p.housenumber) : '';
-          const street = p.street ? String(p.street) : '';
-          const city = p.city ? String(p.city) : '';
-          const state = p.state_code ? String(p.state_code) : p.state ? String(p.state) : '';
-          const postcode = p.postcode ? String(p.postcode) : '';
-
-          const line1 = [houseNumber, street].filter(Boolean).join(' ');
-          const displayAddress = [line1, city, state, postcode, 'US'].filter(Boolean).join(', ');
-
-          return {
-            displayAddress,
-            houseNumber,
-            street,
-            city,
-            state,
-            postcode,
-          };
-        })
-        .filter((s) => s.displayAddress);
+      const suggestions = features.map(buildGeoapifySuggestion).filter(Boolean);
 
       return res.json({ suggestions });
     } catch (error) {
@@ -196,9 +233,19 @@ module.exports = function accountRoutes(deps) {
 
       const normalizedStreet = String(street_address).trim();
       const normalizedCity = String(city).trim();
-      const normalizedState = String(state_province).trim();
+      const normalizedState = String(state_province).trim().toUpperCase();
       const normalizedPostal = String(postal_code).trim();
-      const normalizedCountry = String(country_code).trim().toUpperCase();
+      const normalizedCountryInput = String(country_code).trim().toUpperCase();
+      const normalizedCountry = normalizedCountryInput || 'US';
+
+      if (!normalizedStreet || !normalizedCity || !normalizedState || !normalizedPostal) {
+        return res.status(400).json({
+          message: 'Please enter a full residential address (street, city, state, and ZIP code)',
+        });
+      }
+      if (!/\d/.test(normalizedStreet)) {
+        return res.status(400).json({ message: 'Street address must include a house or building number' });
+      }
 
       if (normalizedStreet.length > 200) {
         return res.status(400).json({ message: 'Street address is too long' });
@@ -212,8 +259,14 @@ module.exports = function accountRoutes(deps) {
       if (normalizedPostal.length > 30) {
         return res.status(400).json({ message: 'Postal code is too long' });
       }
-      if (normalizedCountry && !/^[A-Z]{2}$/.test(normalizedCountry)) {
-        return res.status(400).json({ message: 'Country code must be a 2-letter code (e.g., US)' });
+      if (!US_STATE_CODE_REGEX.test(normalizedState)) {
+        return res.status(400).json({ message: 'State must be a 2-letter US code (e.g., CA)' });
+      }
+      if (!US_POSTAL_CODE_REGEX.test(normalizedPostal)) {
+        return res.status(400).json({ message: 'ZIP code must be valid (e.g., 94107 or 94107-1234)' });
+      }
+      if (normalizedCountry !== 'US') {
+        return res.status(400).json({ message: 'Only US residential addresses are supported' });
       }
 
       const updated = await pool.query(
@@ -372,5 +425,12 @@ module.exports = function accountRoutes(deps) {
       return res.status(500).json({ message: 'Server error' });
     }
   });
+}
+
+accountRoutes.__private = {
+  buildGeocodioSuggestion,
+  buildGeoapifySuggestion,
 };
+
+module.exports = accountRoutes;
 
