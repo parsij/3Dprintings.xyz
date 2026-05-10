@@ -31,6 +31,11 @@ const ProductPage = ({ user }) => {
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewMessage, setReviewMessage] = useState("");
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [editReviewForm, setEditReviewForm] = useState({ rating: 5, content: "" });
+  const [isUpdatingReview, setIsUpdatingReview] = useState(false);
+  const [deleteModalReviewId, setDeleteModalReviewId] = useState(null);
+  const [isDeletingReview, setIsDeletingReview] = useState(false);
 
   // Gallery states
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -67,6 +72,8 @@ const ProductPage = ({ user }) => {
     const fetchReviews = async () => {
       setReviewsLoading(true);
       setReviewsError(null);
+      setEditingReviewId(null);
+      setDeleteModalReviewId(null);
       try {
         const response = await axios.get(`${API_BASE}/api/products/${id}/reviews`, {
           withCredentials: true,
@@ -300,7 +307,7 @@ const ProductPage = ({ user }) => {
         return;
       }
 
-      createHeartExplosion(event);
+      createIconExplosion(event, "heart-particle");
       const result = await toggleReviewLike(reviewId);
       setReviews((prev) =>
         prev.map((review) =>
@@ -314,6 +321,132 @@ const ProductPage = ({ user }) => {
       );
     } catch (err) {
       console.error("Error toggling review like:", err);
+    }
+  };
+
+  const handleStartReviewEdit = (review) => {
+    if (!user) return;
+    setEditingReviewId(review.id);
+    setEditReviewForm({
+      rating: Math.max(1, Math.min(5, Number(review.rating) || 5)),
+      content: review.content || "",
+    });
+    setReviewMessage("");
+  };
+
+  const handleEditReviewInputChange = (event) => {
+    const { name, value } = event.target;
+    setEditReviewForm((prev) => ({
+      ...prev,
+      [name]: name === "rating" ? Number(value) : value,
+    }));
+  };
+
+  const handleCancelReviewEdit = () => {
+    setEditingReviewId(null);
+    setEditReviewForm({ rating: 5, content: "" });
+  };
+
+  const handleSaveEditedReview = async (reviewId) => {
+    if (!user) {
+      setReviewMessage("Please sign in to edit a review.");
+      return;
+    }
+
+    setIsUpdatingReview(true);
+    setReviewMessage("");
+
+    try {
+      const response = await axios.put(
+        `${API_BASE}/api/products/${id}/reviews/${reviewId}`,
+        {
+          rating: editReviewForm.rating,
+          content: editReviewForm.content,
+        },
+        { withCredentials: true }
+      );
+
+      const updatedReview = response.data?.review;
+      if (updatedReview) {
+        setReviews((prev) =>
+          prev.map((review) =>
+            review.id === reviewId
+              ? {
+                  ...review,
+                  ...updatedReview,
+                  isLiked: review.isLiked,
+                }
+              : review
+          )
+        );
+      }
+
+      setProduct((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          rating: response.data?.averageRating ?? prev.rating,
+          reviews_count: response.data?.reviewsCount ?? prev.reviews_count,
+        };
+      });
+
+      setEditingReviewId(null);
+      setEditReviewForm({ rating: 5, content: "" });
+      setReviewMessage("Review updated!");
+    } catch (err) {
+      console.error("Error updating review:", err);
+      setReviewMessage(err?.response?.data?.message || "Failed to update review.");
+    } finally {
+      setIsUpdatingReview(false);
+    }
+  };
+
+  const handleRequestDeleteReview = (reviewId) => {
+    setDeleteModalReviewId(reviewId);
+    setReviewMessage("");
+  };
+
+  const handleCancelDeleteReview = () => {
+    if (isDeletingReview) return;
+    setDeleteModalReviewId(null);
+  };
+
+  const handleConfirmDeleteReview = async () => {
+    if (!deleteModalReviewId) return;
+
+    setIsDeletingReview(true);
+    setReviewMessage("");
+
+    try {
+      const response = await axios.delete(
+        `${API_BASE}/api/products/${id}/reviews/${deleteModalReviewId}`,
+        { withCredentials: true }
+      );
+
+      const deletedReviewId = Number(response.data?.deletedReviewId ?? deleteModalReviewId);
+      setReviews((prev) => prev.filter((review) => Number(review.id) !== deletedReviewId));
+
+      setProduct((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          rating: response.data?.averageRating ?? prev.rating,
+          reviews_count: response.data?.reviewsCount ?? Math.max(0, (prev.reviews_count || 0) - 1),
+        };
+      });
+
+      if (Number(editingReviewId) === deletedReviewId) {
+        setEditingReviewId(null);
+        setEditReviewForm({ rating: 5, content: "" });
+      }
+
+      setDeleteModalReviewId(null);
+      setReviewMessage("Review deleted.");
+    } catch (err) {
+      console.error("Error deleting review:", err);
+      setReviewMessage(err?.response?.data?.message || "Failed to delete review.");
+    } finally {
+      setIsDeletingReview(false);
     }
   };
 
@@ -555,6 +688,7 @@ const ProductPage = ({ user }) => {
 
         <Reviews
           user={user}
+          currentUserId={user?.id}
           reviewForm={reviewForm}
           handleReviewInputChange={handleReviewInputChange}
           handleSubmitReview={handleSubmitReview}
@@ -565,6 +699,18 @@ const ProductPage = ({ user }) => {
           reviews={reviews}
           formatReviewTimestamp={formatReviewTimestamp}
           handleToggleReviewLike={handleToggleReviewLike}
+          editingReviewId={editingReviewId}
+          editReviewForm={editReviewForm}
+          isUpdatingReview={isUpdatingReview}
+          deleteModalReviewId={deleteModalReviewId}
+          isDeletingReview={isDeletingReview}
+          handleStartReviewEdit={handleStartReviewEdit}
+          handleEditReviewInputChange={handleEditReviewInputChange}
+          handleCancelReviewEdit={handleCancelReviewEdit}
+          handleSaveEditedReview={handleSaveEditedReview}
+          handleRequestDeleteReview={handleRequestDeleteReview}
+          handleCancelDeleteReview={handleCancelDeleteReview}
+          handleConfirmDeleteReview={handleConfirmDeleteReview}
         />
       </main>
 
@@ -635,4 +781,3 @@ const ProductPage = ({ user }) => {
 };
 
 export default ProductPage;
-

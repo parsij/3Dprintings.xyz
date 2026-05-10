@@ -3,6 +3,26 @@ const { normalizeNumericArray, ensureLikesColumns } = require('./likesShared.cjs
 module.exports = function reviewsRoutes(deps) {
   const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid } = deps;
 
+  const updateProductRatingAndCount = async (productId) => {
+    const aggregateResult = await pool.query(
+      `SELECT COALESCE(AVG(rating), 0)::numeric(3,2) AS average_rating,
+              COUNT(*)::int AS reviews_count
+       FROM reviews
+       WHERE product_id = $1`,
+      [productId]
+    );
+
+    const averageRating = Number(aggregateResult.rows[0]?.average_rating || 0);
+    const reviewsCount = Number(aggregateResult.rows[0]?.reviews_count || 0);
+
+    await pool.query(
+      'UPDATE products SET rating = $1 WHERE id = $2',
+      [averageRating, productId]
+    );
+
+    return { averageRating, reviewsCount };
+  };
+
   app.get('/api/products/:id/reviews', async (req, res) => {
     try {
       const productId = parseInt(req.params.id, 10);
@@ -78,21 +98,7 @@ module.exports = function reviewsRoutes(deps) {
         [productId, auth.userId, rating, contentValue || null]
       );
 
-      const aggregateResult = await pool.query(
-        `SELECT COALESCE(AVG(rating), 0)::numeric(3,2) AS average_rating,
-                COUNT(*)::int AS reviews_count
-         FROM reviews
-         WHERE product_id = $1`,
-        [productId]
-      );
-
-      const averageRating = Number(aggregateResult.rows[0]?.average_rating || 0);
-      const reviewsCount = Number(aggregateResult.rows[0]?.reviews_count || 0);
-
-      await pool.query(
-        'UPDATE products SET rating = $1 WHERE id = $2',
-        [averageRating, productId]
-      );
+      const { averageRating, reviewsCount } = await updateProductRatingAndCount(productId);
 
       const usernameResult = await pool.query(
         'SELECT username FROM users WHERE id = $1',
@@ -111,6 +117,105 @@ module.exports = function reviewsRoutes(deps) {
       });
     } catch (error) {
       console.error('Error submitting review:', error);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  app.put('/api/products/:productId/reviews/:reviewId', async (req, res) => {
+    try {
+      const auth = isAuthenticatedAnIisValid(req, res, 'reviews');
+      if (!auth?.userId) return;
+
+      const productId = parseInt(req.params.productId, 10);
+      const reviewId = parseInt(req.params.reviewId, 10);
+
+      if (!Number.isInteger(productId) || productId <= 0 || !Number.isInteger(reviewId) || reviewId <= 0) {
+        return res.status(400).json({ message: 'Invalid product or review ID' });
+      }
+
+      const existingReviewResult = await pool.query(
+        `SELECT r.id, r.product_id, r.user_id, r.rating, r.content, r.created_at, u.username
+         FROM reviews r
+         LEFT JOIN users u ON r.user_id = u.id
+         WHERE r.id = $1 AND r.product_id = $2`,
+        [reviewId, productId]
+      );
+
+      if (existingReviewResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Review not found' });
+      }
+
+      const existingReview = existingReviewResult.rows[0];
+      if (Number(existingReview.user_id) !== Number(auth.userId)) {
+        return res.status(403).json({ message: 'You can only edit your own reviews' });
+      }
+
+      const updateResult = await pool.query(
+        `UPDATE reviews
+         SET rating = $1, content = $2
+         WHERE id = $3 AND product_id = $4
+         RETURNING id, product_id, user_id, rating, content, created_at`,
+        [auth.rating, auth.content || null, reviewId, productId]
+      );
+
+      const { averageRating, reviewsCount } = await updateProductRatingAndCount(productId);
+
+      return res.json({
+        message: 'Review updated',
+        review: {
+          ...updateResult.rows[0],
+          username: existingReview.username || null,
+        },
+        averageRating,
+        reviewsCount,
+      });
+    } catch (error) {
+      console.error('Error updating review:', error);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  app.delete('/api/products/:productId/reviews/:reviewId', async (req, res) => {
+    try {
+      const auth = isAuthenticatedAnIisValid(req, res, 'nothing');
+      if (!auth?.userId) return;
+
+      const productId = parseInt(req.params.productId, 10);
+      const reviewId = parseInt(req.params.reviewId, 10);
+
+      if (!Number.isInteger(productId) || productId <= 0 || !Number.isInteger(reviewId) || reviewId <= 0) {
+        return res.status(400).json({ message: 'Invalid product or review ID' });
+      }
+
+      const existingReviewResult = await pool.query(
+        'SELECT id, user_id FROM reviews WHERE id = $1 AND product_id = $2',
+        [reviewId, productId]
+      );
+
+      if (existingReviewResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Review not found' });
+      }
+
+      const existingReview = existingReviewResult.rows[0];
+      if (Number(existingReview.user_id) !== Number(auth.userId)) {
+        return res.status(403).json({ message: 'You can only delete your own reviews' });
+      }
+
+      await pool.query(
+        'DELETE FROM reviews WHERE id = $1 AND product_id = $2',
+        [reviewId, productId]
+      );
+
+      const { averageRating, reviewsCount } = await updateProductRatingAndCount(productId);
+
+      return res.json({
+        message: 'Review deleted',
+        deletedReviewId: reviewId,
+        averageRating,
+        reviewsCount,
+      });
+    } catch (error) {
+      console.error('Error deleting review:', error);
       return res.status(500).json({ message: 'Server error' });
     }
   });
