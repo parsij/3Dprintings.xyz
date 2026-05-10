@@ -78,7 +78,7 @@ export default function CartPage() {
           <SmallNavBar />
         <SideMenu />
     <main className="min-h-screen bg-orange-50 text-gray-900 px-4 py-8 my-8">
-        <div className="mx-auto max-w-7xl animate-fade-in-up">
+6        <div className="mx-auto max-w-7xl animate-fade-in-up">
         <div className="mb-6 group">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight transition-all duration-300 group-hover:translate-x-2">
             Your <span className="text-orange-500 group-hover:text-orange-600 transition-colors duration-300">Cart</span>
@@ -103,7 +103,7 @@ export default function CartPage() {
 
         {cartItems.length === 0 ? (
           <section className="rounded-2xl border border-orange-100 bg-white p-8 text-center shadow-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02] animate-fade-in-up">
-            <p className="text-lg font-semibold animate-bounce">Your cart is empty.</p>
+            <p className="text-lg font-semibold">Your cart is empty.</p>
             <p className="mt-2 text-sm text-gray-600 transition-colors duration-300 group-hover:text-gray-700">
               Add some awesome 3D printed models to get started.
             </p>

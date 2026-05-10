@@ -188,6 +188,8 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
     let rejexValue;
     let productId;
     let quantity;
+    let rating;
+    let content;
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated ' });
     }
@@ -218,12 +220,21 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
           case "nothing" :
             rejexValue = /^[\s\S]*$/;
             break;
+          case "reviews":
+            rejexValue = /^\d+$/;
+            rating = parseInt(req.body?.rating, 10);
+            if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+              return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+            }
+
+            content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+            break;
         // More cases later if I want
       default:
         console.error("Unknown type: " + type);
         rejexValue = /.*/; // fallback regex that matches anything
     }
-  return { userId, productId, rejexValue, quantity };
+  return { userId, productId, rejexValue, quantity, rating, content };
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Server error' });

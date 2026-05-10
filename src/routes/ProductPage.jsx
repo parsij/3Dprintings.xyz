@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import cart from "../assets/Cart.svg"
 import Navbar from "../components/NavBar.jsx";
+import Reviews from "../components/Reviews.jsx";
+import StarRating from "../components/StarRating.jsx";
 import { addToCart } from "../services/cartService.js";
-import { toggleLike, toggleSave, getProductStatus } from "../services/likesService.js";
+import { toggleLike, toggleSave, getProductStatus, toggleReviewLike } from "../services/likesService.js";
 import image_test from "../assets/Screenshot_20260322_175244.png";
+
+const API_BASE = "http://localhost:3000";
 
 const ProductPage = ({ user }) => {
   const { id } = useParams();
@@ -21,6 +25,12 @@ const ProductPage = ({ user }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState("");
 
   // Gallery states
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -35,7 +45,7 @@ const ProductPage = ({ user }) => {
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.get(`http://localhost:3000/api/products/${id}`);
+        const response = await axios.get(`${API_BASE}/api/products/${id}`);
         setProduct(response.data);
 
         // Fetch like/save status
@@ -53,11 +63,36 @@ const ProductPage = ({ user }) => {
     fetchProduct();
   }, [id]);
 
+  useEffect(() => {
+    const fetchReviews = async () => {
+      setReviewsLoading(true);
+      setReviewsError(null);
+      try {
+        const response = await axios.get(`${API_BASE}/api/products/${id}/reviews`, {
+          withCredentials: true,
+        });
+        setReviews(response.data?.reviews || []);
+      } catch (err) {
+        console.error("Error fetching reviews:", err);
+        setReviewsError(err?.response?.data?.message || "Failed to load reviews.");
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [id]);
+
   // Derived images array
   const images = product?.images?.length ? product.images : [product?.image_url || image_test];
 
-  const nextImage = () => setCurrentImageIndex((prev) => Math.min(prev + 1, images.length - 1));
-  const prevImage = () => setCurrentImageIndex((prev) => Math.max(prev - 1, 0));
+  const nextImage = useCallback(() => {
+    setCurrentImageIndex((prev) => Math.min(prev + 1, images.length - 1));
+  }, [images.length]);
+
+  const prevImage = useCallback(() => {
+    setCurrentImageIndex((prev) => Math.max(prev - 1, 0));
+  }, []);
 
   // Keyboard navigation
   useEffect(() => {
@@ -68,7 +103,7 @@ const ProductPage = ({ user }) => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [images.length, isFullscreen]);
+  }, [nextImage, prevImage, isFullscreen]);
 
   // Autohide fullscreen UI
   useEffect(() => {
@@ -118,6 +153,47 @@ const ProductPage = ({ user }) => {
     return num % 1 === 0 ? num.toString() : num.toFixed(2);
   };
 
+  const formatReviewTimestamp = (timestamp) => {
+    const parsed = new Date(timestamp);
+    if (Number.isNaN(parsed.getTime())) {
+      return timestamp || "";
+    }
+
+    return parsed.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const createIconExplosion = (event, particleClassName = "heart-particle") => {
+    const button = event?.currentTarget;
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const particleCount = 9;
+
+    for (let i = 0; i < particleCount; i += 1) {
+      const particle = document.createElement("span");
+      particle.className = particleClassName;
+      particle.style.left = `${centerX}px`;
+      particle.style.top = `${centerY}px`;
+
+      const angle = (Math.PI * 2 * i) / particleCount;
+      const distance = 24 + Math.random() * 20;
+      particle.style.setProperty("--particle-x", `${Math.cos(angle) * distance}px`);
+      particle.style.setProperty("--particle-y", `${Math.sin(angle) * distance}px`);
+      particle.style.animationDelay = `${Math.random() * 50}ms`;
+
+      document.body.appendChild(particle);
+      setTimeout(() => particle.remove(), 800);
+    }
+  };
+
   const handleAddToCart = async () => {
     if (!product) return;
     setIsAddingToCart(true);
@@ -137,12 +213,13 @@ const ProductPage = ({ user }) => {
     }
   };
 
-  const toggleLikeClick = async () => {
+  const toggleLikeClick = async (event) => {
     try {
       if (!user) {
         alert("Please sign in to like products");
         return;
       }
+      createIconExplosion(event, "heart-particle");
       const result = await toggleLike(product.id);
       setIsLiked(result.isLiked);
     } catch (error) {
@@ -150,16 +227,93 @@ const ProductPage = ({ user }) => {
     }
   };
 
-  const toggleSaveClick = async () => {
+  const toggleSaveClick = async (event) => {
     try {
       if (!user) {
         alert("Please sign in to save products");
         return;
       }
+      createIconExplosion(event, "save-particle");
       const result = await toggleSave(product.id);
       setIsSaved(result.isSaved);
     } catch (error) {
       console.error("Error toggling save:", error);
+    }
+  };
+
+  const handleReviewInputChange = (event) => {
+    const { name, value } = event.target;
+    setReviewForm((prev) => ({
+      ...prev,
+      [name]: name === "rating" ? Number(value) : value,
+    }));
+  };
+
+  const handleSubmitReview = async (event) => {
+    event.preventDefault();
+    if (!user) {
+      setReviewMessage("Please sign in to submit a review.");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    setReviewMessage("");
+
+    try {
+      const response = await axios.post(
+        `${API_BASE}/api/products/${id}/reviews`,
+        {
+          rating: reviewForm.rating,
+          content: reviewForm.content,
+        },
+        { withCredentials: true }
+      );
+
+      const createdReview = response.data?.review;
+      if (createdReview) {
+        setReviews((prev) => [createdReview, ...prev]);
+      }
+
+      setProduct((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          rating: response.data?.averageRating ?? prev.rating,
+          reviews_count: response.data?.reviewsCount ?? (prev.reviews_count || 0) + 1,
+        };
+      });
+
+      setReviewForm({ rating: 5, content: "" });
+      setReviewMessage("Review submitted!");
+    } catch (err) {
+      console.error("Error submitting review:", err);
+      setReviewMessage(err?.response?.data?.message || "Failed to submit review.");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const handleToggleReviewLike = async (reviewId, event) => {
+    try {
+      if (!user) {
+        alert("Please sign in to like reviews");
+        return;
+      }
+
+      createHeartExplosion(event);
+      const result = await toggleReviewLike(reviewId);
+      setReviews((prev) =>
+        prev.map((review) =>
+          review.id === reviewId
+            ? {
+                ...review,
+                isLiked: result.isLiked,
+              }
+            : review
+        )
+      );
+    } catch (err) {
+      console.error("Error toggling review like:", err);
     }
   };
 
@@ -283,8 +437,12 @@ const ProductPage = ({ user }) => {
               <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                 By {product.creator_name || 'Unknown User'}
               </span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-yellow-500">⭐</span>
+              <div className="flex items-center gap-2">
+                <StarRating
+                  value={Math.max(0, Math.min(5, Number(product.rating) || 0))}
+                  readOnly
+                  starClassName="w-4 h-4"
+                />
                 <span className="font-bold text-gray-800">{product.rating ? Number(product.rating).toFixed(1) : "0.0"}</span>
                 <span className="text-sm text-gray-500">({product.reviews_count || 0} reviews)</span>
               </div>
@@ -394,6 +552,20 @@ const ProductPage = ({ user }) => {
 
           </div>
         </div>
+
+        <Reviews
+          user={user}
+          reviewForm={reviewForm}
+          handleReviewInputChange={handleReviewInputChange}
+          handleSubmitReview={handleSubmitReview}
+          isSubmittingReview={isSubmittingReview}
+          reviewMessage={reviewMessage}
+          reviewsLoading={reviewsLoading}
+          reviewsError={reviewsError}
+          reviews={reviews}
+          formatReviewTimestamp={formatReviewTimestamp}
+          handleToggleReviewLike={handleToggleReviewLike}
+        />
       </main>
 
       {/* Fullscreen Overlay */}

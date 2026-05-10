@@ -16,6 +16,20 @@ export const toggleLike = async (productId) => {
   }
 };
 
+export const toggleReviewLike = async (reviewId) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE}/api/reviews/${reviewId}/like`,
+      {},
+      { withCredentials: true }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error toggling review like:", error);
+    throw error.response?.data || { message: "Failed to toggle review like" };
+  }
+};
+
 export const toggleSave = async (productId) => {
   try {
     const response = await axios.post(

@@ -1,3 +1,9 @@
+const {
+  normalizeNumericArray,
+  toggleNumericId,
+  ensureLikesColumns,
+} = require('./likesShared.cjs');
+
 module.exports = function likesSavesRoutes(deps) {
   const { app, pool, getAuthUserFromRequest } = deps;
 
@@ -20,14 +26,28 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
-      const productId = parseInt(req.params.id);
+      const productId = parseInt(req.params.id, 10);
       if (!Number.isInteger(productId) || productId <= 0) {
         return res.status(400).json({ message: 'Invalid product ID' });
       }
 
-      // Get user's current liked_products
+      const productResult = await pool.query(
+        'SELECT id FROM products WHERE id = $1',
+        [productId]
+      );
+
+      if (productResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      await ensureLikesColumns(pool);
+
+      // Get user's current liked_products and liked_reviews
       const userResult = await pool.query(
-        'SELECT liked_products FROM users WHERE id = $1',
+        `SELECT COALESCE(liked_products, '[]'::jsonb) AS liked_products,
+                COALESCE(liked_reviews, '[]'::jsonb) AS liked_reviews
+         FROM users
+         WHERE id = $1`,
         [authUser.id]
       );
 
@@ -35,30 +55,77 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      let likedProducts = userResult.rows[0].liked_products || [];
-      const isLiked = likedProducts.includes(productId);
+      const toggledLike = toggleNumericId(userResult.rows[0].liked_products, productId);
 
-      // Toggle like
-      if (isLiked) {
-        likedProducts = likedProducts.filter(id => id !== productId);
-      } else {
-        likedProducts.push(productId);
-      }
-
-       // Update database
-       await pool.query(
-         'UPDATE users SET liked_products = $1::jsonb WHERE id = $2',
-         [JSON.stringify(likedProducts), authUser.id]
-       );
+      // Update database
+      await pool.query(
+        'UPDATE users SET liked_products = $1::jsonb WHERE id = $2',
+        [JSON.stringify(toggledLike.ids), authUser.id]
+      );
 
       res.json({
-        message: isLiked ? 'Product unliked' : 'Product liked',
-        isLiked: !isLiked,
-        likedCount: likedProducts.length
+        message: toggledLike.isActive ? 'Product liked' : 'Product unliked',
+        isLiked: toggledLike.isActive,
+        likedCount: toggledLike.ids.length
       });
     } catch (error) {
       console.error('Error toggling like:', error);
       res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Toggle Review Like
+  app.post('/api/reviews/:id/like', async (req, res) => {
+    try {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser) {
+        return res.status(401).json({ message: 'Not signed in' });
+      }
+
+      const reviewId = parseInt(req.params.id, 10);
+      if (!Number.isInteger(reviewId) || reviewId <= 0) {
+        return res.status(400).json({ message: 'Invalid review ID' });
+      }
+
+      const reviewResult = await pool.query(
+        'SELECT id FROM reviews WHERE id = $1',
+        [reviewId]
+      );
+
+      if (reviewResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Review not found' });
+      }
+
+      await ensureLikesColumns(pool);
+
+      // Read both columns to keep product/review likes in sync logic.
+      const userResult = await pool.query(
+        `SELECT COALESCE(liked_products, '[]'::jsonb) AS liked_products,
+                COALESCE(liked_reviews, '[]'::jsonb) AS liked_reviews
+         FROM users
+         WHERE id = $1`,
+        [authUser.id]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const toggledLike = toggleNumericId(userResult.rows[0].liked_reviews, reviewId);
+
+      await pool.query(
+        'UPDATE users SET liked_reviews = $1::jsonb WHERE id = $2',
+        [JSON.stringify(toggledLike.ids), authUser.id]
+      );
+
+      return res.json({
+        message: toggledLike.isActive ? 'Review liked' : 'Review unliked',
+        isLiked: toggledLike.isActive,
+        likedCount: toggledLike.ids.length,
+      });
+    } catch (error) {
+      console.error('Error toggling review like:', error);
+      return res.status(500).json({ message: 'Server error' });
     }
   });
 
@@ -70,10 +137,12 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
-      const productId = parseInt(req.params.id);
+      const productId = parseInt(req.params.id, 10);
       if (!Number.isInteger(productId) || productId <= 0) {
         return res.status(400).json({ message: 'Invalid product ID' });
       }
+
+      await ensureLikesColumns(pool);
 
       // Get user's current saved_products
       const userResult = await pool.query(
@@ -85,26 +154,18 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      let savedProducts = userResult.rows[0].saved_products || [];
-      const isSaved = savedProducts.includes(productId);
+      const toggledSave = toggleNumericId(userResult.rows[0].saved_products, productId);
 
-      // Toggle save
-      if (isSaved) {
-        savedProducts = savedProducts.filter(id => id !== productId);
-      } else {
-        savedProducts.push(productId);
-      }
-
-       // Update database
-       await pool.query(
-         'UPDATE users SET saved_products = $1::jsonb WHERE id = $2',
-         [JSON.stringify(savedProducts), authUser.id]
-       );
+      // Update database
+      await pool.query(
+        'UPDATE users SET saved_products = $1::jsonb WHERE id = $2',
+        [JSON.stringify(toggledSave.ids), authUser.id]
+      );
 
       res.json({
-        message: isSaved ? 'Product unsaved' : 'Product saved',
-        isSaved: !isSaved,
-        savedCount: savedProducts.length
+        message: toggledSave.isActive ? 'Product saved' : 'Product unsaved',
+        isSaved: toggledSave.isActive,
+        savedCount: toggledSave.ids.length
       });
     } catch (error) {
       console.error('Error toggling save:', error);
@@ -120,6 +181,8 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
+      await ensureLikesColumns(pool);
+
       const userResult = await pool.query(
         'SELECT liked_products FROM users WHERE id = $1',
         [authUser.id]
@@ -129,7 +192,7 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      const likedProducts = userResult.rows[0].liked_products || [];
+      const likedProducts = normalizeNumericArray(userResult.rows[0].liked_products);
       res.json({ likedProducts });
     } catch (error) {
       console.error('Error fetching liked products:', error);
@@ -145,6 +208,8 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
+      await ensureLikesColumns(pool);
+
       const userResult = await pool.query(
         'SELECT liked_products FROM users WHERE id = $1',
         [authUser.id]
@@ -154,12 +219,7 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      const likedIdsRaw = userResult.rows[0].liked_products || [];
-      const likedIds = Array.isArray(likedIdsRaw)
-        ? likedIdsRaw
-            .map((id) => parseInt(id, 10))
-            .filter((id) => Number.isInteger(id) && id > 0)
-        : [];
+      const likedIds = normalizeNumericArray(userResult.rows[0].liked_products);
       if (likedIds.length === 0) {
         return res.json({ products: [] });
       }
@@ -190,6 +250,8 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
+      await ensureLikesColumns(pool);
+
       const userResult = await pool.query(
         'SELECT saved_products FROM users WHERE id = $1',
         [authUser.id]
@@ -199,7 +261,7 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      const savedProducts = userResult.rows[0].saved_products || [];
+      const savedProducts = normalizeNumericArray(userResult.rows[0].saved_products);
       res.json({ savedProducts });
     } catch (error) {
       console.error('Error fetching saved products:', error);
@@ -215,6 +277,8 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
+      await ensureLikesColumns(pool);
+
       const userResult = await pool.query(
         'SELECT saved_products FROM users WHERE id = $1',
         [authUser.id]
@@ -224,12 +288,7 @@ module.exports = function likesSavesRoutes(deps) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      const savedIdsRaw = userResult.rows[0].saved_products || [];
-      const savedIds = Array.isArray(savedIdsRaw)
-        ? savedIdsRaw
-            .map((id) => parseInt(id, 10))
-            .filter((id) => Number.isInteger(id) && id > 0)
-        : [];
+      const savedIds = normalizeNumericArray(userResult.rows[0].saved_products);
       if (savedIds.length === 0) {
         return res.json({ products: [] });
       }
@@ -256,7 +315,7 @@ module.exports = function likesSavesRoutes(deps) {
   app.get('/api/products/:id/status', async (req, res) => {
     try {
       const authUser = getAuthUserFromRequest(req);
-      const productId = parseInt(req.params.id);
+      const productId = parseInt(req.params.id, 10);
 
       if (!Number.isInteger(productId) || productId <= 0) {
         return res.status(400).json({ message: 'Invalid product ID' });
@@ -266,8 +325,14 @@ module.exports = function likesSavesRoutes(deps) {
         return res.json({ isLiked: false, isSaved: false });
       }
 
+      await ensureLikesColumns(pool);
+
       const userResult = await pool.query(
-        'SELECT liked_products, saved_products FROM users WHERE id = $1',
+        `SELECT COALESCE(liked_products, '[]'::jsonb) AS liked_products,
+                COALESCE(saved_products, '[]'::jsonb) AS saved_products,
+                COALESCE(liked_reviews, '[]'::jsonb) AS liked_reviews
+         FROM users
+         WHERE id = $1`,
         [authUser.id]
       );
 
@@ -275,12 +340,14 @@ module.exports = function likesSavesRoutes(deps) {
         return res.json({ isLiked: false, isSaved: false });
       }
 
-      const likedProducts = userResult.rows[0].liked_products || [];
-      const savedProducts = userResult.rows[0].saved_products || [];
+      const likedProducts = normalizeNumericArray(userResult.rows[0].liked_products);
+      const savedProducts = normalizeNumericArray(userResult.rows[0].saved_products);
+      const likedReviews = normalizeNumericArray(userResult.rows[0].liked_reviews);
 
       res.json({
         isLiked: likedProducts.includes(productId),
-        isSaved: savedProducts.includes(productId)
+        isSaved: savedProducts.includes(productId),
+        likedReviews,
       });
     } catch (error) {
       console.error('Error checking product status:', error);

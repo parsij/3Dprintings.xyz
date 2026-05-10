@@ -117,7 +117,7 @@ export default function SignUp({ setUser }) {
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
                 />
                 {form.username && isFieldValid("username") && (
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg animate-bounce">
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg">
                     ✓
                   </span>
                 )}
@@ -146,7 +146,7 @@ export default function SignUp({ setUser }) {
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
                 />
                 {form.email && isFieldValid("email") && (
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg animate-bounce">
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg">
                     ✓
                   </span>
                 )}
@@ -181,7 +181,7 @@ export default function SignUp({ setUser }) {
                   <img src={PasswordEye} alt="Password visibility changer" className="h-5 w-5" />
                 </button>
                 {form.password && isFieldValid("password") && (
-                  <span className="pointer-events-none absolute right-12 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg animate-bounce">
+                  <span className="pointer-events-none absolute right-12 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg">
                     ✓
                   </span>
                 )}
@@ -209,7 +209,7 @@ export default function SignUp({ setUser }) {
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
                 />
                 {form.confirmPassword && isFieldValid("confirmPassword") && (
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg animate-bounce">
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-500 font-bold text-lg">
                     ✓
                   </span>
                 )}

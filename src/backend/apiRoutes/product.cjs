@@ -8,9 +8,15 @@ module.exports = function productRoutes(deps) {
       const offset = (page - 1) * limit;
 
       const result = await pool.query(
-        `SELECT p.*, u.username as creator_name
+        `SELECT p.*, u.username as creator_name,
+                COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS review_count
+            FROM reviews
+            WHERE reviews.product_id = p.id
+         ) r ON true
          ORDER BY p.id DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset]
@@ -47,9 +53,15 @@ module.exports = function productRoutes(deps) {
       const offset = (page - 1) * limit;
 
       const result = await pool.query(
-        `SELECT p.*, u.username as creator_name
+        `SELECT p.*, u.username as creator_name,
+                COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS review_count
+            FROM reviews
+            WHERE reviews.product_id = p.id
+         ) r ON true
          WHERE p.name ILIKE $1
          ORDER BY p.id DESC
          LIMIT $2 OFFSET $3`,
@@ -85,9 +97,15 @@ module.exports = function productRoutes(deps) {
       }
 
       const result = await pool.query(
-        `SELECT p.*, u.username as creator_name
+        `SELECT p.*, u.username as creator_name,
+                COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS review_count
+            FROM reviews
+            WHERE reviews.product_id = p.id
+         ) r ON true
          WHERE p.id = $1`,
         [productId]
       );
