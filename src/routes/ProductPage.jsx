@@ -608,7 +608,7 @@ const ProductPage = ({ user }) => {
               {product.category && (
                 <div className="mb-3">
                   <span className="text-sm font-semibold text-gray-700 mr-2">Category:</span>
-                  <span className="text-sm text-gray-600 bg-orange-50 px-2 py-1 rounded-md text-orange-600 border border-orange-100">{product.category}</span>
+                  <span className="text-sm bg-orange-50 px-2 py-1 rounded-md text-orange-600 border border-orange-100">{product.category}</span>
                 </div>
               )}
 
