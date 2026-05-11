@@ -23,51 +23,77 @@ module.exports = function reviewsRoutes(deps) {
     return { averageRating, reviewsCount };
   };
 
-  app.get('/api/products/:id/reviews', async (req, res) => {
-    try {
-      const productId = parseInt(req.params.id, 10);
-      if (!Number.isInteger(productId) || productId <= 0) {
-        return res.status(400).json({ message: 'Invalid product ID' });
-      }
+   app.get('/api/user/reviews', async (req, res) => {
+     try {
+       const auth = getAuthUserFromRequest(req);
+       if (!auth?.id) {
+         return res.status(401).json({ message: 'Unauthorized' });
+       }
 
-      const authUser = getAuthUserFromRequest(req);
-      let likedReviewIds = [];
+       const reviewsResult = await pool.query(
+         `SELECT r.id, r.product_id, r.user_id, r.rating, r.content, r.created_at, u.username, p.name as product_name, p.img_path as image_url
+          FROM reviews r
+          LEFT JOIN users u ON r.user_id = u.id
+          LEFT JOIN products p ON r.product_id = p.id
+          WHERE r.user_id = $1
+          ORDER BY r.created_at DESC, r.id DESC`,
+         [auth.id]
+       );
 
-      if (authUser?.id) {
-        await ensureLikesColumns(pool);
+       const reviews = reviewsResult.rows;
 
-        const likedResult = await pool.query(
-          `SELECT COALESCE(liked_reviews, '[]'::jsonb) AS liked_reviews
-           FROM users
-           WHERE id = $1`,
-          [authUser.id]
-        );
+       return res.json({ reviews });
+     } catch (error) {
+       console.error('Error fetching user reviews:', error);
+       return res.status(500).json({ message: 'Server error' });
+     }
+   });
 
-        if (likedResult.rows.length > 0) {
-          likedReviewIds = normalizeNumericArray(likedResult.rows[0].liked_reviews);
-        }
-      }
+   app.get('/api/products/:id/reviews', async (req, res) => {
+     try {
+       const productId = parseInt(req.params.id, 10);
+       if (!Number.isInteger(productId) || productId <= 0) {
+         return res.status(400).json({ message: 'Invalid product ID' });
+       }
 
-      const reviewsResult = await pool.query(
-        `SELECT r.id, r.product_id, r.user_id, r.rating, r.content, r.created_at, u.username
-         FROM reviews r
-         LEFT JOIN users u ON r.user_id = u.id
-         WHERE r.product_id = $1
-         ORDER BY r.created_at DESC, r.id DESC`,
-        [productId]
-      );
+       const authUser = getAuthUserFromRequest(req);
+       let likedReviewIds = [];
 
-      const reviews = reviewsResult.rows.map((review) => ({
-        ...review,
-        isLiked: likedReviewIds.includes(review.id),
-      }));
+       if (authUser?.id) {
+         await ensureLikesColumns(pool);
 
-      return res.json({ reviews });
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-      return res.status(500).json({ message: 'Server error' });
-    }
-  });
+         const likedResult = await pool.query(
+           `SELECT COALESCE(liked_reviews, '[]'::jsonb) AS liked_reviews
+            FROM users
+            WHERE id = $1`,
+           [authUser.id]
+         );
+
+         if (likedResult.rows.length > 0) {
+           likedReviewIds = normalizeNumericArray(likedResult.rows[0].liked_reviews);
+         }
+       }
+
+       const reviewsResult = await pool.query(
+         `SELECT r.id, r.product_id, r.user_id, r.rating, r.content, r.created_at, u.username
+          FROM reviews r
+          LEFT JOIN users u ON r.user_id = u.id
+          WHERE r.product_id = $1
+          ORDER BY r.created_at DESC, r.id DESC`,
+         [productId]
+       );
+
+       const reviews = reviewsResult.rows.map((review) => ({
+         ...review,
+         isLiked: likedReviewIds.includes(review.id),
+       }));
+
+       return res.json({ reviews });
+     } catch (error) {
+       console.error('Error fetching reviews:', error);
+       return res.status(500).json({ message: 'Server error' });
+     }
+   });
 
   app.post('/api/products/:id/reviews', async (req, res) => {
     try {
@@ -89,6 +115,14 @@ module.exports = function reviewsRoutes(deps) {
 
       if (productResult.rows.length === 0) {
         return res.status(404).json({ message: 'Product not found' });
+      }
+
+      const reviewCountResult = await pool.query(
+        'SELECT COUNT(*) FROM reviews WHERE product_id = $1 AND user_id = $2',
+        [productId, auth.userId]
+      );
+      if (parseInt(reviewCountResult.rows[0].count, 10) >= 5) {
+        return res.status(400).json({ message: 'You cannot leave more than 5 reviews per item.' });
       }
 
       const insertResult = await pool.query(

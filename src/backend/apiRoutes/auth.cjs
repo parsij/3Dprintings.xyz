@@ -38,7 +38,7 @@ module.exports = function authRoutes(deps) {
         return res.status(409).json({ message: 'Email already in use' });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 8);
+      const hashedPassword = await bcrypt.hash(password, 12);
 
       const query = `
       INSERT INTO users (username, email, password)

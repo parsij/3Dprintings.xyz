@@ -6,6 +6,7 @@ import Navbar from "../components/NavBar.jsx";
 const Products = ({ user, NoNavBarLimit }) => {
   const [products, setProducts] = useState([]);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("relevant");
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   
@@ -26,9 +27,9 @@ const Products = ({ user, NoNavBarLimit }) => {
     setLoading(true);
     try {
       // Ensure backend matches: http://localhost:3000/api/products?page=...&limit=12
-      console.log('[Products fetchProducts] Fetching page:', page);
+      console.log('[Products fetchProducts] Fetching page:', page, 'with sort:', sort);
       const response = await axios.get("http://localhost:3000/api/products", {
-        params: { page, limit: 12 },
+        params: { page, limit: 12, sort },
       });
       const data = response.data;
       console.log('[Products fetchProducts] Received', data.products.length, 'products');
@@ -51,7 +52,13 @@ const Products = ({ user, NoNavBarLimit }) => {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, sort]);
+
+  useEffect(() => {
+    setProducts([]);
+    setPage(1);
+    setHasMore(true);
+  }, [sort]);
 
   useEffect(() => {
     fetchProducts();
@@ -61,6 +68,25 @@ const Products = ({ user, NoNavBarLimit }) => {
     <div className="min-h-screen bg-[#f2f2f2]">
       <Navbar isSignedIn={!!user} NoNavBarLimit={NoNavBarLimit} />
       <main className="px-4 lg:px-[5vw] pt-24 pb-12">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Our Models</h1>
+          <div className="relative">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-xl leading-tight focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 shadow-sm cursor-pointer transition-all duration-300"
+            >
+              <option value="relevant">Most Relevant</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="sales">Most Sales</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700">
+              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
            {products.map((product, index) => {
              const isLastElement = products.length === index + 1;

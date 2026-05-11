@@ -1,38 +1,23 @@
 const fs = require('fs');
 const path = require('path');
 
+
 module.exports = function createRoutes(deps) {
-  const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, getAuthUserFromRequest } = deps;
+  const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, isAuthenticatedAnIisValid } = deps;
 
   app.post('/api/create', upload.array('photos', MAX_PHOTOS), async (req, res) => {
     const photos = req.files || [];
 
     try {
-          const userId = getAuthUserFromRequest(req)?.id;
+      const { isProfane } = await import('../../services/profanityFilter.js');
+      const auth = isAuthenticatedAnIisValid(req, res, "create");
+      if (!auth?.userId) return; // response is already sent in isAuthenticatedAnIisValid or we wait, wait, the response is actually sent inside isAuthenticatedAnIisValid so if it returns an object with user ID it is valid. But if not, it sends res and returns the res object.. Wait, if it fails, it returns res.status().json() which is undefined or object.
 
-    if (!userId) {
-      return res.status(401).json({ message: 'User not authenticated.' });
-    }
+      const userId = auth.userId;
       const { modelName = '', description = '', price, category = '', tags } = req.body;
       const parsedPrice = Number(price);
 
       const fieldErrors = {};
-
-      if (modelName.trim().length < 3) {
-        fieldErrors.modelName = 'Model name must be at least 3 characters.';
-      }
-
-      if (!getAuthUserFromRequest(req)?.id) {
-        fieldErrors.userId = 'User not authenticated.(missing user id)';
-      }
-
-      if (description.trim().length < 20) {
-        fieldErrors.description = 'Description must be at least 20 characters.';
-      }
-
-      if (!price || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
-        fieldErrors.price = 'Enter a valid price greater than 0.';
-      }
 
       if (photos.length === 0) {
         fieldErrors.photos = 'Upload at least one printed model photo.';
@@ -41,13 +26,6 @@ module.exports = function createRoutes(deps) {
       if (photos.length > MAX_PHOTOS) {
         fieldErrors.photos = `You can upload up to ${MAX_PHOTOS} photos.`;
       }
-      if (Object.keys(fieldErrors).length > 0) {
-        await cleanupUploadedFiles(photos);
-        return res.status(400).json({
-          message: 'Validation failed.',
-          errors: fieldErrors,
-        });
-      }
 
       // Parse tags
       let parsedTags = [];
@@ -55,17 +33,31 @@ module.exports = function createRoutes(deps) {
         try {
           const rawTags = JSON.parse(tags);
           if (Array.isArray(rawTags)) {
-            parsedTags = rawTags.map((tag) => String(tag).trim()).filter(Boolean);
+            parsedTags = rawTags.map((tag) => String(tag).trim().toLowerCase()).filter(Boolean);
           }
         } catch {
           parsedTags = tags
             .split(',')
-            .map((tag) => tag.trim())
+            .map((tag) => tag.trim().toLowerCase())
             .filter(Boolean);
         }
       }
 
-      // Insert product (without images first)
+      // Remove duplicates
+      parsedTags = [...new Set(parsedTags)];
+
+      const hasBadWords = isProfane(modelName) || isProfane(description) || parsedTags.some(tag => isProfane(tag));
+      if (hasBadWords) {
+        fieldErrors.general = 'Explicit content or bad words are not allowed in the title, description, or tags.';
+      }
+
+      if (Object.keys(fieldErrors).length > 0) {
+        await cleanupUploadedFiles(photos);
+        return res.status(400).json({
+          message: 'Validation failed.',
+          errors: fieldErrors,
+        });
+      }
       const insertProductQuery = `
         INSERT INTO products (
           name,
@@ -73,13 +65,25 @@ module.exports = function createRoutes(deps) {
           original_price,
           current_price,
           rating,
-          user_id
+          user_id,
+          category,
+          tags
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, name, description, original_price, current_price, rating, user_id
---         remove unnecessary userID
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags
       `;
-      const productValues = [modelName.trim(), description.trim(), parsedPrice, parsedPrice, 0, userId];
+      // Pass parsedTags as a JS array so pg can map to a Postgres array (text[]) or JSON array depending on column type.
+      const normalizedCategory = category ? category.trim() : null;
+      const productValues = [
+        modelName.trim(),
+        description.trim(),
+        parsedPrice,
+        parsedPrice,
+        0,
+        userId,
+        normalizedCategory,
+        parsedTags,
+      ];
       const productResult = await pool.query(insertProductQuery, productValues);
       const product = productResult.rows[0];
       const productId = product.id;
@@ -105,6 +109,30 @@ module.exports = function createRoutes(deps) {
         `UPDATE products SET img_path = $1 WHERE id = $2`,
         [imageFileNames, productId]
       );
+
+      // Ensure tags and category are stored correctly after insert.
+      // Some DB schemas use text[] and others use jsonb; updating with the JS array will correctly map to text[]
+      // and will also work for jsonb. Use a second update to be defensive and guarantee data is stored.
+      try {
+        await pool.query(
+          `UPDATE products SET tags = $1, category = $2 WHERE id = $3`,
+          [parsedTags, normalizedCategory, productId]
+        );
+      } catch (e) {
+        // Best-effort: log but don't break the create flow
+        console.warn('Failed to run follow-up tags/category update:', e.message || e);
+      }
+
+      // Update tags usage in tags table
+      for (const t of parsedTags) {
+        await pool.query(
+          `INSERT INTO tags (tag_name, uses)
+           VALUES ($1, 1)
+           ON CONFLICT (tag_name) DO UPDATE
+           SET uses = tags.uses + 1`,
+          [t]
+        );
+      }
 
       // Respond
       return res.status(201).json({

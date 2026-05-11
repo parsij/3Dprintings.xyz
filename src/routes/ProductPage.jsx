@@ -603,6 +603,27 @@ const ProductPage = ({ user }) => {
             {/* Description */}
             <div className="mb-auto">
               <h3 className="font-bold text-gray-900 mb-2">Description</h3>
+
+              {/* Category */}
+              {product.category && (
+                <div className="mb-3">
+                  <span className="text-sm font-semibold text-gray-700 mr-2">Category:</span>
+                  <span className="text-sm text-gray-600 bg-orange-50 px-2 py-1 rounded-md text-orange-600 border border-orange-100">{product.category}</span>
+                </div>
+              )}
+
+              {/* Tags */}
+              {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <span className="text-sm font-semibold text-gray-700 mr-1 py-1">Tags:</span>
+                  {product.tags.map((tag, idx) => (
+                    <span key={idx} className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <p className={`text-gray-600 text-sm leading-relaxed whitespace-pre-wrap transition-all duration-300 ${!descriptionExpanded && 'line-clamp-3'}`}>
                 {product.description || "No description provided for this 3D model."}
               </p>

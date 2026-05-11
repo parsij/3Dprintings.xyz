@@ -1,5 +1,6 @@
-import React, {useEffect, useRef, useState} from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { isProfane } from "../services/profanityFilter.js";
 
 const axiosWithCredentials = axios.create({
   baseURL: "http://localhost:3000",
@@ -11,6 +12,17 @@ const Tags = ({ tags, setTags }) => {
   const itemRefs = useRef([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleTextChange = (e) => {
+    const val = e.target.value;
+    setText(val);
+    setErrorMsg("");
+    if (!val.trim()) {
+      setSuggestions([]);
+      setActiveIndex(0);
+    }
+  };
 
   useEffect(() => {
   itemRefs.current[activeIndex]?.scrollIntoView({
@@ -21,7 +33,6 @@ const Tags = ({ tags, setTags }) => {
 
   useEffect(() => {
     if (!text.trim()) {
-      setSuggestions([]);
       return;
     }
 
@@ -72,6 +83,11 @@ const Tags = ({ tags, setTags }) => {
     const cleanTag = tagName.trim();
     if (!cleanTag) return;
 
+    if (isProfane(cleanTag)) {
+      setErrorMsg("Please avoid using explicit language in tags.");
+      return;
+    }
+
     setTags((prev) => {
       if (prev.includes(cleanTag)) return prev;
       return [...prev, cleanTag];
@@ -80,6 +96,7 @@ const Tags = ({ tags, setTags }) => {
     setText("");
     setSuggestions([]);
     setActiveIndex(0);
+    setErrorMsg("");
   }
 
   function removeTag(tagToRemove) {
@@ -87,21 +104,19 @@ const Tags = ({ tags, setTags }) => {
   }
 
   function handleKeyDown(e) {
-    if (!suggestions.length) return;
-
-    if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown" && suggestions.length) {
       e.preventDefault();
       setActiveIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
-    }
-
-    if (e.key === "ArrowUp") {
+    } else if (e.key === "ArrowUp" && suggestions.length) {
       e.preventDefault();
       setActiveIndex((prev) => Math.max(prev - 1, 0));
-    }
-
-    if (e.key === "Enter" && suggestions[activeIndex]) {
+    } else if (e.key === "Enter") {
       e.preventDefault();
-      addTag(suggestions[activeIndex].tag_name);
+      if (suggestions.length && suggestions[activeIndex]) {
+        addTag(suggestions[activeIndex].tag_name);
+      } else {
+        addTag(text);
+      }
     }
   }
 
@@ -132,13 +147,16 @@ const Tags = ({ tags, setTags }) => {
         <input
           type="text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           placeholder="Type a tag"
           className="min-w-30 flex-1 border-none bg-transparent px-1 py-1 outline-none"
         />
       </div>
 
+      {errorMsg && (
+        <p className="mt-1 text-sm text-red-500">{errorMsg}</p>
+      )}
       <p className="mt-1 text-sm text-gray-500">
         Having accurate tags will help your model.
       </p>

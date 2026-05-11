@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { createPortal } from "react-dom";
 import trash from "../assets/trash.svg";
 import image_test from "../assets/Screenshot_20260322_175244.png";
 
@@ -123,7 +124,6 @@ const CartProductCard = ({
                   {productName}
                 </div>
               </Link>
-              {/* You can put product title, subtitle, etc. here if needed */}
             </div>
 
             {/* Remove (trash) icon */}
@@ -226,9 +226,9 @@ const CartProductCard = ({
       </div>
 
       {/* Confirmation Modal */}
-      {showDeleteModal && (
+      {showDeleteModal && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-up"
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-up"
           onClick={() => setShowDeleteModal(false)}
         >
           <div
@@ -257,7 +257,8 @@ const CartProductCard = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

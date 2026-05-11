@@ -12,6 +12,7 @@ const SearchResults = ({ user }) => {
   const [searchInput, setSearchInput] = useState(query);
   const [products, setProducts] = useState([]);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("relevant");
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const debounceTimer = useRef(null);
@@ -29,43 +30,52 @@ const SearchResults = ({ user }) => {
     if (node) observer.current.observe(node);
   }, [loading, hasMore]);
 
-  const fetchSearchResults = async () => {
-    if (!query.trim()) {
-      setProducts([]);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      console.log('[SearchResults] Fetching:', query, 'page:', page);
-      const response = await axios.get(`http://localhost:3000/api/products/search`, {
-        params: { q: query, page, limit: 12 }
-      });
-
-      console.log('[SearchResults] Response:', response.data);
-      setProducts(prev => {
-        const existingIds = new Set(prev.map(p => p.id));
-        const newProducts = response.data.products.filter(p => !existingIds.has(p.id));
-        return [...prev, ...newProducts];
-      });
-      setHasMore(response.data.hasMore);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching search results:", error);
-      setLoading(false);
-    }
-  };
-
-  // Auto-search when URL query changes
-  useEffect(() => {
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setSearchInput(query);
     setProducts([]);
     setPage(1);
-    setSearchInput(query);
-  }, [query]);
+  }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProducts([]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPage(1);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasMore(true);
+  }, [sort]);
+
+  useEffect(() => {
+    const fetchSearchResults = async () => {
+      if (!query.trim()) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log('[SearchResults] Fetching:', query, 'page:', page, 'sort:', sort);
+        const response = await axios.get(`http://localhost:3000/api/products/search`, {
+          params: { q: query, page, limit: 12, sort }
+        });
+
+        console.log('[SearchResults] Response:', response.data);
+        setProducts(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newProducts = response.data.products.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newProducts];
+        });
+        setHasMore(response.data.hasMore);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching search results:", error);
+        setLoading(false);
+      }
+    };
+
     fetchSearchResults();
-  }, [page, query]);
+  }, [page, query, sort]);
 
   // Handle search input change with debounce
   const handleSearchChange = (e) => {
@@ -105,13 +115,30 @@ const SearchResults = ({ user }) => {
             />
           </div>
 
-          <div className="transition-all duration-500 ease-in-out transform hover:translate-x-2">
-            <h1 className="text-3xl lg:text-4xl font-extrabold text-gray-900 transition-colors duration-300">
-              Search Results for "<span className="text-orange-500 hover:text-orange-600 transition-colors">{query}</span>"
-            </h1>
-            <p className="text-gray-600 mt-2 animate-pulse">
-              {products.length > 0 ? `Found ${products.length} products` : "No products found"}
-            </p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all duration-500 ease-in-out transform hover:translate-x-2">
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-extrabold text-gray-900 transition-colors duration-300">
+                Search Results for "<span className="text-orange-500 hover:text-orange-600 transition-colors">{query}</span>"
+              </h1>
+              <p className="text-gray-600 mt-2 animate-pulse">
+                {products.length > 0 ? `Found ${products.length} products` : "No products found"}
+              </p>
+            </div>
+            <div className="relative mt-2 sm:mt-0">
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                 className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-xl leading-tight focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 shadow-sm cursor-pointer transition-all duration-300"
+              >
+                <option value="relevant">Most Relevant</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="sales">Most Sales</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700">
+                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -164,5 +191,4 @@ const SearchResults = ({ user }) => {
 };
 
 export default SearchResults;
-
 

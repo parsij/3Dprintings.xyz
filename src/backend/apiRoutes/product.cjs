@@ -6,6 +6,16 @@ module.exports = function productRoutes(deps) {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 12;
       const offset = (page - 1) * limit;
+      const sort = req.query.sort || 'relevant';
+
+      let orderClause = 'ORDER BY p.id DESC';
+      if (sort === 'price_asc') {
+        orderClause = 'ORDER BY p.current_price ASC';
+      } else if (sort === 'price_desc') {
+        orderClause = 'ORDER BY p.current_price DESC';
+      } else if (sort === 'sales') {
+        orderClause = 'ORDER BY p.sales_count DESC';
+      }
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
@@ -17,7 +27,7 @@ module.exports = function productRoutes(deps) {
             FROM reviews
             WHERE reviews.product_id = p.id
          ) r ON true
-         ORDER BY p.id DESC
+         ${orderClause}
          LIMIT $1 OFFSET $2`,
         [limit, offset]
       );
@@ -25,13 +35,28 @@ module.exports = function productRoutes(deps) {
       const products = result.rows.map(p => {
         // img_path is the array you saved in create.cjs
         // We take the first image if it exists
-        const firstImage = Array.isArray(p.img_path) && p.img_path.length > 0 
-          ? p.img_path[0] 
+        const firstImage = Array.isArray(p.img_path) && p.img_path.length > 0
+          ? p.img_path[0]
           : null;
+
+        // Normalize tags: DB may store tags as JSON text or as array
+        let parsedTags = [];
+        if (p.tags) {
+          if (Array.isArray(p.tags)) parsedTags = p.tags;
+          else if (typeof p.tags === 'string') {
+            try { parsedTags = JSON.parse(p.tags); }
+            catch { parsedTags = p.tags.split(',').map(t => t.trim()).filter(Boolean); }
+          }
+        }
+
+        // Normalize category
+        const category = typeof p.category === 'string' && p.category.trim().length > 0 ? p.category.trim() : null;
 
         return {
           ...p,
-          image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null
+          image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null,
+          tags: parsedTags,
+          category
         };
       });
 
@@ -51,6 +76,16 @@ module.exports = function productRoutes(deps) {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 12;
       const offset = (page - 1) * limit;
+      const sort = req.query.sort || 'relevant';
+
+      let orderClause = 'ORDER BY p.id DESC';
+      if (sort === 'price_asc') {
+        orderClause = 'ORDER BY p.current_price ASC';
+      } else if (sort === 'price_desc') {
+        orderClause = 'ORDER BY p.current_price DESC';
+      } else if (sort === 'sales') {
+        orderClause = 'ORDER BY p.sales_count DESC';
+      }
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
@@ -63,7 +98,7 @@ module.exports = function productRoutes(deps) {
             WHERE reviews.product_id = p.id
          ) r ON true
          WHERE p.name ILIKE $1
-         ORDER BY p.id DESC
+         ${orderClause}
          LIMIT $2 OFFSET $3`,
         [`%${q}%`, limit, offset]
       );
@@ -73,9 +108,22 @@ module.exports = function productRoutes(deps) {
           ? p.img_path[0]
           : null;
 
+        let parsedTags = [];
+        if (p.tags) {
+          if (Array.isArray(p.tags)) parsedTags = p.tags;
+          else if (typeof p.tags === 'string') {
+            try { parsedTags = JSON.parse(p.tags); }
+            catch { parsedTags = p.tags.split(',').map(t => t.trim()).filter(Boolean); }
+          }
+        }
+
+        const category = typeof p.category === 'string' && p.category.trim().length > 0 ? p.category.trim() : null;
+
         return {
           ...p,
-          image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null
+          image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null,
+          tags: parsedTags,
+          category
         };
       });
 
@@ -120,10 +168,23 @@ module.exports = function productRoutes(deps) {
         : [];
       const firstImage = images.length > 0 ? images[0] : null;
 
+      let parsedTags = [];
+      if (p.tags) {
+        if (Array.isArray(p.tags)) parsedTags = p.tags;
+        else if (typeof p.tags === 'string') {
+          try { parsedTags = JSON.parse(p.tags); }
+          catch { parsedTags = p.tags.split(',').map(t => t.trim()).filter(Boolean); }
+        }
+      }
+
+      const category = typeof p.category === 'string' && p.category.trim().length > 0 ? p.category.trim() : null;
+
       const product = {
         ...p,
         image_url: firstImage,
-        images: images
+        images: images,
+        tags: parsedTags,
+        category
       };
 
       res.json(product);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
@@ -7,7 +7,7 @@ import Navbar from "../components/NavBar.jsx";
 const SavedProducts = ({ user }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  
 
   useEffect(() => {
     if (!user) return;
@@ -22,7 +22,7 @@ const SavedProducts = ({ user }) => {
         setProducts(response.data.products || []);
       } catch (err) {
         console.error("Error fetching saved products:", err);
-        setError("Failed to load saved products.");
+        
       } finally {
         setLoading(false);
       }

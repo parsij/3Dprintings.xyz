@@ -63,6 +63,8 @@ export default function SubmitModel() {
 
     if (form.modelName.trim().length < 3) {
       nextErrors.modelName = "Model name must be at least 3 characters.";
+    } else if (!/^[a-zA-Z0-9 ]+$/.test(form.modelName.trim())) {
+     nextErrors.modelName = "Model name can only contain letters, numbers and space.";
     }
 
     if (form.description.trim().length < 20) {
@@ -310,7 +312,3 @@ export default function SubmitModel() {
     </>
   );
 }
-
-
-
-

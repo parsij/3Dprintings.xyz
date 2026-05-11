@@ -1,5 +1,5 @@
-import { useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRef, useState, useEffect, useCallback } from "react";
+import {Link, useNavigate} from "react-router-dom";
 import accountLogo from "../assets/accountLogo.svg";
 import accountLogoHover from "../assets/accountLogoHover.svg";
 import Search from "../assets/search.svg";
@@ -15,7 +15,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
   const [searchInput, setSearchInput] = useState("");
   const lastScrollY = useRef(0);
 
-  function showNavBar() {
+  const showNavBar = useCallback(() => {
     const currentScrollY = window.scrollY;
 
     if (currentScrollY > window.innerHeight || NoNavBarLimit) {
@@ -29,14 +29,14 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
     }
 
     lastScrollY.current = currentScrollY;
-  }
+  }, [NoNavBarLimit]);
 
   useEffect(() => {
     window.addEventListener("scroll", showNavBar);
     return () => {
       window.removeEventListener("scroll", showNavBar);
     };
-  }, []);
+  }, [showNavBar]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -54,19 +54,19 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
         }`}
       >
         <nav className="flex items-center gap-3 md:gap-4 max-w-7xl mx-auto px-3 md:px-4 py-3">
-          <a
-            href="/home"
+          <Link
+            to="/home"
             className="w-10 h-10 flex items-center justify-center rounded-full border border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
           >
             3z
-          </a>
+          </Link>
 
-          <a
-            href="#"
+          <Link
+            to={"/products"}
             className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
           >
             3D Printed Models
-          </a>
+          </Link>
 
           <div className="flex-1 min-w-0">
             <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
@@ -86,37 +86,10 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             </form>
           </div>
 
-          <button
-            onClick={() => setMenuOpen((prev) => !prev)}
-            className="group flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
-            aria-label="Open menu"
-          >
-            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-            <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
-            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-          </button>
-
-          <a
-            href="/cart"
-            className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
-            aria-label="Cart"
-          >
-            <img
-              src={Cart}
-              alt="Cart"
-              className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
-            />
-            <img
-              src={CartHover}
-              alt="Cart hover"
-              className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-            />
-          </a>
-
           <div className="shrink-0">
             {isSignedIn ? (
-              <a
-                href="/account"
+              <Link
+                to="/account"
                 className="group relative inline-flex h-6 w-6 md:h-8 md:w-8 items-center justify-center cursor-pointer"
                 aria-label="Account"
               >
@@ -130,16 +103,44 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                   alt="account hover"
                   className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                 />
-              </a>
+              </Link>
             ) : (
-              <a
-                href="/signup"
+              <Link
+                to="/signup"
                 className="border-2 font-bold border-orange-300 rounded-2xl px-4 py-0.5 transition hover:border-orange-500 hover:text-orange-500 shrink-0"
               >
                 Sign Up
-              </a>
+              </Link>
             )}
           </div>
+
+          <Link
+              to="/cart"
+              className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
+              aria-label="Cart"
+          >
+            <img
+                src={Cart}
+                alt="Cart"
+                className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
+            />
+            <img
+                src={CartHover}
+                alt="Cart hover"
+                className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            />
+          </Link>
+
+          <button
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="group flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
+              aria-label="Open menu"
+          >
+            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+            <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
+            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+          </button>
+
         </nav>
       </header>
 

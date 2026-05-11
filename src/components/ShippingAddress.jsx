@@ -164,7 +164,7 @@ export default function ShippingAddress({
             </div>
           </div>
         )}
-
+        <div className={"mt-16"}>
         <button
           type="button"
           onClick={() => {
@@ -176,6 +176,7 @@ export default function ShippingAddress({
         >
           {useManualAddress ? "Use one-line autocomplete" : "Type manually"}
         </button>
+        </div>
 
         {useManualAddress && (
           <>

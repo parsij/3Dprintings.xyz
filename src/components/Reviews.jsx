@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import StarRating from "./StarRating.jsx";
 import editIcon from "../assets/edit.svg";
 import trashIcon from "../assets/trash.svg";
@@ -220,8 +221,8 @@ const Reviews = ({
         </div>
       )}
 
-      {deleteModalReviewId && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center px-4">
+      {deleteModalReviewId && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-xs flex items-center justify-center px-4">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 animate-fade-in-up">
             <h3 className="text-lg font-bold text-gray-900">Delete review</h3>
             <p className="mt-2 text-sm text-gray-600">
@@ -247,7 +248,8 @@ const Reviews = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

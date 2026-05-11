@@ -229,7 +229,31 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
 
             content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
             break;
-        // More cases later if I want
+          case "create":
+            rejexValue = /^[a-zA-Z0-9 ]+$/;
+            let fieldErrors = {};
+            let modelName = (req.body?.modelName || '').trim();
+            if (modelName.length < 3) {
+              fieldErrors.modelName = 'Model name must be at least 3 characters.';
+            } else if (!rejexValue.test(modelName)) {
+              fieldErrors.modelName = 'Model name can only contain letters, numbers, and spaces.';
+            }
+
+            let description = (req.body?.description || '').trim();
+            if (description.length < 20) {
+              fieldErrors.description = 'Description must be at least 20 characters.';
+            }
+
+            let price = Number(req.body?.price);
+            if (!req.body?.price || Number.isNaN(price) || price <= 0) {
+              fieldErrors.price = 'Enter a valid price greater than 0.';
+            }
+
+            if (Object.keys(fieldErrors).length > 0) {
+              return res.status(400).json({ message: 'Validation failed.', errors: fieldErrors });
+            }
+            break;
+      // More cases later if I want
       default:
         console.error("Unknown type: " + type);
         rejexValue = /.*/; // fallback regex that matches anything

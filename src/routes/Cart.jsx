@@ -78,7 +78,7 @@ export default function CartPage() {
           <SmallNavBar />
         <SideMenu />
     <main className="min-h-screen bg-orange-50 text-gray-900 px-4 py-8 my-8">
-6        <div className="mx-auto max-w-7xl animate-fade-in-up">
+        <div className="mx-auto max-w-7xl animate-fade-in-up">
         <div className="mb-6 group">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight transition-all duration-300 group-hover:translate-x-2">
             Your <span className="text-orange-500 group-hover:text-orange-600 transition-colors duration-300">Cart</span>

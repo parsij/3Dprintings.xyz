@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
@@ -7,7 +7,7 @@ import Navbar from "../components/NavBar.jsx";
 const LikedProducts = ({ user }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  
 
   useEffect(() => {
     if (!user) return;
@@ -22,7 +22,7 @@ const LikedProducts = ({ user }) => {
         setProducts(response.data.products || []);
       } catch (err) {
         console.error("Error fetching liked products:", err);
-        setError("Failed to load liked products.");
+        
       } finally {
         setLoading(false);
       }
