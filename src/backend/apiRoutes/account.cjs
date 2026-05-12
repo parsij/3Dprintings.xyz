@@ -309,70 +309,71 @@ function accountRoutes(deps) {
     }
   });
 
-  app.put('/api/account/profile', async (req, res) => {
-    try {
-      const authUser = getAuthUserFromRequest(req);
-      if (!authUser) {
-        return res.status(401).json({ message: 'Not signed in' });
-      }
+   app.put('/api/account/profile', async (req, res) => {
+     try {
+       const authUser = getAuthUserFromRequest(req);
+       if (!authUser) {
+         return res.status(401).json({ message: 'Not signed in' });
+       }
 
-      const { username, email } = req.body;
+       const { username, email, phone_number } = req.body;
 
-      if (!username || !email) {
-        return res.status(400).json({ message: 'Username and email are required' });
-      }
+       if (!username || !email) {
+         return res.status(400).json({ message: 'Username and email are required' });
+       }
 
-      const normalizedUsername = String(username).trim();
-      const normalizedEmail = String(email).toLowerCase().trim();
+       const normalizedUsername = String(username).trim();
+       const normalizedEmail = String(email).toLowerCase().trim();
+       const normalizedPhone = phone_number ? String(phone_number).trim() : null;
 
-      if (normalizedUsername.length < 3) {
-        return res.status(400).json({ message: 'Username must be at least 3 characters' });
-      }
+       if (normalizedUsername.length < 3) {
+         return res.status(400).json({ message: 'Username must be at least 3 characters' });
+       }
 
-      if (!EMAIL_REGEX.test(normalizedEmail)) {
-        return res.status(400).json({ message: 'Invalid email format' });
-      }
+       if (!EMAIL_REGEX.test(normalizedEmail)) {
+         return res.status(400).json({ message: 'Invalid email format' });
+       }
 
-      const existingEmail = await pool.query('SELECT id FROM users WHERE email = $1 AND id <> $2', [
-        normalizedEmail,
-        authUser.id,
-      ]);
+       const existingEmail = await pool.query('SELECT id FROM users WHERE email = $1 AND id <> $2', [
+         normalizedEmail,
+         authUser.id,
+       ]);
 
-      if (existingEmail.rows.length > 0) {
-        return res.status(409).json({ message: 'Email already in use' });
-      }
+       if (existingEmail.rows.length > 0) {
+         return res.status(409).json({ message: 'Email already in use' });
+       }
 
-      const updatedUserResult = await pool.query(
-        `
-        UPDATE users
-        SET username = $1, email = $2
-        WHERE id = $3
-        RETURNING id, username, email
-      `,
-        [normalizedUsername, normalizedEmail, authUser.id]
-      );
+       const updatedUserResult = await pool.query(
+         `
+         UPDATE users
+         SET username = $1, email = $2, phone_number = $3
+         WHERE id = $4
+         RETURNING id, username, email, phone_number
+       `,
+         [normalizedUsername, normalizedEmail, normalizedPhone, authUser.id]
+       );
 
-      if (updatedUserResult.rows.length === 0) {
-        return res.status(404).json({ message: 'User not found' });
-      }
+       if (updatedUserResult.rows.length === 0) {
+         return res.status(404).json({ message: 'User not found' });
+       }
 
-      const updatedUser = updatedUserResult.rows[0];
-      const token = createAuthToken(updatedUser);
-      setAuthCookie(res, token);
+       const updatedUser = updatedUserResult.rows[0];
+       const token = createAuthToken(updatedUser);
+       setAuthCookie(res, token);
 
-      return res.json({
-        message: 'Account profile updated.',
-        user: updatedUser,
-      });
-    } catch (error) {
-      if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
-        return res.status(401).json({ message: 'Invalid token' });
-      }
+       return res.json({
+         message: 'Account profile updated.',
+         user: updatedUser,
+       });
+     } catch (error) {
+       if (error?.name === 'JsonWebTokenError' || error?.name === 'TokenExpiredError') {
+         return res.status(401).json({ message: 'Invalid token' });
+       }
 
-      console.error('Profile update error:', error.message);
-      return res.status(500).json({ message: 'Server error' });
-    }
-  });
+       console.error('Profile update error:', error.message);
+       return res.status(500).json({ message: 'Server error' });
+     }
+   });
 
   app.put('/api/account/password', async (req, res) => {
     try {

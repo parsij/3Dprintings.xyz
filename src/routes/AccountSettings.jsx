@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Navigate, useNavigate, Routes, Route, Link, useLocation } from "react-router-dom";
 import Account from "../components/Account.jsx";
-import ChnagePassword from "../components/ChnagePassword.jsx";
-import SmallNavBar from "../components/SmallNavBar.jsx";
+import ChangePassword from "../components/ChangePassword.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import ShippingAddress from "../components/ShippingAddress.jsx";
+import Orders from "./Orders.jsx";
 import {
   changeAccountPassword,
   getAccountAddress,
@@ -13,13 +13,14 @@ import {
   updateAccountAddress,
   updateAccountProfile,
 } from "../services/accountSettingsService.js";
+import Navbar from "../components/NavBar.jsx";
 
 const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const ADDRESS_AUTOCOMPLETE_DEBOUNCE_MS = 100;
 
 export default function AccountSettings({ user, setUser }) {
   const navigate = useNavigate();
-  const [profileForm, setProfileForm] = useState({ username: "", email: "" });
+  const [profileForm, setProfileForm] = useState({ username: "", email: "", phone_number: "" });
   const [addressForm, setAddressForm] = useState({
     street_address: "",
     city: "",
@@ -62,6 +63,7 @@ export default function AccountSettings({ user, setUser }) {
     setProfileForm({
       username: user.username || "",
       email: user.email || "",
+      phone_number: user.phone_number || "",
     });
   }, [user]);
 
@@ -226,6 +228,8 @@ export default function AccountSettings({ user, setUser }) {
   const canSubmitAddress = Object.keys(addressErrors).length === 0;
   const canSubmitPassword = Object.keys(passwordErrors).length === 0;
 
+  const location = useLocation();
+
   async function onProfileSubmit(event) {
     event.preventDefault();
 
@@ -244,6 +248,7 @@ export default function AccountSettings({ user, setUser }) {
       const data = await updateAccountProfile({
         username: profileForm.username,
         email: profileForm.email,
+        phone_number: profileForm.phone_number,
       });
 
       if (data?.user) {
@@ -394,59 +399,124 @@ export default function AccountSettings({ user, setUser }) {
 
   return (
     <>
-      <SmallNavBar />
+      <Navbar isSignedIn={!!user} NoNavBarLimit={false
+      } />
       <SideMenu />
 
-      <main className="min-h-screen overflow-x-hidden bg-orange-50 px-4 pb-12 pt-24 text-gray-900">
-        <section className="mx-auto grid w-full max-w-5xl gap-5 px-1 lg:grid-cols-2">
-          <Account
-            profileForm={profileForm}
-            setProfileForm={setProfileForm}
-            profileErrors={profileErrors}
-            canSubmitProfile={canSubmitProfile}
-            isSavingProfile={isSavingProfile}
-            onProfileSubmit={onProfileSubmit}
-            profileMessage={profileMessage}
-            profileError={profileError}
-            onSignOut={onSignOut}
-            isSigningOut={isSigningOut}
-            signOutMessage={signOutMessage}
-          />
+      <main className="flex min-h-screen pt-16 bg-gray-50 flex-col md:flex-row text-gray-900">
+        <aside className="w-full md:w-64 lg:w-72 border-r border-gray-200 bg-white shrink-0">
+          <nav className="sticky top-20 flex flex-col gap-1 p-4 md:pt-8 pt-4">
+            <h3 className="mb-4 px-3 text-xs font-bold uppercase tracking-wider text-gray-500">Account Settings</h3>
 
-          <ShippingAddress
-            addressLine={addressLine}
-            setAddressLine={setAddressLine}
-            addressSuggestions={addressSuggestions}
-            showAddressSuggestions={showAddressSuggestions}
-            setShowAddressSuggestions={setShowAddressSuggestions}
-            isSuggestingAddress={isSuggestingAddress}
-            useManualAddress={useManualAddress}
-            setUseManualAddress={setUseManualAddress}
-            addressForm={addressForm}
-            setAddressForm={setAddressForm}
-            addressErrors={addressErrors}
-            canSubmitAddress={canSubmitAddress}
-            isSavingAddress={isSavingAddress}
-            onAddressSubmit={onAddressSubmit}
-            addressMessage={addressMessage}
-            addressError={addressError}
-            setAddressMessage={setAddressMessage}
-            setAddressError={setAddressError}
-          />
+            <Link
+              to="/account"
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                location.pathname === '/account' || location.pathname === '/account/'
+                  ? 'bg-orange-50 border-orange-500 text-orange-800' 
+                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              Profile Info
+            </Link>
 
-          <ChnagePassword
-            passwordForm={passwordForm}
-            setPasswordForm={setPasswordForm}
-            showPasswords={showPasswords}
-            setShowPasswords={setShowPasswords}
-            passwordErrors={passwordErrors}
-            canSubmitPassword={canSubmitPassword}
-            isSavingPassword={isSavingPassword}
-            onPasswordSubmit={onPasswordSubmit}
-            passwordMessage={passwordMessage}
-            passwordError={passwordError}
-          />
-        </section>
+            <Link
+              to="/account/address"
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                location.pathname === '/account/address'
+                  ? 'bg-orange-50 border-orange-500 text-orange-800'  
+                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              Shipping Address
+            </Link>
+
+            <Link
+              to="/account/password"
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                location.pathname === '/account/password'
+                  ? 'bg-orange-50 border-orange-500 text-orange-800'  
+                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              Change Password
+            </Link>
+
+            <Link
+              to="/account/orders"
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                location.pathname === '/account/orders'
+                  ? 'bg-orange-50 border-orange-500 text-orange-800'  
+                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              Your Orders
+            </Link>
+          </nav>
+        </aside>
+
+        <div className="flex-1 p-6 md:p-10 lg:p-14 overflow-x-hidden">
+          <div className="max-w-4xl">
+            <Routes>
+              <Route path="/" element={
+                <Account
+                  profileForm={profileForm}
+                  setProfileForm={setProfileForm}
+                  profileErrors={profileErrors}
+                  canSubmitProfile={canSubmitProfile}
+                  isSavingProfile={isSavingProfile}
+                  onProfileSubmit={onProfileSubmit}
+                  profileMessage={profileMessage}
+                  profileError={profileError}
+                  onSignOut={onSignOut}
+                  isSigningOut={isSigningOut}
+                  signOutMessage={signOutMessage}
+                />
+              } />
+
+              <Route path="address" element={
+                <ShippingAddress
+                  addressLine={addressLine}
+                  setAddressLine={setAddressLine}
+                  addressSuggestions={addressSuggestions}
+                  showAddressSuggestions={showAddressSuggestions}
+                  setShowAddressSuggestions={setShowAddressSuggestions}
+                  isSuggestingAddress={isSuggestingAddress}
+                  useManualAddress={useManualAddress}
+                  setUseManualAddress={setUseManualAddress}
+                  addressForm={addressForm}
+                  setAddressForm={setAddressForm}
+                  addressErrors={addressErrors}
+                  canSubmitAddress={canSubmitAddress}
+                  isSavingAddress={isSavingAddress}
+                  onAddressSubmit={onAddressSubmit}
+                  addressMessage={addressMessage}
+                  addressError={addressError}
+                  setAddressMessage={setAddressMessage}
+                  setAddressError={setAddressError}
+                />
+              } />
+
+              <Route path="password" element={
+                <ChangePassword
+                  passwordForm={passwordForm}
+                  setPasswordForm={setPasswordForm}
+                  showPasswords={showPasswords}
+                  setShowPasswords={setShowPasswords}
+                  passwordErrors={passwordErrors}
+                  canSubmitPassword={canSubmitPassword}
+                  isSavingPassword={isSavingPassword}
+                  onPasswordSubmit={onPasswordSubmit}
+                  passwordMessage={passwordMessage}
+                  passwordError={passwordError}
+                />
+              } />
+
+              <Route path="orders" element={
+                <Orders user={user} />
+              } />
+            </Routes>
+          </div>
+        </div>
       </main>
     </>
   );

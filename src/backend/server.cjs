@@ -1,4 +1,8 @@
 const express = require('express');
+const path = require("path");
+const { spawn } = require('child_process');
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+
 const app = express();
 const pool = require("./db.cjs");
 const cors = require('cors');
@@ -7,9 +11,7 @@ const multer = require("multer");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
-const path = require("path");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -299,6 +301,7 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   getAuthUserFromRequest,
   isAuthenticatedAnIisValid,
   calculateTax: calculateTaxAndAuthentication,
+  stripe,
   EMAIL_REGEX,
   PASSWORD_REGEX,
   MAX_PHOTOS,
@@ -324,6 +327,100 @@ app.use((error, req, res, next) => {
   return next(error);
 });
 
-app.listen(3000, '0.0.0.0', () => {
-  console.log('Server is running on http://0.0.0.0:3000');
-});
+// Initialize database tables
+async function initializeDatabase() {
+  try {
+     // Add phone_number column if it doesn't exist
+     await pool.query(`
+       ALTER TABLE users
+       ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20)
+     `);
+     console.log('✅ Phone number column ensured in users table');
+
+     // Add payment_type column to orders if it doesn't exist
+     await pool.query(`
+       ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS payment_type VARCHAR(100)
+     `);
+     console.log('✅ Payment type column ensured in orders table');
+
+     // Create orders table if it doesn't exist
+     await pool.query(`
+       CREATE TABLE IF NOT EXISTS orders (
+         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+         customer_id BIGINT NOT NULL,
+         status VARCHAR(50) DEFAULT 'pending',
+         total_amount NUMERIC(12, 2) NOT NULL CHECK (total_amount >= 0),
+         items JSONB NOT NULL,
+         shipping_address_id INT,
+         payment_type VARCHAR(100),
+         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       );
+     `);
+    console.log('✅ Orders table initialized');
+  } catch (error) {
+    console.error('⚠️ Error initializing database:', error.message);
+  }
+}
+
+// Start Stripe Webhook Listener
+function startStripeWebhookListener() {
+  const isWindows = process.platform === 'win32';
+  const command = isWindows ? 'stripe.cmd' : 'stripe';
+
+  const webhookProcess = spawn(command, ['listen', '--forward-to', 'localhost:3000/webhook'], {
+    stdio: 'inherit',
+    shell: isWindows
+  });
+
+  webhookProcess.on('error', (error) => {
+    console.warn('⚠️ Stripe webhook listener not available. Make sure Stripe CLI is installed and STRIPE_WEBHOOK_SECRET is set.');
+    console.warn('Install: https://stripe.com/docs/stripe-cli');
+  });
+
+  webhookProcess.on('close', (code) => {
+    if (code !== 0) {
+      console.warn('⚠️ Webhook listener closed with code:', code);
+    }
+  });
+
+  process.on('exit', () => {
+    webhookProcess.kill();
+  });
+}
+
+// Start server and services
+async function startServer() {
+  try {
+    // Initialize database
+    await initializeDatabase();
+
+    // Start Express server
+    app.listen(3000, '0.0.0.0', () => {
+      console.log('');
+      console.log('═══════════════════════════════════════════');
+      console.log('🚀 SERVER STARTED');
+      console.log('═══════════════════════════════════════════');
+      console.log('✅ API: http://0.0.0.0:3000');
+      console.log('✅ Database: Connected');
+      console.log('✅ Stripe: Configured');
+      console.log('═══════════════════════════════════════════');
+      console.log('');
+
+      // Start webhook listener (optional, but recommended)
+      if (process.env.STRIPE_WEBHOOK_SECRET) {
+        console.log('🔔 Starting Stripe Webhook Listener...');
+        console.log('   Make sure Stripe CLI is running');
+        startStripeWebhookListener();
+      } else {
+        console.warn('⚠️ STRIPE_WEBHOOK_SECRET not set. Webhooks will not work.');
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();

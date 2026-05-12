@@ -12,6 +12,9 @@ import SearchResults from "./routes/SearchResults.jsx";
 import LikedProducts from "./routes/LikedProducts.jsx";
 import SavedProducts from "./routes/SavedProducts.jsx";
 import YourReviews from "./routes/YourReviews.jsx";
+import Checkout from "./components/Checkout.jsx";
+import PaymentSuccess from "./routes/PaymentSuccess.jsx";
+import PaymentCancel from "./routes/PaymentCancel.jsx";
 
 const Router = ({ user, setUser }) => {
   return (
@@ -29,9 +32,12 @@ const Router = ({ user, setUser }) => {
         <Route path="/your-reviews" element={<YourReviews user={user} />} />
         <Route path="/product/:id" element={<ProductPage user={user} />} />
         <Route path="/cart" element={<CartPage user={user} />} />
+        <Route path="/checkout" element={user ? <Checkout /> : <Navigate to="/signin" replace />} />
+        <Route path="/success" element={<PaymentSuccess />} />
+        <Route path="/cancel" element={<PaymentCancel />} />
         <Route path="/create" element={<SubmitModel user={user} />} />
         <Route
-          path="/account"
+          path="/account/*"
           element={user ? <AccountSettings user={user} setUser={setUser} /> : <Navigate to="/signin" replace />}
         />
       </Routes>

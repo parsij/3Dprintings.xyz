@@ -52,27 +52,44 @@ export default function Account({
           )}
         </div>
 
-        <div className="transform transition-all duration-300 hover:translate-x-1">
-          <label htmlFor="email" className="mb-1 block text-sm text-gray-700 font-semibold">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={profileForm.email}
-            onChange={(event) =>
-              setProfileForm((prev) => ({ ...prev, email: event.target.value }))
-            }
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
-            placeholder="you@example.com"
-          />
-          {profileErrors.email && (
-            <p className="mt-1 text-xs text-red-500 animate-pulse">{profileErrors.email}</p>
-          )}
-        </div>
+         <div className="transform transition-all duration-300 hover:translate-x-1">
+           <label htmlFor="email" className="mb-1 block text-sm text-gray-700 font-semibold">
+             Email
+           </label>
+           <input
+             id="email"
+             name="email"
+             type="email"
+             value={profileForm.email}
+             onChange={(event) =>
+               setProfileForm((prev) => ({ ...prev, email: event.target.value }))
+             }
+             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
+             placeholder="you@example.com"
+           />
+           {profileErrors.email && (
+             <p className="mt-1 text-xs text-red-500 animate-pulse">{profileErrors.email}</p>
+           )}
+         </div>
 
-        <button
+         <div className="transform transition-all duration-300 hover:translate-x-1">
+           <label htmlFor="phone" className="mb-1 block text-sm text-gray-700 font-semibold">
+             Phone Number (Optional)
+           </label>
+           <input
+             id="phone"
+             name="phone"
+             type="tel"
+             value={profileForm.phone_number || ""}
+             onChange={(event) =>
+               setProfileForm((prev) => ({ ...prev, phone_number: event.target.value }))
+             }
+             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 hover:border-orange-200 shadow-sm focus:shadow-md"
+             placeholder="+1 (555) 123-4567"
+           />
+         </div>
+
+         <button
           type="submit"
           disabled={!canSubmitProfile || isSavingProfile}
           className={`w-full cursor-pointer rounded-xl py-3 font-semibold text-white transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:scale-100 ${

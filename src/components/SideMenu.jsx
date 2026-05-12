@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { useMenu } from "../MenuContext.jsx";
 
 const SideMenu = () => {
@@ -24,13 +25,14 @@ const SideMenu = () => {
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
-          <a href="/home" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Home</a>
-          <a href="/products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">3D Printed Models</a>
-          <a href="/liked-products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Liked Products</a>
-          <a href="/saved-products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Saved Products</a>
-          <a href="/your-reviews" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Your Reviews</a>
-          <a href="/create" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">List a 3D Printed Model</a>
+          <div className="p-4 space-y-3">
+          <Link to="/home" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Home</Link>
+          <Link to="/products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">3D Printed Models</Link>
+          <Link to="/liked-products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Liked Products</Link>
+          <Link to="/saved-products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Saved Products</Link>
+          <Link to="/your-reviews" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Your Reviews</Link>
+          <Link to="/account/orders" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Your Orders</Link>
+          <Link to="/create" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">List a 3D Printed Model</Link>
         </div>
       </aside>
     </>

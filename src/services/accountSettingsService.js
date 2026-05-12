@@ -2,13 +2,14 @@ import axios from "axios";
 
 const API_BASE = "http://localhost:3000";
 
-export async function updateAccountProfile({ username, email }) {
+export async function updateAccountProfile({ username, email, phone_number }) {
   try {
     const response = await axios.put(
       `${API_BASE}/api/account/profile`,
       {
         username: username.trim(),
         email: email.trim(),
+        phone_number: phone_number ? phone_number.trim() : null,
       },
       {
         withCredentials: true,

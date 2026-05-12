@@ -1,6 +1,6 @@
 import PasswordEye from "../assets/PasswordEye.svg";
 
-export default function ChnagePassword({
+export default function ChangePassword({
   passwordForm,
   setPasswordForm,
   showPasswords,
@@ -14,7 +14,7 @@ export default function ChnagePassword({
 }) {
   return (
     <article
-      className="animate-fade-in-up rounded-2xl border border-orange-100 bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl sm:p-8 lg:col-span-2"
+      className="animate-fade-in-up rounded-2xl border border-orange-100 bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl sm:p-8"
       style={{ animationDelay: "0.15s" }}
     >
       <h2 className="text-2xl font-extrabold tracking-tight overflow-visible pb-2">

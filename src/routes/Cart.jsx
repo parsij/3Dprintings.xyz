@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
@@ -13,6 +13,7 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   // Load cart on mount
   useEffect(() => {
@@ -135,6 +136,38 @@ export default function CartPage() {
                 />
               </div>
             ))}
+            
+            {/* Checkout Section */}
+            <div className="mt-8 rounded-2xl border border-orange-200 bg-white p-6 shadow-md hover:shadow-lg transition-all duration-300">
+              <h2 className="text-2xl font-bold mb-4 text-gray-800">Order Summary</h2>
+              
+              <div className="space-y-2 mb-4 text-gray-700">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span className="font-semibold">${(cartItems.reduce((sum, item) => sum + (item.current_price * item.quantity), 0)).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Tax & Shipping (estimated):</span>
+                  <span>Calculated at checkout</span>
+                </div>
+              </div>
+              
+              <hr className="my-4 border-orange-100" />
+              
+              <button
+                onClick={() => navigate("/checkout", { state: { items: cartItems } })}
+                className="w-full rounded-xl bg-orange-500 px-6 py-3 font-bold text-white transition-all duration-300 hover:bg-orange-600 hover:scale-105 active:scale-95 cursor-pointer shadow-md hover:shadow-lg"
+              >
+                Proceed to Checkout
+              </button>
+              
+              <Link
+                to="/home"
+                className="block mt-3 text-center text-orange-500 font-semibold hover:underline transition-colors duration-300 hover:text-orange-600"
+              >
+                Continue Shopping
+              </Link>
+            </div>
           </div>
         )}
       </div>
