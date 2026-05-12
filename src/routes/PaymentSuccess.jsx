@@ -17,9 +17,18 @@ const PaymentSuccess = () => {
                     setLoading(false);
                     return;
                 }
-                
+
+                if (sessionId) {
+                    await fetch('/api/payment/confirm-success', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ sessionId, orderId }),
+                    });
+                }
+
                 // Fetch order details from backend
-                const response = await fetch(`/api/orders/${orderId}`);
+                const response = await fetch(`/api/orders/${orderId}`, { credentials: 'include' });
                 if (response.ok) {
                     const data = await response.json();
                     setOrderData(data);
@@ -32,7 +41,7 @@ const PaymentSuccess = () => {
         };
 
         fetchOrderDetails();
-    }, [orderId]);
+    }, [orderId, sessionId]);
 
     return (
         <>

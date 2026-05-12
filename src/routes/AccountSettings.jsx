@@ -4,7 +4,7 @@ import Account from "../components/Account.jsx";
 import ChangePassword from "../components/ChangePassword.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import ShippingAddress from "../components/ShippingAddress.jsx";
-import Orders from "./Orders.jsx";
+import Orders from "../components/Orders.jsx";
 import {
   changeAccountPassword,
   getAccountAddress,

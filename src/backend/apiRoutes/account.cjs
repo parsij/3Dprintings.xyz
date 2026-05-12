@@ -193,7 +193,7 @@ function accountRoutes(deps) {
           bias: 'countrycode:us',
           apiKey: geoapifyApiKey,
         },
-        timeout: 8000,
+        timeout: 12000,
       });
 
       const features = Array.isArray(data?.features) ? data.features : [];
@@ -210,6 +210,11 @@ function accountRoutes(deps) {
         error?.response?.data?.error ||
         error?.message ||
         'Server error';
+
+      if (error?.code === 'ECONNABORTED') {
+        console.warn('Geoapify autocomplete timeout');
+        return res.json({ suggestions: [] });
+      }
 
       console.error('Geoapify autocomplete error:', message);
       return res.status(500).json({ message: 'Could not autocomplete address right now.' });
@@ -434,4 +439,3 @@ accountRoutes.__private = {
 };
 
 module.exports = accountRoutes;
-

@@ -1,6 +1,14 @@
 module.exports = function paymentController(deps) {
     const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid, stripe } = deps;
     const express = require('express');
+    const normalizeAddress = (address = {}) => ({
+        line1: String(address.line1 || '').trim(),
+        line2: String(address.line2 || '').trim(),
+        city: String(address.city || '').trim(),
+        state: String(address.state || '').trim().toUpperCase(),
+        zip: String(address.zip || '').trim(),
+        country: String(address.country || '').trim().toUpperCase(),
+    });
 
     // List orders for authenticated user (supports pagination via ?page=&limit=)
     app.get("/api/orders", async (req, res) => {
@@ -83,11 +91,12 @@ module.exports = function paymentController(deps) {
             if (!authUser) return res.status(401).json({ error: "Unauthorized" });
 
             const { items, address } = req.body;
+            const safeAddress = normalizeAddress(address);
             if (!items || !items.length) {
                 return res.status(400).json({ error: "No items provided" });
             }
 
-            if (!address || !address.zip || !address.state || !address.country) {
+            if (!safeAddress.zip || !safeAddress.state || !safeAddress.country) {
                 return res.status(400).json({ error: "Invalid shipping address" });
             }
 
@@ -107,12 +116,12 @@ module.exports = function paymentController(deps) {
                     })),
                     customer_details: {
                         address: {
-                            line1: address.line1 || '',
-                            line2: address.line2 || '',
-                            city: address.city || '',
-                            state: address.state,
-                            postal_code: address.zip,
-                            country: address.country,
+                            line1: safeAddress.line1,
+                            line2: safeAddress.line2,
+                            city: safeAddress.city,
+                            state: safeAddress.state,
+                            postal_code: safeAddress.zip,
+                            country: safeAddress.country,
                         },
                         address_source: 'shipping',
                     },
@@ -164,11 +173,12 @@ module.exports = function paymentController(deps) {
             if (!authUser) return res.status(401).json({ error: "Unauthorized" });
 
             const { items, address } = req.body;
+            const safeAddress = normalizeAddress(address);
             if (!items || !items.length) {
                 return res.status(400).json({ error: "No items to checkout" });
             }
 
-            if (!address || !address.zip || !address.state || !address.country) {
+            if (!safeAddress.zip || !safeAddress.state || !safeAddress.country) {
                 return res.status(400).json({ error: "Invalid shipping address" });
             }
 
@@ -191,12 +201,12 @@ module.exports = function paymentController(deps) {
                     })),
                     customer_details: {
                         address: {
-                            line1: address.line1 || '',
-                            line2: address.line2 || '',
-                            city: address.city || '',
-                            state: address.state,
-                            postal_code: address.zip,
-                            country: address.country,
+                            line1: safeAddress.line1,
+                            line2: safeAddress.line2,
+                            city: safeAddress.city,
+                            state: safeAddress.state,
+                            postal_code: safeAddress.zip,
+                            country: safeAddress.country,
                         },
                         address_source: 'shipping',
                     },
@@ -317,70 +327,66 @@ module.exports = function paymentController(deps) {
         }
     });
 
-    // Stripe webhook handler
-    app.post('/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
-        const sig = request.headers['stripe-signature'];
-
-        let event;
+    // Confirm payment from success page as a fallback to webhook delivery issues
+    app.post("/api/payment/confirm-success", async (req, res) => {
         try {
-            event = stripe.webhooks.constructEvent(
-                request.body,
-                sig,
-                process.env.STRIPE_WEBHOOK_SECRET
-            );
-        } catch (err) {
-            console.error('Webhook signature verification failed:', err.message);
-            return response.status(400).send(`Webhook Error: ${err.message}`);
-        }
+            const authUser = getAuthUserFromRequest(req);
+            if (!authUser) return res.status(401).json({ error: "Unauthorized" });
 
-        try {
-            if (event.type === 'checkout.session.completed') {
-                const session = event.data.object;
-                const orderId = session.metadata?.orderId;
-
-                if (orderId) {
-                    // Extract payment method info - determine payment type from session
-                    let paymentType = 'card'; // default
-                    if (session.payment_method) {
-                        const paymentMethod = await stripe.paymentMethods.retrieve(session.payment_method);
-                        if (paymentMethod.type === 'card') {
-                            paymentType = paymentMethod.card.brand || 'card';
-                        } else if (paymentMethod.type === 'ideal') {
-                            paymentType = 'iDEAL';
-                        } else if (paymentMethod.type === 'klarna') {
-                            paymentType = 'Klarna';
-                        } else if (paymentMethod.type === 'sepa_debit') {
-                            paymentType = 'SEPA Debit';
-                        } else if (paymentMethod.type === 'ach_debit') {
-                            paymentType = 'ACH Debit';
-                        } else {
-                            paymentType = paymentMethod.type || 'card';
-                        }
-                    }
-
-                    // Update order status to success and save payment type
-                    await pool.query(
-                        `UPDATE orders SET status = 'success', payment_type = $1, updated_at = NOW() WHERE id = $2`,
-                        [paymentType, orderId]
-                    );
-                    console.log(`Order ${orderId} marked as success with payment type: ${paymentType}`);
-
-                    // Optionally: Clear user's cart
-                    const userId = session.metadata?.userId;
-                    if (userId) {
-                        await pool.query(
-                            `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
-                            [userId]
-                        );
-                        console.log(`Cart cleared for user ${userId}.`);
-                    }
-                }
+            const { sessionId, orderId } = req.body || {};
+            if (!sessionId || !orderId) {
+                return res.status(400).json({ error: "Missing sessionId or orderId" });
             }
 
-            response.json({ received: true });
-        } catch (err) {
-            console.error('Error processing webhook:', err);
-            response.status(500).json({ error: 'Webhook processing failed' });
+            const orderResult = await pool.query(
+                `SELECT id, customer_id, status FROM orders WHERE id = $1`,
+                [orderId]
+            );
+            if (orderResult.rows.length === 0) {
+                return res.status(404).json({ error: "Order not found" });
+            }
+            if (String(orderResult.rows[0].customer_id) !== String(authUser.id)) {
+                return res.status(403).json({ error: "Forbidden" });
+            }
+
+            const session = await stripe.checkout.sessions.retrieve(sessionId);
+            const sessionOrderId = session.metadata?.orderId;
+            if (!sessionOrderId || String(sessionOrderId) !== String(orderId)) {
+                return res.status(400).json({ error: "Session does not match order" });
+            }
+
+            if (session.payment_status !== 'paid') {
+                return res.json({
+                    updated: false,
+                    status: orderResult.rows[0].status,
+                    paymentStatus: session.payment_status,
+                });
+            }
+
+            await pool.query(
+                `UPDATE orders
+                 SET status = 'completed',
+                     updated_at = NOW(),
+                     payment_type = COALESCE(payment_type, 'card')
+                 WHERE id = $1 AND status = 'pending'`,
+                [orderId]
+            );
+
+            const updatedOrder = await pool.query(
+                `SELECT id, status FROM orders WHERE id = $1`,
+                [orderId]
+            );
+
+            return res.json({
+                updated: true,
+                status: updatedOrder.rows[0]?.status || 'completed',
+                paymentStatus: session.payment_status,
+            });
+        } catch (error) {
+            console.error('Error confirming checkout success:', error);
+            res.status(500).json({ error: 'Internal server error' });
         }
     });
+
+    // The Stripe webhook handler has been moved to server.cjs BEFORE express.json()
 }

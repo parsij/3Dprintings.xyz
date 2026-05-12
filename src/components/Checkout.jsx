@@ -102,13 +102,19 @@ const Checkout = () => {
             setCalculatingTax(true);
             setError(null);
             try {
+                const normalizedAddress = {
+                    ...shippingAddress,
+                    state: shippingAddress.state.trim().toUpperCase(),
+                    zip: shippingAddress.zip.trim(),
+                    country: shippingAddress.country.trim().toUpperCase(),
+                };
                 const res = await fetch('http://localhost:3000/api/payment/calculate-totals', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
                         items: cartItems,
-                        address: shippingAddress,
+                        address: normalizedAddress,
                     }),
                 });
 
@@ -140,9 +146,16 @@ const Checkout = () => {
 
     const handleAddressChange = (e) => {
         const { name, value } = e.target;
+        let nextValue = value;
+        if (name === 'country' || name === 'state') {
+            nextValue = value.toUpperCase();
+        }
+        if (name === 'country' || name === 'state' || name === 'zip') {
+            nextValue = nextValue.trimStart();
+        }
         setShippingAddress(prev => ({
             ...prev,
-            [name]: value,
+            [name]: nextValue,
         }));
     };
 
@@ -196,7 +209,12 @@ const Checkout = () => {
                 credentials: 'include',
                 body: JSON.stringify({
                     items: cartItems,
-                    address: shippingAddress,
+                    address: {
+                        ...shippingAddress,
+                        state: shippingAddress.state.trim().toUpperCase(),
+                        zip: shippingAddress.zip.trim(),
+                        country: shippingAddress.country.trim().toUpperCase(),
+                    },
                 }),
             });
             const data = await res.json();

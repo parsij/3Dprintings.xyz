@@ -161,6 +161,70 @@ app.use(cors({
   credentials: true,
 }));
 
+// We must apply the webhook route BEFORE express.json() because Stripe needs the raw body
+app.post('/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
+  const sig = request.headers['stripe-signature'];
+  let event;
+  try {
+      event = stripe.webhooks.constructEvent(
+          request.body,
+          sig,
+          process.env.STRIPE_WEBHOOK_SECRET
+      );
+  } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return response.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+      if (event.type === 'checkout.session.completed') {
+          const session = event.data.object;
+          const orderId = session.metadata?.orderId;
+
+          if (orderId) {
+              let paymentType = 'card';
+              if (session.payment_method) {
+                  const paymentMethod = await stripe.paymentMethods.retrieve(session.payment_method);
+                  if (paymentMethod.type === 'card') {
+                      paymentType = paymentMethod.card.brand || 'card';
+                  } else if (paymentMethod.type === 'ideal') {
+                      paymentType = 'iDEAL';
+                  } else if (paymentMethod.type === 'klarna') {
+                      paymentType = 'Klarna';
+                  } else if (paymentMethod.type === 'sepa_debit') {
+                      paymentType = 'SEPA Debit';
+                  } else if (paymentMethod.type === 'ach_debit') {
+                      paymentType = 'ACH Debit';
+                  } else {
+                      paymentType = paymentMethod.type || 'card';
+                  }
+              }
+
+              await pool.query(
+                  `UPDATE orders SET status = 'completed', payment_type = $1, updated_at = NOW() WHERE id = $2`,
+                  [paymentType, orderId]
+              );
+              console.log(`Order ${orderId} marked as completed with payment type: ${paymentType}`);
+
+              // Optionally: Clear user's cart
+              const userId = session.metadata?.userId;
+              if (userId) {
+                  await pool.query(
+                      `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
+                      [userId]
+                  );
+                  console.log(`Cart cleared for user ${userId}.`);
+              }
+          }
+      }
+
+      response.json({ received: true });
+  } catch (err) {
+      console.error('Error processing webhook:', err);
+      response.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
 app.use(express.json());
 app.use(cookieParser());
 app.use("/imgUploads", express.static(uploadDir));
