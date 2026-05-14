@@ -47,6 +47,25 @@ const PaymentSuccess = () => {
                 setOrderData(payload?.order || null);
                 setPaymentStatus(payload?.paymentStatus || '');
                 setPaymentVerified(Boolean(payload?.paymentVerified));
+
+                const shouldClearCart =
+                    Boolean(payload?.paymentVerified) || payload?.order?.status === 'completed';
+                if (shouldClearCart) {
+                    const clearCartResponse = await fetch('/api/cart/clear', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { Accept: 'application/json' },
+                    });
+
+                    if (clearCartResponse.status === 401) {
+                        navigate('/signin', { replace: true });
+                        return;
+                    }
+
+                    if (!clearCartResponse.ok) {
+                        console.warn('Could not clear cart after successful payment.');
+                    }
+                }
             } catch (error) {
                 console.error('Error fetching order details:', error);
                 setError(error.message || 'Could not load order status.');

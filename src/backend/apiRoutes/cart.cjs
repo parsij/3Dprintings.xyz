@@ -139,4 +139,31 @@ module.exports = function cartRoutes(deps) {
       return res.status(500).json({ message: 'Server error' });
     }
   });
+
+  app.post('/api/cart/clear', async (req, res) => {
+    try {
+      const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+      if (!auth?.userId) return;
+
+      const result = await pool.query(
+        `UPDATE users
+         SET cart_json = '{}'::jsonb
+         WHERE id = $1
+         RETURNING COALESCE(cart_json::jsonb, '{}'::jsonb) AS cart_json`,
+        [auth.userId]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+
+      return res.status(200).json({
+        message: 'Cart cleared successfully.',
+        cart: result.rows[0].cart_json || {},
+      });
+    } catch (error) {
+      console.error('[POST /api/cart/clear] Error:', error);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  });
 };

@@ -507,6 +507,15 @@ module.exports = function paymentController(deps) {
             }
 
             const existingOrder = orderResult.rows[0];
+            if (existingOrder.status === "completed") {
+                await clearCartForOrderCustomer(orderId);
+                return res.json({
+                    order: existingOrder,
+                    paymentStatus: "paid",
+                    paymentVerified: true,
+                });
+            }
+
             if (!existingOrder.stripe_session_id) {
                 return res.json({
                     order: existingOrder,
