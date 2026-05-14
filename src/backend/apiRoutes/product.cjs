@@ -1,5 +1,6 @@
 module.exports = function productRoutes(deps) {
   const { app, pool } = deps;
+  const IMAGE_BASE_URL = 'https://3dprintings.xyz/api/imgUploads';
 
   app.get('/api/products', async (req, res) => {
     try {
@@ -54,7 +55,7 @@ module.exports = function productRoutes(deps) {
 
         return {
           ...p,
-          image_url: firstImage ? `https://3dprintings.xyz/imgUploads/${firstImage}` : null,
+          image_url: firstImage ? `${IMAGE_BASE_URL}/${firstImage}` : null,
           tags: parsedTags,
           category
         };
@@ -121,7 +122,7 @@ module.exports = function productRoutes(deps) {
 
         return {
           ...p,
-          image_url: firstImage ? `https://3dprintings.xyz/imgUploads/${firstImage}` : null,
+          image_url: firstImage ? `${IMAGE_BASE_URL}/${firstImage}` : null,
           tags: parsedTags,
           category
         };
@@ -164,7 +165,7 @@ module.exports = function productRoutes(deps) {
 
       const p = result.rows[0];
       const images = Array.isArray(p.img_path) && p.img_path.length > 0
-        ? p.img_path.map(img => `https://3dprintings.xyz/imgUploads/${img}`)
+        ? p.img_path.map(img => `${IMAGE_BASE_URL}/${img}`)
         : [];
       const firstImage = images.length > 0 ? images[0] : null;
 

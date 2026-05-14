@@ -147,7 +147,7 @@ module.exports = function createRoutes(deps) {
         photoCount: renamedPhotos.length,
         photos: renamedPhotos.map((file) => ({
           fileName: file.filename,
-          url: `/imgUploads/${file.filename}`,
+          url: `/api/imgUploads/${file.filename}`,
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,

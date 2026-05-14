@@ -257,6 +257,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
 app.use(express.json());
 app.use(cookieParser());
 app.use("/imgUploads", express.static(uploadDir));
+app.use("/api/imgUploads", express.static(uploadDir));
 
 function createAuthToken(user) {
   return jwt.sign(

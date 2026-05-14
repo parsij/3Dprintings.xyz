@@ -6,6 +6,7 @@ const {
 
 module.exports = function likesSavesRoutes(deps) {
   const { app, pool, getAuthUserFromRequest } = deps;
+  const IMAGE_BASE_URL = 'https://3dprintings.xyz/api/imgUploads';
 
   function mapProductRow(p) {
     const firstImage =
@@ -13,7 +14,7 @@ module.exports = function likesSavesRoutes(deps) {
     return {
       ...p,
       image_url: firstImage
-        ? `https://3dprintings.xyz/imgUploads/${firstImage}`
+        ? `${IMAGE_BASE_URL}/${firstImage}`
         : null,
     };
   }
@@ -355,4 +356,3 @@ module.exports = function likesSavesRoutes(deps) {
     }
   });
 };
-
