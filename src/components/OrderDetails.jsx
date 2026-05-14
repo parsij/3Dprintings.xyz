@@ -64,6 +64,7 @@ export default function OrderDetails({ user }) {
         if (!response.ok) {
           throw new Error(payload?.error || payload?.message || "Failed to load order.");
         }
+        // this is not an error
 
         setOrder(payload);
       } catch (err) {
