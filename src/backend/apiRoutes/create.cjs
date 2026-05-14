@@ -69,11 +69,12 @@ module.exports = function createRoutes(deps) {
           category,
           tags
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
         RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags
       `;
-      // Pass parsedTags as a JS array so pg can map to a Postgres array (text[]) or JSON array depending on column type.
+      // Persist tags as explicit JSON for jsonb columns.
       const normalizedCategory = category ? category.trim() : null;
+      const tagsJson = JSON.stringify(parsedTags);
       const productValues = [
         modelName.trim(),
         description.trim(),
@@ -82,7 +83,7 @@ module.exports = function createRoutes(deps) {
         0,
         userId,
         normalizedCategory,
-        parsedTags,
+        tagsJson,
       ];
       const productResult = await pool.query(insertProductQuery, productValues);
       const product = productResult.rows[0];
@@ -115,8 +116,8 @@ module.exports = function createRoutes(deps) {
       // and will also work for jsonb. Use a second update to be defensive and guarantee data is stored.
       try {
         await pool.query(
-          `UPDATE products SET tags = $1, category = $2 WHERE id = $3`,
-          [parsedTags, normalizedCategory, productId]
+          `UPDATE products SET tags = $1::jsonb, category = $2 WHERE id = $3`,
+          [tagsJson, normalizedCategory, productId]
         );
       } catch (e) {
         // Best-effort: log but don't break the create flow

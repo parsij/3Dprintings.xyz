@@ -428,14 +428,14 @@ async function initializeDatabase() {
        ALTER TABLE users
        ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20)
      `);
-     console.log('✅ Phone number column ensured in users table');
+     console.log('Phone number column ensured in users table');
 
      // Add Google identity column if it doesn't exist
      await pool.query(`
        ALTER TABLE users
        ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)
      `);
-     console.log('✅ Google identity column ensured in users table');
+     console.log('Google identity column ensured in users table');
 
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`
@@ -443,21 +443,21 @@ async function initializeDatabase() {
        ON users (google_sub)
        WHERE google_sub IS NOT NULL
      `);
-     console.log('✅ Google identity unique index ensured');
+     console.log(' Google identity unique index ensured');
 
      // Add payment_type column to orders if it doesn't exist
      await pool.query(`
        ALTER TABLE orders
        ADD COLUMN IF NOT EXISTS payment_type VARCHAR(100)
      `);
-     console.log('✅ Payment type column ensured in orders table');
+     console.log('ayment type column ensured in orders table');
 
      // Add stripe_session_id column to orders if it doesn't exist
      await pool.query(`
        ALTER TABLE orders
        ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255)
      `);
-     console.log('✅ Stripe session id column ensured in orders table');
+     console.log('Stripe session id column ensured in orders table');
 
      // Create orders table if it doesn't exist
      await pool.query(`
@@ -503,13 +503,13 @@ function startStripeWebhookListener() {
   });
 
   webhookProcess.on('error', (error) => {
-    console.warn('⚠️ Stripe webhook listener not available. Make sure Stripe CLI is installed and you are logged in.');
+    console.warn('⚠Stripe webhook listener not available. Make sure Stripe CLI is installed and you are logged in.');
     console.warn('Install: https://stripe.com/docs/stripe-cli');
   });
 
   webhookProcess.on('close', (code) => {
     if (code !== 0) {
-      console.warn('⚠️ Webhook listener closed with code:', code);
+      console.warn('Webhook listener closed with code:', code);
     }
   });
 
@@ -526,16 +526,7 @@ async function startServer() {
 
     // Start Express server
     app.listen(3000, '0.0.0.0', () => {
-      console.log('');
-      console.log('═══════════════════════════════════════════');
-      console.log('🚀 SERVER STARTED');
-      console.log('═══════════════════════════════════════════');
-      console.log('✅ API: https://3dprintings.xyz');
-      console.log('✅ Database: Connected');
-      console.log('✅ Stripe: Configured');
-      console.log('═══════════════════════════════════════════');
-      console.log('');
-
+console.log("the Server is online.")
       // Start webhook listener in non-production so local webhook secrets stay in sync.
       if (process.env.NODE_ENV !== 'production') {
         console.log('🔔 Starting Stripe Webhook Listener...');
@@ -548,7 +539,7 @@ async function startServer() {
       }
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
