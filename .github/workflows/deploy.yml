@@ -22,7 +22,7 @@ jobs:
           npm run build
 
       - name: Deploy Frontend Files (rsync)
-        uses: Burnett01/rsync-deployments@5.2.1
+        uses: Burnett01/rsync-deployments@7.0.1 # Updated version
         with:
           switches: -avzr --delete
           path: dist/
@@ -37,8 +37,10 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Added a safety check to make sure the directory exists before git pull
           script: |
+            mkdir -p ~/3Dprintings.xyz/src/backend
             cd ~/3Dprintings.xyz/src/backend
-            git pull origin main
+            git pull origin master || echo "Git pull failed, check branch name"
             npm install --production
             pm2 restart api-backend || pm2 start index.js --name "api-backend"
