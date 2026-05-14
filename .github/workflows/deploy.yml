@@ -46,20 +46,28 @@ jobs:
           port: ${{ secrets.SERVER_PORT || '22' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # 1. Navigate to directory
-            mkdir -p ~/3Dprintings.xyz/src/backend
-            cd ~/3Dprintings.xyz/src/backend
+            # 1. Navigate to backend directory
+            cd ~/3Dprintings.xyz/src/backend || exit 1
 
-            # 2. Fix the Git Conflict (Force Reset)
-            # This wipes local changes on the server to allow the update
+            # 2. Sync code with GitHub
             git fetch origin master
             git reset --hard origin/master
 
-            # 3. Install Dependencies
-            # We use --omit=dev to keep it light
+            # 3. Install production dependencies
             npm install --omit=dev
 
-            # 4. Restart with PM2 (Using full path fix)
-            # We try to find where pm2 is installed to avoid 'command not found'
+            # 4. PM2 Management
             PM2_PATH=$(which pm2 || echo "/usr/local/bin/pm2")
-            $PM2_PATH restart api-backend || $PM2_PATH start index.js --name "api-backend"
+            
+            # Check if 'api-backend' is already in the list
+            if $PM2_PATH info api-backend > /dev/null 2>&1; then
+              echo "Restarting api-backend..."
+              $PM2_PATH restart api-backend --update-env
+            else
+              echo "Starting api-backend for the first time..."
+              # Target server.cjs as requested
+              $PM2_PATH start server.cjs --name "api-backend"
+            fi
+            
+            # Ensure PM2 restarts this process if the server ever reboots
+            $PM2_PATH save
