@@ -25,12 +25,34 @@ jobs:
           npm install
           npm run build
 
-      - name: Install SSH Key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: unnecessary
-          if_key_exists: replace
+      - name: Prepare SSH Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "${SSH_PRIVATE_KEY}" ]; then
+            echo "Missing SSH_PRIVATE_KEY in GitHub repository secrets."
+            exit 1
+          fi
+
+          install -m 700 -d ~/.ssh
+
+          # Support both raw multiline keys and keys stored with literal '\n'
+          if printf '%s' "${SSH_PRIVATE_KEY}" | grep -q '\\n'; then
+            printf '%b' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+          else
+            printf '%s' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+          fi
+
+          # Normalize Windows line endings if present
+          sed -i 's/\r$//' ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          # Validate key format early with a clear failure
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+            echo "SSH_PRIVATE_KEY is invalid, encrypted with a passphrase, or incorrectly formatted."
+            echo "Expected unencrypted OpenSSH private key with proper line breaks."
+            exit 1
+          fi
 
       - name: Validate Deploy Secrets
         run: |
@@ -41,7 +63,7 @@ jobs:
 
       - name: Deploy Frontend Files (rsync)
         run: |
-          rsync -avzr --delete -e "ssh -i ~/.ssh/id_rsa -p ${DEPLOY_PORT} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/3dprintings.xyz/dist
+          rsync -avzr --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${DEPLOY_PORT} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/3dprintings.xyz/dist
 
       - name: Update Backend via SSH
         uses: appleboy/ssh-action@master
