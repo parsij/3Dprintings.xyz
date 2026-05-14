@@ -445,8 +445,8 @@ module.exports = function paymentController(deps) {
                 payment_method_types: ['card'],
                 line_items,
                 mode: 'payment',
-                success_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz'}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz'}/cancel?order_id=${orderId}`,
+                success_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz:5173'}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
+                cancel_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz:5173'}/cancel?order_id=${orderId}`,
                 ...(userEmail ? { customer_email: userEmail } : {}),
                 metadata: {
                     orderId,

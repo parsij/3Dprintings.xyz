@@ -7,7 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   server: {
     host: true,
-    port: 3000, // Ensure this matches what Nginx is looking for
+    port: 5173, // Vite default dev port
     allowedHosts: [
       '3dprintings.xyz',
       'www.3dprintings.xyz'
