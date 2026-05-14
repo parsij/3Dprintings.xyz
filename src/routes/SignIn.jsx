@@ -1,12 +1,16 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg";
+import googleLogo from "../assets/google.svg";
 import SideMenu from "../components/SideMenu.jsx";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import axios from "axios";
 
+const GOOGLE_GSI_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
+
 export default function SignIn({ setUser }) {
   const navigate = useNavigate();
+  const API_BASE = `https://3dprintings.xyz`;
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -22,6 +26,10 @@ export default function SignIn({ setUser }) {
 
   const [activeField, setActiveField] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const googleButtonRef = useRef(null);
 
   const validators = {
     email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
@@ -59,9 +67,6 @@ export default function SignIn({ setUser }) {
 
     try {
       setIsSubmitting(true);
-      // Use window.location.hostname to dynamically find the server IP
-      const API_BASE = `http://${window.location.hostname}:3000`;
-
       const response = await axios.post(
         `${API_BASE}/api/login`,
         {
@@ -87,6 +92,131 @@ export default function SignIn({ setUser }) {
       setIsSubmitting(false);
     }
   };
+
+  const handleGoogleCredentialResponse = useCallback(
+    async (googleResponse) => {
+      const credential = String(googleResponse?.credential || "").trim();
+      if (!credential) {
+        setSubmitError(true);
+        setSubmitMessage("Google sign-in did not return a credential.");
+        return;
+      }
+
+      try {
+        setIsGoogleSubmitting(true);
+        setSubmitError(false);
+        setSubmitMessage("");
+
+        const response = await axios.post(
+          `${API_BASE}/api/auth/google`,
+          { credential },
+          { withCredentials: true }
+        );
+
+        setUser(response.data.user);
+        setSubmitError(false);
+        setSubmitMessage(response.data?.message || "Signed in with Google.");
+        navigate("/home", { replace: true });
+      } catch (error) {
+        const message = error.response?.data?.message || "Google sign-in failed";
+        setSubmitError(true);
+        setSubmitMessage(message);
+      } finally {
+        setIsGoogleSubmitting(false);
+      }
+    },
+    [API_BASE, navigate, setUser]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchGoogleConfig() {
+      try {
+        const response = await axios.get(`${API_BASE}/api/auth/google/config`, {
+          withCredentials: true,
+        });
+        const clientId = String(response.data?.clientId || "").trim();
+        if (isMounted) {
+          setGoogleClientId(clientId);
+        }
+      } catch {
+        if (isMounted) {
+          setGoogleClientId("");
+        }
+      }
+    }
+
+    fetchGoogleConfig();
+    return () => {
+      isMounted = false;
+    };
+  }, [API_BASE]);
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) return;
+
+    let cancelled = false;
+    let scriptNode = null;
+
+    const renderGoogleButton = () => {
+      if (cancelled || !googleButtonRef.current || !window.google?.accounts?.id) return;
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredentialResponse,
+        ux_mode: "popup",
+        context: "signin",
+      });
+
+      googleButtonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        shape: "rectangular",
+        text: "continue_with",
+        width: 320,
+      });
+      setGoogleReady(true);
+    };
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingScript = document.querySelector(`script[src="${GOOGLE_GSI_SCRIPT_SRC}"]`);
+    if (existingScript) {
+      const handleLoad = () => renderGoogleButton();
+      const handleError = () => setGoogleReady(false);
+      existingScript.addEventListener("load", handleLoad);
+      existingScript.addEventListener("error", handleError);
+
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener("load", handleLoad);
+        existingScript.removeEventListener("error", handleError);
+      };
+    }
+
+    scriptNode = document.createElement("script");
+    scriptNode.src = GOOGLE_GSI_SCRIPT_SRC;
+    scriptNode.async = true;
+    scriptNode.defer = true;
+    scriptNode.onload = renderGoogleButton;
+    scriptNode.onerror = () => setGoogleReady(false);
+    document.head.appendChild(scriptNode);
+
+    return () => {
+      cancelled = true;
+      if (scriptNode) {
+        scriptNode.onload = null;
+        scriptNode.onerror = null;
+      }
+    };
+  }, [googleClientId, handleGoogleCredentialResponse]);
 
   return (
     <>
@@ -213,12 +343,22 @@ export default function SignIn({ setUser }) {
             <div className="h-px flex-1 bg-gray-200" />
           </div>
 
-          <button
-            type="button"
-            className="cursor-pointer w-full rounded-xl border border-gray-300 bg-white py-3 text-sm font-medium transition-all duration-300 hover:border-orange-500 hover:text-orange-500 hover:scale-105 active:scale-95 hover:shadow-md shadow-sm"
-          >
-            Continue with Google
-          </button>
+          {!googleClientId ? (
+            <div className="min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 shadow-sm">
+              <div className="flex items-center justify-center gap-2 text-center text-sm text-gray-500">
+                <img src={googleLogo} alt="Google" className="h-4 w-4" />
+                <span>Google sign-in is not available.</span>
+              </div>
+            </div>
+          ) : (
+            <div
+              ref={googleButtonRef}
+              className={`${isGoogleSubmitting ? "pointer-events-none opacity-70" : ""} flex min-h-[44px] w-full items-center justify-center`}
+            />
+          )}
+          {googleClientId && !googleReady && (
+            <p className="mt-2 text-center text-xs text-gray-500">Loading Google sign-in...</p>
+          )}
 
           <p className="mt-6 text-center text-sm text-gray-600 transition-colors duration-300 hover:text-gray-700">
             Don't have an account?{" "}

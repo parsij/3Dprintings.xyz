@@ -33,7 +33,7 @@ const Router = ({ user, setUser }) => {
         <Route path="/product/:id" element={<ProductPage user={user} />} />
         <Route path="/cart" element={<CartPage user={user} />} />
         <Route path="/checkout" element={user ? <Checkout /> : <Navigate to="/signin" replace />} />
-        <Route path="/success" element={<PaymentSuccess />} />
+        <Route path="/success" element={user ? <PaymentSuccess user={user} /> : <Navigate to="/signin" replace />} />
         <Route path="/cancel" element={<PaymentCancel />} />
         <Route path="/create" element={<SubmitModel user={user} />} />
         <Route

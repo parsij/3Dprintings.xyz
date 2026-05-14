@@ -10,7 +10,7 @@ const App = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/api/auth", {
+        const response = await axios.get("https://3dprintings.xyz/api/auth", {
           withCredentials: true,
         });
         setUser(response.data.user);

@@ -1,158 +1,198 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import OrderCard from "./OrderCard.jsx";
 
+const PAGE_SIZE = 10;
+
+function getErrorMessage(response, payload) {
+  if (payload && typeof payload.error === "string") return payload.error;
+  if (payload && typeof payload.message === "string") return payload.message;
+  if (response.status === 401) return "Please sign in to view your orders.";
+  return "Failed to load orders.";
+}
+
+function getOrderItemsArray(itemsPayload) {
+  if (Array.isArray(itemsPayload)) return itemsPayload;
+  if (itemsPayload && typeof itemsPayload === "object" && Array.isArray(itemsPayload.items)) {
+    return itemsPayload.items;
+  }
+  return [];
+}
+
+function getOrderItemsCount(itemsPayload) {
+  const items = getOrderItemsArray(itemsPayload);
+  return items.reduce((count, item) => {
+    const quantity = Number(item?.quantity);
+    if (Number.isFinite(quantity) && quantity > 0) return count + quantity;
+    return count + 1;
+  }, 0);
+}
+
+function normalizePaymentType(paymentType) {
+  if (!paymentType || typeof paymentType !== "string") return "Not available";
+  return paymentType
+    .replaceAll("_", " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export default function Orders({ user }) {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState("");
-  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  const sentinelRef = useRef(null);
+  const nextPageRef = useRef(1);
+  const listRequestInFlightRef = useRef(false);
+  const listAbortRef = useRef(null);
+
+  const loadOrdersPage = useCallback(
+    async (pageToLoad, { replace = false } = {}) => {
+      if (!user || listRequestInFlightRef.current) return;
+      listRequestInFlightRef.current = true;
+
+      if (replace) setLoading(true);
+      else setLoadingMore(true);
+      setError("");
+
+      const controller = new AbortController();
+      listAbortRef.current = controller;
+
+      try {
+        const query = new URLSearchParams({
+          page: String(pageToLoad),
+          limit: String(PAGE_SIZE),
+        });
+        const response = await fetch(`/api/orders?${query.toString()}`, {
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(getErrorMessage(response, payload));
+        }
+
+        const incomingOrders = Array.isArray(payload?.orders) ? payload.orders : [];
+        const resolvedHasMore = typeof payload?.hasMore === "boolean" ? payload.hasMore : incomingOrders.length === PAGE_SIZE;
+
+        setOrders((previousOrders) => {
+          const base = replace ? [] : previousOrders;
+          const seen = new Set(base.map((order) => order.id));
+          const merged = [...base];
+
+          for (const order of incomingOrders) {
+            if (!order?.id || seen.has(order.id)) continue;
+            seen.add(order.id);
+            merged.push(order);
+          }
+
+          return merged;
+        });
+        setHasMore(resolvedHasMore);
+        nextPageRef.current = pageToLoad + 1;
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message || "Failed to load orders.");
+        }
+      } finally {
+        if (listAbortRef.current === controller) {
+          listAbortRef.current = null;
+        }
+        listRequestInFlightRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [user]
+  );
 
   useEffect(() => {
     if (!user) return;
 
-    let isCancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/orders`, { credentials: "include" });
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || res.statusText);
-        }
-        const data = await res.json();
-        if (isCancelled) return;
-        setOrders(Array.isArray(data.orders) ? data.orders : []);
-      } catch (err) {
-        if (isCancelled) return;
-        setError(err.message || "Failed to load orders.");
-      } finally {
-        if (!isCancelled) setLoading(false);
-      }
-    })();
+    nextPageRef.current = 1;
+    setOrders([]);
+    setHasMore(true);
+    loadOrdersPage(1, { replace: true });
 
     return () => {
-      isCancelled = true;
+      if (listAbortRef.current) {
+        listAbortRef.current.abort();
+      }
     };
-  }, [user]);
+  }, [user, loadOrdersPage]);
+
+  const loadMoreOrders = useCallback(() => {
+    if (!user || !hasMore || loading || loadingMore) return;
+    loadOrdersPage(nextPageRef.current, { replace: false });
+  }, [hasMore, loadOrdersPage, loading, loadingMore, user]);
+
+  useEffect(() => {
+    if (!user || !hasMore) return;
+    const node = sentinelRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMoreOrders();
+        }
+      },
+      { rootMargin: "220px 0px", threshold: 0 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loadMoreOrders, user]);
 
   if (!user) return <Navigate to="/signin" replace />;
 
-  async function viewOrder(orderId) {
-    setSelectedOrder(null);
-    try {
-      const res = await fetch(`/api/orders/${orderId}`, { credentials: "include" });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || res.statusText);
-      }
-      const data = await res.json();
-      setSelectedOrder(data);
-    } catch (err) {
-      setError(err.message || "Failed to load order details.");
-    }
-  }
-
   return (
-      <OrderCard orderNumber={"12ini-123j1-123123-121"} status={"Complete"} date={"1/1/2027"} paymentMethod={"Visa"} total={"320.43"}/>
-    // <div className="space-y-6">
-    //   <div className="flex items-center justify-between">
-    //     <h1 className="text-3xl font-extrabold">Your Orders</h1>
-    //   </div>
-    //
-    //   <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-    //     <div className="lg:col-span-2 space-y-4">
-    //       <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow">
-    //         {loading ? (
-    //           <p>Loading orders…</p>
-    //         ) : error ? (
-    //           <p className="text-red-600">{error}</p>
-    //         ) : orders.length === 0 ? (
-    //           <p>No orders found.</p>
-    //         ) : (
-    //           <ul className="space-y-3">
-    //             {orders.map((o) => (
-    //               <li key={o.id} className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 gap-4">
-    //                 <div>
-    //                   <div className="text-xs text-gray-500 uppercase font-semibold">Order ID</div>
-    //                   <div className="font-mono text-sm break-all">{o.id}</div>
-    //                   <div className="text-xs text-gray-400 mt-1">{new Date(o.created_at).toLocaleString()}</div>
-    //                   {o.payment_type && (
-    //                     <div className="text-xs text-orange-500 mt-1 font-medium bg-orange-50 px-2 py-0.5 rounded-full inline-block">
-    //                       {o.payment_type}
-    //                     </div>
-    //                   )}
-    //                 </div>
-    //                 <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 border-t sm:border-t-0 pt-3 sm:pt-0">
-    //                   <div className="text-right">
-    //                     <div className="font-bold text-lg text-gray-800">${Number(o.total_amount).toFixed(2)}</div>
-    //                     <div className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block ${
-    //                       o.status === 'completed' ? 'bg-green-100 text-green-700' :
-    //                       o.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-    //                       o.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-    //                       'bg-gray-100 text-gray-700'
-    //                     }`}>
-    //                       {o.status.toUpperCase()}
-    //                     </div>
-    //                   </div>
-    //                   <button
-    //                     onClick={() => viewOrder(o.id)}
-    //                     className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 shadow-sm transition-all active:scale-95"
-    //                   >
-    //                     Details
-    //                   </button>
-    //                 </div>
-    //               </li>
-    //             ))}
-    //           </ul>
-    //         )}
-    //       </div>
-    //     </div>
-    //
-    //     <aside className="space-y-4">
-    //       <div className="rounded-2xl border border-orange-100 bg-white p-6 shadow sticky top-24">
-    //         <h3 className="font-bold text-lg mb-4 text-gray-800 border-b border-orange-50 pb-2">Order Details</h3>
-    //         {!selectedOrder ? (
-    //           <div className="text-center py-8">
-    //             <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    //               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    //             </svg>
-    //             <p className="mt-2 text-sm text-gray-500">Select an order to view full details.</p>
-    //           </div>
-    //         ) : (
-    //           <div className="space-y-4 text-sm">
-    //             <div>
-    //               <div className="text-xs text-gray-400 font-bold uppercase">Order Information</div>
-    //               <div className="font-mono text-xs mt-1 bg-gray-50 p-2 rounded break-all">{selectedOrder.id}</div>
-    //             </div>
-    //             <div className="grid grid-cols-2 gap-4">
-    //               <div>
-    //                 <div className="text-xs text-gray-400 font-bold uppercase">Status</div>
-    //                 <div className="capitalize font-medium text-gray-700">{selectedOrder.status}</div>
-    //               </div>
-    //               <div>
-    //                 <div className="text-xs text-gray-400 font-bold uppercase">Total</div>
-    //                 <div className="font-bold text-orange-600 text-base">${Number(selectedOrder.total_amount).toFixed(2)}</div>
-    //               </div>
-    //             </div>
-    //             {selectedOrder.payment_type && (
-    //               <div>
-    //                 <div className="text-xs text-gray-400 font-bold uppercase">Payment Method</div>
-    //                 <div className="capitalize font-medium text-gray-700">{selectedOrder.payment_type}</div>
-    //               </div>
-    //             )}
-    //             <div>
-    //               <div className="text-xs text-gray-400 font-bold uppercase mb-2">Items JSON</div>
-    //               <pre className="whitespace-pre-wrap rounded-lg bg-gray-900 text-gray-300 p-4 text-[10px] overflow-auto max-h-64 leading-tight">
-    //                 {JSON.stringify(selectedOrder.items, null, 2)}
-    //               </pre>
-    //             </div>
-    //           </div>
-    //         )}
-    //       </div>
-    //     </aside>
-    //   </div>
-    // </div>
+    <section className="space-y-4 animate-fade-in-up transition-all duration-300">
+      <nav className="text-[1.67rem] mb-2 font-extrabold">
+        Your <span className="text-orange-500">Orders</span>
+      </nav>
+
+      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+
+      {loading ? (
+        <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">Loading orders...</p>
+      ) : orders.length === 0 ? (
+        <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">No orders found.</p>
+      ) : (
+        <div className="grid gap-4">
+          {orders.map((order) => (
+            <OrderCard
+              key={order.id}
+              orderId={order.id}
+              status={order.status}
+              createdAt={order.created_at}
+              paymentMethod={normalizePaymentType(order.payment_type)}
+              totalAmount={order.total_amount}
+              totalItemsCount={getOrderItemsCount(order.items)}
+              onViewDetails={() => navigate(`/account/orders/${encodeURIComponent(order.id)}`)}
+              isDetailsLoading={false}
+            />
+          ))}
+
+          {loadingMore && <p className="py-2 text-center text-sm text-gray-600">Loading more orders...</p>}
+          {!hasMore && <p className="py-2 text-center text-sm text-gray-500">You reached the end of your orders.</p>}
+          <div ref={sentinelRef} className="h-1 w-full" />
+        </div>
+      )}
+    </section>
   );
 }
-

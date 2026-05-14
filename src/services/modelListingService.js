@@ -28,7 +28,7 @@ export async function submitModelListing({
 
   try {
       const response = await axios.post(
-      "http://localhost:3000/api/create",
+      "https://3dprintings.xyz/api/create",
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },

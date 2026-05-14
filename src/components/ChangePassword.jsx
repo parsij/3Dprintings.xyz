@@ -15,21 +15,9 @@ export default function ChangePassword({
   return (
     <article
       className="animate-fade-in-up rounded-2xl border border-orange-100 bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl sm:p-8"
-      style={{ animationDelay: "0.15s" }}
     >
-      <h2 className="text-2xl font-extrabold tracking-tight overflow-visible pb-2">
-        {["C", "h", "a", "n", "g", "e", " "].map((char, idx) => (
-          <span key={`change-${idx}`} className="wave-char" style={{ animationDelay: `${idx * 0.1}s` }}>
-            {char}
-          </span>
-        ))}
-        <span className="text-orange-500">
-          {["p", "a", "s", "s", "w", "o", "r", "d"].map((char, idx) => (
-            <span key={`password-${idx}`} className="wave-char" style={{ animationDelay: `${(idx + 7) * 0.1}s` }}>
-              {char}
-            </span>
-          ))}
-        </span>
+      <h2 className="pb-2 text-2xl font-extrabold tracking-tight">
+        Change <span className="text-orange-500">password</span>
       </h2>
       <p className="mt-2 text-sm text-gray-600">
         For security, enter your current password before setting a new one.

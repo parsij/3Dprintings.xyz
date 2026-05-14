@@ -31,6 +31,7 @@ const ProductCard = ({
 
   const handleAddToCart = async (e) => {
     e.stopPropagation(); // prevent card click
+    if (isLoading || success) return;
     setIsLoading(true);
     setError(null);
     setSuccess(false);
@@ -39,7 +40,7 @@ const ProductCard = ({
       await addToCart(productId, 1);
       console.log('[ProductCard] Added to cart successfully');
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
+      setTimeout(() => setSuccess(false), 1400);
     } catch (err) {
       console.error('[ProductCard] Error adding to cart:', err);
       setError(err?.response?.data?.message || "Failed to add to cart");
@@ -103,19 +104,30 @@ const ProductCard = ({
           </div>
         )}
 
-        {success && (
-          <div className="mt-2 text-xs text-green-600 bg-green-50 p-1 rounded">
-            ✓ Added to cart!
-          </div>
-        )}
-
         <div className="mt-auto pt-3">
           <button
             onClick={handleAddToCart}
-            disabled={isLoading}
-            className="w-full px-4 py-2 rounded-full border border-black text-sm font-medium transition-all duration-200 hover:bg-black hover:text-white active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || success}
+            className={`relative w-full px-4 py-2 rounded-full border text-sm font-medium transition-all duration-300 active:scale-95 ${
+              success
+                ? "bg-green-600 border-green-600 text-white cursor-default"
+                : "border-black text-black hover:bg-black hover:text-white cursor-pointer"
+            } ${isLoading ? "opacity-70 cursor-default" : ""}`}
           >
-            {isLoading ? "Adding..." : "+ Add to cart"}
+            <span
+              className={`inline-block transition-all duration-200 ${
+                success ? "opacity-0" : "opacity-100"
+              }`}
+            >
+              {isLoading ? "Adding..." : "+ Add to cart"}
+            </span>
+            <span
+              className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-all duration-300 ${
+                success ? "opacity-100 scale-100" : "opacity-0 scale-75"
+              }`}
+            >
+              Added to cart
+            </span>
           </button>
         </div>
       </section>

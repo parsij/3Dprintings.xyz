@@ -12,6 +12,7 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -25,6 +26,23 @@ if (!JWT_SECRET) {
 }
 
 fs.mkdirSync(uploadDir, { recursive: true });
+
+function formatSecretForLogs(secret) {
+  if (!secret) return "(missing)";
+  if (secret.length <= 12) return secret;
+  return `${secret.slice(0, 8)}...${secret.slice(-4)}`;
+}
+
+function syncWebhookSecretFromStripeCliOutput(outputText) {
+  const match = outputText.match(STRIPE_WEBHOOK_SECRET_PATTERN);
+  if (!match) return;
+
+  const discoveredSecret = match[0];
+  if (process.env.STRIPE_WEBHOOK_SECRET === discoveredSecret) return;
+
+  process.env.STRIPE_WEBHOOK_SECRET = discoveredSecret;
+  console.log(`🔐 Stripe webhook secret synced from Stripe CLI: ${formatSecretForLogs(discoveredSecret)}`);
+}
 
 function sanitizeFileName(fileName) {
   return fileName
@@ -164,12 +182,23 @@ app.use(cors({
 // We must apply the webhook route BEFORE express.json() because Stripe needs the raw body
 app.post('/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
   const sig = request.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   let event;
+
+  if (!webhookSecret) {
+      console.error('Webhook signature verification skipped: missing STRIPE_WEBHOOK_SECRET.');
+      return response.status(500).send('Webhook Error: missing STRIPE_WEBHOOK_SECRET');
+  }
+
+  if (!sig) {
+      return response.status(400).send('Webhook Error: missing Stripe-Signature header');
+  }
+
   try {
       event = stripe.webhooks.constructEvent(
           request.body,
           sig,
-          process.env.STRIPE_WEBHOOK_SECRET
+          webhookSecret
       );
   } catch (err) {
       console.error('Webhook signature verification failed:', err.message);
@@ -401,12 +430,34 @@ async function initializeDatabase() {
      `);
      console.log('✅ Phone number column ensured in users table');
 
+     // Add Google identity column if it doesn't exist
+     await pool.query(`
+       ALTER TABLE users
+       ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)
+     `);
+     console.log('✅ Google identity column ensured in users table');
+
+     // Ensure Google identity cannot be linked to multiple users
+     await pool.query(`
+       CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_unique_idx
+       ON users (google_sub)
+       WHERE google_sub IS NOT NULL
+     `);
+     console.log('✅ Google identity unique index ensured');
+
      // Add payment_type column to orders if it doesn't exist
      await pool.query(`
        ALTER TABLE orders
        ADD COLUMN IF NOT EXISTS payment_type VARCHAR(100)
      `);
      console.log('✅ Payment type column ensured in orders table');
+
+     // Add stripe_session_id column to orders if it doesn't exist
+     await pool.query(`
+       ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255)
+     `);
+     console.log('✅ Stripe session id column ensured in orders table');
 
      // Create orders table if it doesn't exist
      await pool.query(`
@@ -418,6 +469,7 @@ async function initializeDatabase() {
          items JSONB NOT NULL,
          shipping_address_id INT,
          payment_type VARCHAR(100),
+         stripe_session_id VARCHAR(255),
          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
        );
@@ -433,13 +485,25 @@ function startStripeWebhookListener() {
   const isWindows = process.platform === 'win32';
   const command = isWindows ? 'stripe.cmd' : 'stripe';
 
-  const webhookProcess = spawn(command, ['listen', '--forward-to', 'localhost:3000/webhook'], {
-    stdio: 'inherit',
+  const webhookProcess = spawn(command, ['listen', '--forward-to', '3dprintings.xyz/webhook'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
     shell: isWindows
   });
 
+  webhookProcess.stdout.on('data', (chunk) => {
+    const text = chunk.toString();
+    process.stdout.write(text);
+    syncWebhookSecretFromStripeCliOutput(text);
+  });
+
+  webhookProcess.stderr.on('data', (chunk) => {
+    const text = chunk.toString();
+    process.stderr.write(text);
+    syncWebhookSecretFromStripeCliOutput(text);
+  });
+
   webhookProcess.on('error', (error) => {
-    console.warn('⚠️ Stripe webhook listener not available. Make sure Stripe CLI is installed and STRIPE_WEBHOOK_SECRET is set.');
+    console.warn('⚠️ Stripe webhook listener not available. Make sure Stripe CLI is installed and you are logged in.');
     console.warn('Install: https://stripe.com/docs/stripe-cli');
   });
 
@@ -466,18 +530,20 @@ async function startServer() {
       console.log('═══════════════════════════════════════════');
       console.log('🚀 SERVER STARTED');
       console.log('═══════════════════════════════════════════');
-      console.log('✅ API: http://0.0.0.0:3000');
+      console.log('✅ API: https://3dprintings.xyz');
       console.log('✅ Database: Connected');
       console.log('✅ Stripe: Configured');
       console.log('═══════════════════════════════════════════');
       console.log('');
 
-      // Start webhook listener (optional, but recommended)
-      if (process.env.STRIPE_WEBHOOK_SECRET) {
+      // Start webhook listener in non-production so local webhook secrets stay in sync.
+      if (process.env.NODE_ENV !== 'production') {
         console.log('🔔 Starting Stripe Webhook Listener...');
-        console.log('   Make sure Stripe CLI is running');
+        if (process.env.STRIPE_WEBHOOK_SECRET) {
+          console.log(`   Using configured webhook secret: ${formatSecretForLogs(process.env.STRIPE_WEBHOOK_SECRET)}`);
+        }
         startStripeWebhookListener();
-      } else {
+      } else if (!process.env.STRIPE_WEBHOOK_SECRET) {
         console.warn('⚠️ STRIPE_WEBHOOK_SECRET not set. Webhooks will not work.');
       }
     });

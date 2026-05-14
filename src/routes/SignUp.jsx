@@ -63,7 +63,7 @@ export default function SignUp({ setUser }) {
     if (!isFormValid) return;
 
     try {
-      const API_BASE = `http://${window.location.hostname}:3000`;
+      const API_BASE = `https://3dprintings.xyz`;
       const response = await axios.post(
         `${API_BASE}/api/signup`,
         {

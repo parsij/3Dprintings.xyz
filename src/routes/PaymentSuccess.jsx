@@ -1,47 +1,62 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import SmallNavBar from '../components/SmallNavBar';
 import SideMenu from '../components/SideMenu';
 
 const PaymentSuccess = () => {
+    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [orderData, setOrderData] = useState(null);
+    const [paymentStatus, setPaymentStatus] = useState('');
+    const [paymentVerified, setPaymentVerified] = useState(false);
+    const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
     const orderId = searchParams.get('order_id');
-    const sessionId = searchParams.get('session_id');
 
     useEffect(() => {
         const fetchOrderDetails = async () => {
             try {
                 if (!orderId) {
+                    setError('Missing order id.');
                     setLoading(false);
                     return;
                 }
 
-                if (sessionId) {
-                    await fetch('/api/payment/confirm-success', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ sessionId, orderId }),
-                    });
+                const response = await fetch(`/api/payment/order-status/${encodeURIComponent(orderId)}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (response.status === 401) {
+                    navigate('/signin', { replace: true });
+                    return;
                 }
 
-                // Fetch order details from backend
-                const response = await fetch(`/api/orders/${orderId}`, { credentials: 'include' });
-                if (response.ok) {
-                    const data = await response.json();
-                    setOrderData(data);
+                let payload = null;
+                try {
+                    payload = await response.json();
+                } catch {
+                    payload = null;
                 }
+
+                if (!response.ok) {
+                    throw new Error(payload?.error || payload?.message || 'Could not load order status.');
+                }
+
+                setOrderData(payload?.order || null);
+                setPaymentStatus(payload?.paymentStatus || '');
+                setPaymentVerified(Boolean(payload?.paymentVerified));
             } catch (error) {
                 console.error('Error fetching order details:', error);
+                setError(error.message || 'Could not load order status.');
             } finally {
                 setLoading(false);
             }
         };
 
         fetchOrderDetails();
-    }, [orderId, sessionId]);
+    }, [navigate, orderId]);
 
     return (
         <>
@@ -59,9 +74,14 @@ const PaymentSuccess = () => {
                             </div>
                         </div>
 
-                        <h1 className="text-3xl font-bold text-green-600 mb-2">Payment Successful!</h1>
-                        <p className="text-gray-600 mb-6">Thank you for your order. Your payment has been processed successfully.</p>
-
+                        <h1 className={`text-3xl font-bold mb-2 ${paymentVerified ? 'text-green-600' : 'text-orange-600'}`}>
+                            {paymentVerified ? 'Payment Successful!' : 'Payment Processing'}
+                        </h1>
+                        <p className="text-gray-600 mb-6">
+                            {paymentVerified
+                                ? 'Thank you for your order. Your payment has been Received with Stripe.'
+                                : 'We are still confirming your payment with Stripe.'}
+                        </p>
                         {orderId && (
                             <div className="bg-gray-50 p-4 rounded-lg mb-6">
                                 <p className="text-sm text-gray-500 mb-1">Order ID</p>
@@ -79,11 +99,11 @@ const PaymentSuccess = () => {
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Status:</span>
-                                        <span className="font-semibold text-green-600 capitalize">{orderData.status}</span>
+                                        <span className="font-semibold text-gray-800 capitalize">{orderData.status}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Total Amount:</span>
-                                        <span className="font-semibold text-gray-800">${(orderData.total_amount / 100).toFixed(2)}</span>
+                                        <span className="font-semibold text-gray-800">${Number(orderData.total_amount || 0).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Order Date:</span>
@@ -91,7 +111,15 @@ const PaymentSuccess = () => {
                                             {new Date(orderData.created_at).toLocaleDateString()}
                                         </span>
                                     </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Stripe Payment:</span>
+                                        <span className="font-semibold text-gray-800 capitalize">{paymentStatus || 'unknown'}</span>
+                                    </div>
                                 </div>
+                            </div>
+                        ) : !loading && error ? (
+                            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                {error}
                             </div>
                         ) : null}
 

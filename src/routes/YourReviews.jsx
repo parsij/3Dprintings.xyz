@@ -6,7 +6,7 @@ import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import YourReviewsCard from "../components/YourReviewsCard.jsx";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://3dprintings.xyz";
 
 const YourReviews = ({ user }) => {
   const [reviews, setReviews] = useState([]);

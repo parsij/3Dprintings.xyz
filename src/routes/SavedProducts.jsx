@@ -16,7 +16,7 @@ const SavedProducts = ({ user }) => {
       try {
         setLoading(true);
         const response = await axios.get(
-          `http://localhost:3000/api/likes/saved-products`,
+          `https://3dprintings.xyz/api/likes/saved-products`,
           { withCredentials: true }
         );
         setProducts(response.data.products || []);

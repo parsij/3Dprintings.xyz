@@ -9,7 +9,7 @@ import { addToCart } from "../services/cartService.js";
 import { toggleLike, toggleSave, getProductStatus, toggleReviewLike } from "../services/likesService.js";
 import image_test from "../assets/Screenshot_20260322_175244.png";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://3dprintings.xyz";
 
 const ProductPage = ({ user }) => {
   const { id } = useParams();

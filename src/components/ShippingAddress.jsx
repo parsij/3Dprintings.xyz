@@ -76,21 +76,9 @@ export default function ShippingAddress({
   return (
     <article
       className="animate-fade-in-up rounded-2xl border border-orange-100 bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl sm:p-8"
-      style={{ animationDelay: "0.1s" }}
     >
-      <h2 className="text-2xl font-extrabold tracking-tight overflow-visible pb-2">
-        {["S", "h", "i", "p", "p", "i", "n", "g", " "].map((char, idx) => (
-          <span key={`shipping-${idx}`} className="wave-char" style={{ animationDelay: `${idx * 0.1}s` }}>
-            {char}
-          </span>
-        ))}
-        <span className="text-orange-500">
-          {["a", "d", "d", "r", "e", "s", "s"].map((char, idx) => (
-            <span key={`address-${idx}`} className="wave-char" style={{ animationDelay: `${(idx + 9) * 0.1}s` }}>
-              {char}
-            </span>
-          ))}
-        </span>
+      <h2 className="pb-2 text-2xl font-extrabold tracking-tight">
+        Shipping <span className="text-orange-500">address</span>
       </h2>
       <p className="mt-2 text-sm text-gray-600">This is used for tax calculation and checkout.</p>
 

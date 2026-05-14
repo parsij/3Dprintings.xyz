@@ -54,7 +54,7 @@ module.exports = function productRoutes(deps) {
 
         return {
           ...p,
-          image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null,
+          image_url: firstImage ? `https://3dprintings.xyz/imgUploads/${firstImage}` : null,
           tags: parsedTags,
           category
         };
@@ -121,7 +121,7 @@ module.exports = function productRoutes(deps) {
 
         return {
           ...p,
-          image_url: firstImage ? `http://localhost:3000/imgUploads/${firstImage}` : null,
+          image_url: firstImage ? `https://3dprintings.xyz/imgUploads/${firstImage}` : null,
           tags: parsedTags,
           category
         };
@@ -164,7 +164,7 @@ module.exports = function productRoutes(deps) {
 
       const p = result.rows[0];
       const images = Array.isArray(p.img_path) && p.img_path.length > 0
-        ? p.img_path.map(img => `http://localhost:3000/imgUploads/${img}`)
+        ? p.img_path.map(img => `https://3dprintings.xyz/imgUploads/${img}`)
         : [];
       const firstImage = images.length > 0 ? images[0] : null;
 

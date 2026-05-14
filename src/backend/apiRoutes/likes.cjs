@@ -13,7 +13,7 @@ module.exports = function likesSavesRoutes(deps) {
     return {
       ...p,
       image_url: firstImage
-        ? `http://localhost:3000/imgUploads/${firstImage}`
+        ? `https://3dprintings.xyz/imgUploads/${firstImage}`
         : null,
     };
   }

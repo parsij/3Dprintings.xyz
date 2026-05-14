@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://3dprintings.xyz";
 
 export async function updateAccountProfile({ username, email, phone_number }) {
   try {

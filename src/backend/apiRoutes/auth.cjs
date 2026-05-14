@@ -1,4 +1,35 @@
 const bcrypt = require('bcrypt');
+const { randomBytes } = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
+
+function buildUsernameFromGoogleProfile(name, email) {
+  const rawName = String(name || '').trim().toLowerCase();
+  const rawEmailLocalPart = String(email || '')
+    .split('@')[0]
+    .trim()
+    .toLowerCase();
+
+  const normalize = (value) =>
+    value
+      .replace(/[^a-z0-9._-]/g, '')
+      .replace(/[._-]{2,}/g, '.')
+      .replace(/^[._-]+|[._-]+$/g, '')
+      .slice(0, 40);
+
+  let username = normalize(rawName) || normalize(rawEmailLocalPart);
+  if (username.length < 3) {
+    username = `user${Math.floor(Math.random() * 1_000_000)}`.slice(0, 40);
+  }
+
+  return username;
+}
+
+function normalizeOrigin(origin) {
+  return String(origin || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
 
 module.exports = function authRoutes(deps) {
   const {
@@ -11,6 +42,9 @@ module.exports = function authRoutes(deps) {
     EMAIL_REGEX,
     PASSWORD_REGEX,
   } = deps;
+  const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+  const googleOAuthClient = googleClientId ? new OAuth2Client(googleClientId) : null;
+  const frontendOrigin = normalizeOrigin(process.env.FRONTEND_URL);
 
   app.post('/api/signup', async (req, res) => {
     try {
@@ -104,6 +138,176 @@ module.exports = function authRoutes(deps) {
     }
   });
 
+  app.get('/api/auth/google/config', (req, res) => {
+    if (!googleClientId) {
+      return res.status(503).json({ message: 'Google sign-in is not configured on server' });
+    }
+
+    return res.json({ clientId: googleClientId });
+  });
+
+  app.post('/api/auth/google', async (req, res) => {
+    try {
+      const requestOrigin = normalizeOrigin(req.headers.origin);
+      if (frontendOrigin && requestOrigin && requestOrigin !== frontendOrigin) {
+        return res.status(403).json({ message: 'Blocked origin' });
+      }
+
+      const credential = String(req.body?.credential || '').trim();
+      if (!credential) {
+        return res.status(400).json({ message: 'Missing Google credential' });
+      }
+
+      if (!googleOAuthClient || !googleClientId) {
+        return res.status(503).json({ message: 'Google sign-in is not configured on server' });
+      }
+
+      const ticket = await googleOAuthClient.verifyIdToken({
+        idToken: credential,
+        audience: googleClientId,
+      });
+      const payload = ticket.getPayload();
+
+      if (!payload) {
+        return res.status(401).json({ message: 'Invalid Google token' });
+      }
+
+      const issuer = String(payload.iss || '');
+      const validIssuer = issuer === 'accounts.google.com' || issuer === 'https://accounts.google.com';
+      if (!validIssuer) {
+        return res.status(401).json({ message: 'Invalid Google token issuer' });
+      }
+
+      const googleSub = String(payload.sub || '').trim();
+      const email = String(payload.email || '').trim().toLowerCase();
+      const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
+      const audience = String(payload.aud || '').trim();
+      const exp = Number(payload.exp);
+      const iat = Number(payload.iat);
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const clockSkewSeconds = 300;
+
+      if (audience !== googleClientId) {
+        return res.status(401).json({ message: 'Invalid Google token audience' });
+      }
+
+      if (!Number.isFinite(exp) || exp <= nowUnix - clockSkewSeconds) {
+        return res.status(401).json({ message: 'Google token is expired' });
+      }
+
+      if (!Number.isFinite(iat) || iat <= 0 || iat > nowUnix + clockSkewSeconds || iat > exp) {
+        return res.status(401).json({ message: 'Invalid Google token issue time' });
+      }
+
+      if (!googleSub || !email || !emailVerified || !EMAIL_REGEX.test(email)) {
+        return res.status(401).json({ message: 'Google account email is not verified' });
+      }
+
+      const usernameCandidate = buildUsernameFromGoogleProfile(payload.name, email);
+      const existingBySub = await pool.query(
+        `SELECT id, username, email, google_sub
+         FROM users
+         WHERE google_sub = $1
+         LIMIT 1`,
+        [googleSub]
+      );
+
+      let user;
+      if (existingBySub.rows.length > 0) {
+        const matchedBySub = existingBySub.rows[0];
+
+        if (matchedBySub.email !== email) {
+          const conflictingEmailUser = await pool.query(
+            `SELECT id
+             FROM users
+             WHERE email = $1 AND id <> $2
+             LIMIT 1`,
+            [email, matchedBySub.id]
+          );
+          if (conflictingEmailUser.rows.length > 0) {
+            return res.status(409).json({
+              message: 'Google account email is already in use by another account',
+            });
+          }
+
+          const updatedEmailUser = await pool.query(
+            `UPDATE users
+             SET email = $1
+             WHERE id = $2
+             RETURNING id, username, email, google_sub`,
+            [email, matchedBySub.id]
+          );
+          user = updatedEmailUser.rows[0];
+        } else {
+          user = matchedBySub;
+        }
+      } else {
+        const existingByEmail = await pool.query(
+        `SELECT id, username, email, google_sub
+         FROM users
+         WHERE email = $1
+         LIMIT 1`,
+        [email]
+      );
+
+        if (existingByEmail.rows.length > 0) {
+          const matchedUser = existingByEmail.rows[0];
+
+          if (matchedUser.google_sub && matchedUser.google_sub !== googleSub) {
+            return res.status(409).json({
+              message: 'This email is already linked to a different Google account',
+            });
+          }
+
+          if (!matchedUser.google_sub) {
+            const updated = await pool.query(
+              `UPDATE users
+               SET google_sub = $1
+               WHERE id = $2
+               RETURNING id, username, email, google_sub`,
+              [googleSub, matchedUser.id]
+            );
+            user = updated.rows[0];
+          } else {
+            user = matchedUser;
+          }
+        } else {
+          const generatedPassword = randomBytes(48).toString('hex');
+          const hashedPassword = await bcrypt.hash(generatedPassword, 12);
+          const inserted = await pool.query(
+            `INSERT INTO users (username, email, password, google_sub)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, username, email, google_sub`,
+            [usernameCandidate, email, hashedPassword, googleSub]
+          );
+          user = inserted.rows[0];
+        }
+      }
+
+      const token = createAuthToken(user);
+      setAuthCookie(res, token);
+
+      return res.json({
+        message: 'Signed in with Google',
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          profile: {
+            name: payload.name || null,
+            given_name: payload.given_name || null,
+            family_name: payload.family_name || null,
+            picture: payload.picture || null,
+            locale: payload.locale || null,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Google sign-in error:', err.message || err);
+      return res.status(401).json({ message: 'Google sign-in failed' });
+    }
+  });
+
   app.post('/api/signout', (req, res) => {
 
     if (!getAuthUserFromRequest(req)) {
@@ -126,4 +330,3 @@ module.exports = function authRoutes(deps) {
     }
   });
 };
-

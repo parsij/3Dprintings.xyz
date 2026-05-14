@@ -1,6 +1,9 @@
 module.exports = function paymentController(deps) {
-    const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid, stripe } = deps;
-    const express = require('express');
+    const { app, pool, isAuthenticatedAnIisValid, stripe } = deps;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const ORDER_PAYMENT_POLL_INTERVAL_MS = 10_000;
+    const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+    const orderPaymentPollers = new Map();
     const normalizeAddress = (address = {}) => ({
         line1: String(address.line1 || '').trim(),
         line2: String(address.line2 || '').trim(),
@@ -9,6 +12,133 @@ module.exports = function paymentController(deps) {
         zip: String(address.zip || '').trim(),
         country: String(address.country || '').trim().toUpperCase(),
     });
+    const parseIntInRange = (value, field, min, max) => {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+            return { error: `Invalid ${field}. Must be an integer between ${min} and ${max}.` };
+        }
+        return { value: parsed };
+    };
+    const getPaymentTypeFromSession = (session, fallback = "card") => {
+        if (Array.isArray(session?.payment_method_types) && session.payment_method_types[0]) {
+            return session.payment_method_types[0];
+        }
+        return fallback;
+    };
+
+    const stopOrderPaymentPolling = (orderId) => {
+        const existingInterval = orderPaymentPollers.get(orderId);
+        if (existingInterval) {
+            clearInterval(existingInterval);
+            orderPaymentPollers.delete(orderId);
+        }
+    };
+
+    const runOrderPaymentCheck = async (orderId) => {
+        const result = await pool.query(
+            `SELECT id, status, created_at, stripe_session_id, payment_type
+             FROM orders
+             WHERE id = $1`,
+            [orderId]
+        );
+
+        if (result.rows.length === 0) {
+            stopOrderPaymentPolling(orderId);
+            return;
+        }
+
+        const order = result.rows[0];
+        if (order.status !== "pending") {
+            stopOrderPaymentPolling(orderId);
+            return;
+        }
+
+        const createdAtMs = new Date(order.created_at).getTime();
+        if (!Number.isFinite(createdAtMs)) {
+            stopOrderPaymentPolling(orderId);
+            return;
+        }
+
+        const ageMs = Date.now() - createdAtMs;
+        if (ageMs >= ORDER_PAYMENT_TIMEOUT_MS) {
+            await pool.query(
+                `UPDATE orders
+                 SET status = 'cancelled',
+                     updated_at = NOW()
+                 WHERE id = $1 AND status = 'pending'`,
+                [orderId]
+            );
+            stopOrderPaymentPolling(orderId);
+            return;
+        }
+
+        if (!order.stripe_session_id) {
+            return;
+        }
+
+        let session;
+        try {
+            session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+        } catch (error) {
+            console.error(`Stripe session check failed for order ${orderId}:`, error.message || error);
+            return;
+        }
+
+        if (session?.payment_status !== "paid") {
+            return;
+        }
+
+        const paymentType = getPaymentTypeFromSession(session, order.payment_type || "card");
+        await pool.query(
+            `UPDATE orders
+             SET status = 'completed',
+                 payment_type = COALESCE(payment_type, $2),
+                 updated_at = NOW()
+             WHERE id = $1 AND status = 'pending'`,
+            [orderId, paymentType]
+        );
+        stopOrderPaymentPolling(orderId);
+    };
+
+    const startOrderPaymentPolling = (orderId) => {
+        if (!orderId || orderPaymentPollers.has(orderId)) return;
+
+        // Run first check immediately, then every 10 seconds.
+        runOrderPaymentCheck(orderId).catch((error) => {
+            console.error(`Initial payment check failed for order ${orderId}:`, error);
+        });
+
+        const intervalId = setInterval(() => {
+            runOrderPaymentCheck(orderId).catch((error) => {
+                console.error(`Payment polling failed for order ${orderId}:`, error);
+            });
+        }, ORDER_PAYMENT_POLL_INTERVAL_MS);
+
+        orderPaymentPollers.set(orderId, intervalId);
+    };
+
+    const bootstrapPendingOrderPolling = async () => {
+        try {
+            await pool.query(
+                `UPDATE orders
+                 SET status = 'cancelled',
+                     updated_at = NOW()
+                 WHERE status = 'pending' AND created_at <= NOW() - INTERVAL '2 hours'`
+            );
+
+            const pending = await pool.query(
+                `SELECT id
+                 FROM orders
+                 WHERE status = 'pending' AND created_at > NOW() - INTERVAL '2 hours'`
+            );
+
+            for (const row of pending.rows) {
+                startOrderPaymentPolling(row.id);
+            }
+        } catch (error) {
+            console.error("Error bootstrapping order payment polling:", error);
+        }
+    };
 
     // List orders for authenticated user (supports pagination via ?page=&limit=)
     app.get("/api/orders", async (req, res) => {
@@ -16,20 +146,32 @@ module.exports = function paymentController(deps) {
             const auth = isAuthenticatedAnIisValid(req, res, "nothing");
             if (!auth?.userId) return; // isAuthenticatedAnIisValid already sent a response on failure
 
-            const page = Math.max(1, parseInt(req.query.page || '1', 10));
-            const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '20', 10)));
+            const pageResult = parseIntInRange(req.query.page ?? "1", "page", 1, 1000000);
+            if (pageResult.error) return res.status(400).json({ error: pageResult.error });
+            const limitResult = parseIntInRange(req.query.limit ?? "10", "limit", 1, 50);
+            if (limitResult.error) return res.status(400).json({ error: limitResult.error });
+
+            const page = pageResult.value;
+            const limit = limitResult.value;
             const offset = (page - 1) * limit;
 
             const result = await pool.query(
                 `SELECT id, status, total_amount, items, payment_type, created_at, updated_at
-                 FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-                [auth.userId, limit, offset]
+                 FROM orders
+                 WHERE customer_id = $1
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT $2 OFFSET $3`,
+                [auth.userId, limit + 1, offset]
             );
+
+            const hasMore = result.rows.length > limit;
+            const orders = hasMore ? result.rows.slice(0, limit) : result.rows;
 
             res.json({
                 page,
                 limit,
-                orders: result.rows,
+                hasMore,
+                orders,
             });
         } catch (error) {
             console.error('Error listing orders:', error);
@@ -44,8 +186,12 @@ module.exports = function paymentController(deps) {
             if (!auth?.userId) return;
 
             const { orderId } = req.params;
+            if (!UUID_REGEX.test(orderId)) {
+                return res.status(400).json({ error: "Invalid order id" });
+            }
+
             const result = await pool.query(
-                `SELECT id, customer_id, status, total_amount, items, shipping_address_id, created_at, updated_at 
+                `SELECT id, customer_id, status, total_amount, items, shipping_address_id, payment_type, created_at, updated_at 
                  FROM orders WHERE id = $1 AND customer_id = $2`,
                 [orderId, auth.userId]
             );
@@ -64,13 +210,17 @@ module.exports = function paymentController(deps) {
     // Cancel order endpoint
     app.post("/api/orders/:orderId/cancel", async (req, res) => {
         try {
-            const authUser = getAuthUserFromRequest(req);
-            if (!authUser) return res.status(401).json({ error: "Unauthorized" });
+            const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+            if (!auth?.userId) return;
 
             const { orderId } = req.params;
+            if (!UUID_REGEX.test(orderId)) {
+                return res.status(400).json({ error: "Invalid order id" });
+            }
+
             const result = await pool.query(
                 `UPDATE orders SET status = 'cancelled' WHERE id = $1 AND customer_id = $2 AND status = 'pending' RETURNING *`,
-                [orderId, authUser.id]
+                [orderId, auth.userId]
             );
 
             if (result.rows.length === 0) {
@@ -87,8 +237,8 @@ module.exports = function paymentController(deps) {
     // Calculate tax and shipping for checkout
     app.post("/api/payment/calculate-totals", async (req, res) => {
         try {
-            const authUser = getAuthUserFromRequest(req);
-            if (!authUser) return res.status(401).json({ error: "Unauthorized" });
+            const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+            if (!auth?.userId) return;
 
             const { items, address } = req.body;
             const safeAddress = normalizeAddress(address);
@@ -169,8 +319,11 @@ module.exports = function paymentController(deps) {
     // Create checkout session
     app.post("/api/payment/create-checkout-session", async (req, res) => {
         try {
-            const authUser = getAuthUserFromRequest(req);
-            if (!authUser) return res.status(401).json({ error: "Unauthorized" });
+            const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+            if (!auth?.userId) return;
+            const authUser = { id: auth.userId };
+            const userResult = await pool.query(`SELECT email FROM users WHERE id = $1`, [auth.userId]);
+            const userEmail = userResult.rows[0]?.email;
 
             const { items, address } = req.body;
             const safeAddress = normalizeAddress(address);
@@ -287,38 +440,25 @@ module.exports = function paymentController(deps) {
 
             const orderId = orderInsert.rows[0].id;
 
-            // Automatic cancellation after 2 hours if still pending
-            setTimeout(async () => {
-                try {
-                    const checkResult = await pool.query(
-                        `SELECT status FROM orders WHERE id = $1`,
-                        [orderId]
-                    );
-                    if (checkResult.rows.length > 0 && checkResult.rows[0].status === 'pending') {
-                        await pool.query(
-                            `UPDATE orders SET status = 'cancelled' WHERE id = $1 AND status = 'pending'`,
-                            [orderId]
-                        );
-                        console.log(`Order ${orderId} automatically cancelled after 2 hours.`);
-                    }
-                } catch (e) {
-                    console.error("Error auto-cancelling order:", e);
-                }
-            }, 2 * 60 * 60 * 1000);
-
             // Create Stripe checkout session
             const session = await stripe.checkout.sessions.create({
                 payment_method_types: ['card'],
                 line_items,
                 mode: 'payment',
-                success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/cancel?order_id=${orderId}`,
-                customer_email: authUser.email,
+                success_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz'}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
+                cancel_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz'}/cancel?order_id=${orderId}`,
+                ...(userEmail ? { customer_email: userEmail } : {}),
                 metadata: {
                     orderId,
                     userId: authUser.id,
                 },
             });
+
+            await pool.query(
+                `UPDATE orders SET stripe_session_id = $1, updated_at = NOW() WHERE id = $2`,
+                [session.id, orderId]
+            );
+            startOrderPaymentPolling(orderId);
 
             res.json({ url: session.url, orderId });
         } catch (error) {
@@ -327,66 +467,74 @@ module.exports = function paymentController(deps) {
         }
     });
 
-    // Confirm payment from success page as a fallback to webhook delivery issues
-    app.post("/api/payment/confirm-success", async (req, res) => {
+    // Verify order ownership and payment status using Stripe directly
+    app.get("/api/payment/order-status/:orderId", async (req, res) => {
         try {
-            const authUser = getAuthUserFromRequest(req);
-            if (!authUser) return res.status(401).json({ error: "Unauthorized" });
+            const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+            if (!auth?.userId) return;
 
-            const { sessionId, orderId } = req.body || {};
-            if (!sessionId || !orderId) {
-                return res.status(400).json({ error: "Missing sessionId or orderId" });
+            const { orderId } = req.params;
+            if (!UUID_REGEX.test(orderId)) {
+                return res.status(400).json({ error: "Invalid order id" });
             }
 
             const orderResult = await pool.query(
-                `SELECT id, customer_id, status FROM orders WHERE id = $1`,
+                `SELECT id, customer_id, status, total_amount, payment_type, created_at, updated_at, stripe_session_id
+                 FROM orders WHERE id = $1`,
                 [orderId]
             );
             if (orderResult.rows.length === 0) {
                 return res.status(404).json({ error: "Order not found" });
             }
-            if (String(orderResult.rows[0].customer_id) !== String(authUser.id)) {
+            if (String(orderResult.rows[0].customer_id) !== String(auth.userId)) {
                 return res.status(403).json({ error: "Forbidden" });
             }
 
-            const session = await stripe.checkout.sessions.retrieve(sessionId);
-            const sessionOrderId = session.metadata?.orderId;
-            if (!sessionOrderId || String(sessionOrderId) !== String(orderId)) {
-                return res.status(400).json({ error: "Session does not match order" });
-            }
-
-            if (session.payment_status !== 'paid') {
+            const existingOrder = orderResult.rows[0];
+            if (!existingOrder.stripe_session_id) {
                 return res.json({
-                    updated: false,
-                    status: orderResult.rows[0].status,
-                    paymentStatus: session.payment_status,
+                    order: existingOrder,
+                    paymentStatus: "unavailable",
+                    paymentVerified: existingOrder.status === "completed",
                 });
             }
 
-            await pool.query(
+            const session = await stripe.checkout.sessions.retrieve(existingOrder.stripe_session_id);
+            if (session.payment_status !== 'paid') {
+                return res.json({
+                    order: existingOrder,
+                    paymentStatus: session.payment_status,
+                    paymentVerified: false,
+                });
+            }
+
+            let paymentType = existingOrder.payment_type;
+            if (!paymentType) {
+                const methodType = Array.isArray(session.payment_method_types) ? session.payment_method_types[0] : "";
+                paymentType = methodType || "card";
+            }
+
+            const updatedOrder = await pool.query(
                 `UPDATE orders
                  SET status = 'completed',
                      updated_at = NOW(),
-                     payment_type = COALESCE(payment_type, 'card')
-                 WHERE id = $1 AND status = 'pending'`,
-                [orderId]
-            );
-
-            const updatedOrder = await pool.query(
-                `SELECT id, status FROM orders WHERE id = $1`,
-                [orderId]
+                     payment_type = COALESCE(payment_type, $2)
+                 WHERE id = $1
+                 RETURNING id, customer_id, status, total_amount, payment_type, created_at, updated_at, stripe_session_id`,
+                [orderId, paymentType]
             );
 
             return res.json({
-                updated: true,
-                status: updatedOrder.rows[0]?.status || 'completed',
+                order: updatedOrder.rows[0] || existingOrder,
                 paymentStatus: session.payment_status,
+                paymentVerified: true,
             });
         } catch (error) {
-            console.error('Error confirming checkout success:', error);
+            console.error('Error checking payment order status:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     });
 
     // The Stripe webhook handler has been moved to server.cjs BEFORE express.json()
+    bootstrapPendingOrderPolling();
 }

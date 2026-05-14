@@ -56,7 +56,7 @@ const SearchResults = ({ user }) => {
       try {
         setLoading(true);
         console.log('[SearchResults] Fetching:', query, 'page:', page, 'sort:', sort);
-        const response = await axios.get(`http://localhost:3000/api/products/search`, {
+        const response = await axios.get(`https://3dprintings.xyz/api/products/search`, {
           params: { q: query, page, limit: 12, sort }
         });
 

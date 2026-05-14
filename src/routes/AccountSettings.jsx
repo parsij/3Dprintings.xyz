@@ -5,6 +5,7 @@ import ChangePassword from "../components/ChangePassword.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import ShippingAddress from "../components/ShippingAddress.jsx";
 import Orders from "../components/Orders.jsx";
+import OrderDetails from "../components/OrderDetails.jsx";
 import {
   changeAccountPassword,
   getAccountAddress,
@@ -405,53 +406,61 @@ export default function AccountSettings({ user, setUser }) {
 
       <main className="flex min-h-screen pt-16 bg-gray-50 flex-col md:flex-row text-gray-900">
         <aside className="w-full md:w-64 lg:w-72 border-r border-gray-200 bg-white shrink-0">
-          <nav className="sticky top-20 flex flex-col gap-1 p-4 md:pt-8 pt-4">
-            <h3 className="mb-4 px-3 text-xs font-bold uppercase tracking-wider text-gray-500">Account Settings</h3>
+          <div className="sticky top-20 p-4 md:pt-8 pt-4">
+            <nav className="flex flex-col gap-1">
+              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-gray-500">Account Settings</h3>
 
-            <Link
-              to="/account"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
-                location.pathname === '/account' || location.pathname === '/account/'
-                  ? 'bg-orange-50 border-orange-500 text-orange-800' 
-                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-              }`}
-            >
-              Profile Info
-            </Link>
+              <Link
+                to="/account"
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                  location.pathname === '/account' || location.pathname === '/account/'
+                    ? 'bg-orange-50 border-orange-500 text-orange-800' 
+                    : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                Profile Info
+              </Link>
 
-            <Link
-              to="/account/address"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
-                location.pathname === '/account/address'
-                  ? 'bg-orange-50 border-orange-500 text-orange-800'  
-                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-              }`}
-            >
-              Shipping Address
-            </Link>
+              <Link
+                to="/account/address"
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                  location.pathname === '/account/address'
+                    ? 'bg-orange-50 border-orange-500 text-orange-800'  
+                    : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                Shipping Address
+              </Link>
 
-            <Link
-              to="/account/password"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
-                location.pathname === '/account/password'
-                  ? 'bg-orange-50 border-orange-500 text-orange-800'  
-                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-              }`}
-            >
-              Change Password
-            </Link>
+              <Link
+                to="/account/password"
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                  location.pathname === '/account/password'
+                    ? 'bg-orange-50 border-orange-500 text-orange-800'  
+                    : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                Change Password
+              </Link>
+            </nav>
 
-            <Link
-              to="/account/orders"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
-                location.pathname === '/account/orders'
-                  ? 'bg-orange-50 border-orange-500 text-orange-800'  
-                  : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-              }`}
-            >
-              Your Orders
-            </Link>
-          </nav>
+            <h3 className="mt-4 text-xs font-bold uppercase tracking-wider text-gray-500">
+              Activity
+            </h3>
+
+            <nav className="flex flex-col gap-1 pt-2">
+              <Link
+                to="/account/orders"
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border-l-4 ${
+                  location.pathname === '/account/orders' || location.pathname.startsWith('/account/orders/')
+                    ? 'bg-orange-50 border-orange-500 text-orange-800'
+                    : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                My Orders
+              </Link>
+            </nav>
+          </div>
         </aside>
 
         <div className="flex-1 p-6 md:p-10 lg:p-14 overflow-x-hidden">
@@ -513,6 +522,10 @@ export default function AccountSettings({ user, setUser }) {
 
               <Route path="orders" element={
                 <Orders user={user} />
+              } />
+
+              <Route path="orders/:orderId" element={
+                <OrderDetails user={user} />
               } />
             </Routes>
           </div>

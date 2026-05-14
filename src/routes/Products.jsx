@@ -26,9 +26,9 @@ const Products = ({ user, NoNavBarLimit }) => {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      // Ensure backend matches: http://localhost:3000/api/products?page=...&limit=12
+      // Ensure backend matches: https://3dprintings.xyz/api/products?page=...&limit=12
       console.log('[Products fetchProducts] Fetching page:', page, 'with sort:', sort);
-      const response = await axios.get("http://localhost:3000/api/products", {
+      const response = await axios.get("https://3dprintings.xyz/api/products", {
         params: { page, limit: 12, sort },
       });
       const data = response.data;

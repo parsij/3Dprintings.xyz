@@ -33,7 +33,7 @@ const Checkout = () => {
     useEffect(() => {
         const loadUserAddress = async () => {
             try {
-                const response = await axios.get('http://localhost:3000/api/account/address', {
+                const response = await axios.get('https://3dprintings.xyz/api/account/address', {
                     withCredentials: true,
                 });
                 const addr = response.data?.address;
@@ -69,7 +69,7 @@ const Checkout = () => {
         const timer = setTimeout(async () => {
             try {
                 setIsSuggestingAddress(true);
-                const response = await axios.get('http://localhost:3000/api/address/autocomplete', {
+                const response = await axios.get('https://3dprintings.xyz/api/address/autocomplete', {
                     params: { q: addressLine, limit: 6 },
                     withCredentials: true,
                 });
@@ -108,7 +108,7 @@ const Checkout = () => {
                     zip: shippingAddress.zip.trim(),
                     country: shippingAddress.country.trim().toUpperCase(),
                 };
-                const res = await fetch('http://localhost:3000/api/payment/calculate-totals', {
+                const res = await fetch('https://3dprintings.xyz/api/payment/calculate-totals', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -185,7 +185,7 @@ const Checkout = () => {
             if (saveAddressForFuture) {
                 try {
                     await axios.put(
-                        'http://localhost:3000/api/account/address',
+                        'https://3dprintings.xyz/api/account/address',
                         {
                             street_address: shippingAddress.line1,
                             city: shippingAddress.city,
@@ -203,7 +203,7 @@ const Checkout = () => {
                 }
             }
 
-            const res = await fetch('http://localhost:3000/api/payment/create-checkout-session', {
+            const res = await fetch('https://3dprintings.xyz/api/payment/create-checkout-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
