@@ -29,41 +29,14 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          if [ -z "${SSH_PRIVATE_KEY}" ]; then
-            echo "Missing SSH_PRIVATE_KEY in GitHub repository secrets."
-            exit 1
-          fi
-
           install -m 700 -d ~/.ssh
-
-          # Support both raw multiline keys and keys stored with literal '\n'
-          if printf '%s' "${SSH_PRIVATE_KEY}" | grep -q '\\n'; then
-            printf '%b' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
-          else
-            printf '%s' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
-          fi
-
-          # Normalize Windows line endings if present
+          printf '%s' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
           sed -i 's/\r$//' ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # Validate key format early with a clear failure
-          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
-            echo "SSH_PRIVATE_KEY is invalid, encrypted with a passphrase, or incorrectly formatted."
-            echo "Expected unencrypted OpenSSH private key with proper line breaks."
-            exit 1
-          fi
-
-      - name: Validate Deploy Secrets
-        run: |
-          if [ -z "${DEPLOY_HOST}" ]; then
-            echo "Missing deploy host secret. Set SERVER_IP (or SERVER_HOST) in GitHub repository secrets."
-            exit 1
-          fi
-
       - name: Deploy Frontend Files (rsync)
         run: |
-          rsync -avzr --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${DEPLOY_PORT} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/3dprintings.xyz/dist
+          rsync -avzr --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no" dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/3dprintings.xyz/dist
 
       - name: Update Backend via SSH
         uses: appleboy/ssh-action@master
@@ -73,15 +46,20 @@ jobs:
           port: ${{ secrets.SERVER_PORT || '22' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Ensure the backend directory exists
+            # 1. Navigate to directory
             mkdir -p ~/3Dprintings.xyz/src/backend
             cd ~/3Dprintings.xyz/src/backend
-            
-            # Pull latest code
-            git pull origin master
-            
-            # Install production dependencies only
-            npm install --production
-            
-            # Restart the process (or start it if it's new)
-            pm2 restart api-backend || pm2 start index.js --name "api-backend"
+
+            # 2. Fix the Git Conflict (Force Reset)
+            # This wipes local changes on the server to allow the update
+            git fetch origin master
+            git reset --hard origin/master
+
+            # 3. Install Dependencies
+            # We use --omit=dev to keep it light
+            npm install --omit=dev
+
+            # 4. Restart with PM2 (Using full path fix)
+            # We try to find where pm2 is installed to avoid 'command not found'
+            PM2_PATH=$(which pm2 || echo "/usr/local/bin/pm2")
+            $PM2_PATH restart api-backend || $PM2_PATH start index.js --name "api-backend"
