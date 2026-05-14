@@ -21,15 +21,18 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy Frontend Files (rsync)
-        uses: Burnett01/rsync-deployments@7.0.1 # Updated version
+      # NEW STEP: This handles the SSH key perfectly and prevents "libcrypto" errors
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
         with:
-          switches: -avzr --delete
-          path: dist/
-          remote_path: /var/www/3dprintings.xyz/dist
-          remote_host: ${{ secrets.SERVER_IP }}
-          remote_user: root
-          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Deploy Frontend Files (rsync)
+        # Using a simpler rsync command because we already set up the SSH key above
+        run: |
+          rsync -avzr --delete -e "ssh -o StrictHostKeyChecking=no" dist/ root@${{ secrets.SERVER_IP }}:/var/www/3dprintings.xyz/dist
 
       - name: Update Backend via SSH
         uses: appleboy/ssh-action@master
@@ -37,10 +40,8 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # Added a safety check to make sure the directory exists before git pull
           script: |
-            mkdir -p ~/3Dprintings.xyz/src/backend
             cd ~/3Dprintings.xyz/src/backend
-            git pull origin master || echo "Git pull failed, check branch name"
+            git pull origin master
             npm install --production
             pm2 restart api-backend || pm2 start index.js --name "api-backend"
