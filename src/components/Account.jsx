@@ -45,6 +45,7 @@ export default function Account({
            <label htmlFor="email" className="mb-1 block text-sm text-gray-700 font-semibold">
              Email
            </label>
+             {/*email input*/}
            <input
              id="email"
              name="email"
