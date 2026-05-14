@@ -235,8 +235,15 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
               );
               console.log(`Order ${orderId} marked as completed with payment type: ${paymentType}`);
 
-              // Optionally: Clear user's cart
-              const userId = session.metadata?.userId;
+              // Clear cart for this order's customer. Prefer explicit userId metadata, fallback to DB lookup.
+              let userId = session.metadata?.userId;
+              if (!userId) {
+                  const ownerResult = await pool.query(
+                      `SELECT customer_id FROM orders WHERE id = $1`,
+                      [orderId]
+                  );
+                  userId = ownerResult.rows[0]?.customer_id;
+              }
               if (userId) {
                   await pool.query(
                       `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,

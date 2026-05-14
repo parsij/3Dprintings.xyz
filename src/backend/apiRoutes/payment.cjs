@@ -25,6 +25,21 @@ module.exports = function paymentController(deps) {
         }
         return fallback;
     };
+    const clearCartForOrderCustomer = async (orderId) => {
+        if (!orderId) return;
+
+        const ownerResult = await pool.query(
+            `SELECT customer_id FROM orders WHERE id = $1`,
+            [orderId]
+        );
+        const customerId = ownerResult.rows[0]?.customer_id;
+        if (!customerId) return;
+
+        await pool.query(
+            `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
+            [customerId]
+        );
+    };
 
     const stopOrderPaymentPolling = (orderId) => {
         const existingInterval = orderPaymentPollers.get(orderId);
@@ -97,6 +112,7 @@ module.exports = function paymentController(deps) {
              WHERE id = $1 AND status = 'pending'`,
             [orderId, paymentType]
         );
+        await clearCartForOrderCustomer(orderId);
         stopOrderPaymentPolling(orderId);
     };
 
@@ -523,6 +539,7 @@ module.exports = function paymentController(deps) {
                  RETURNING id, customer_id, status, total_amount, payment_type, created_at, updated_at, stripe_session_id`,
                 [orderId, paymentType]
             );
+            await clearCartForOrderCustomer(orderId);
 
             return res.json({
                 order: updatedOrder.rows[0] || existingOrder,
