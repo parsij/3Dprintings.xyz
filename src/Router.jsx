@@ -22,8 +22,14 @@ const Router = ({ user, setUser }) => {
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<Home user={user} setUser={setUser} />} />
-        <Route path="/signin" element={<SignIn setUser={setUser} />} />
-        <Route path="/signup" element={<SignUp setUser={setUser} />} />
+        <Route
+          path="/signin"
+          element={user ? <Navigate to="/account" replace /> : <SignIn setUser={setUser} />}
+        />
+        <Route
+          path="/signup"
+          element={user ? <Navigate to="/account" replace /> : <SignUp setUser={setUser} />}
+        />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/products" element={<Products user={user} />} />
         <Route path="/search" element={<SearchResults user={user} />} />
