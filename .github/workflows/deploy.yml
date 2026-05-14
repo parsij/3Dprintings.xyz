@@ -21,18 +21,24 @@ jobs:
           npm install
           npm run build
 
-      # NEW STEP: This handles the SSH key perfectly and prevents "libcrypto" errors
       - name: Install SSH Key
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: unnecessary
           if_key_exists: replace
+          # This config creates a nickname 'myserver' so GitHub's security masking
+          # doesn't break the rsync command path.
+          config: |
+            Host myserver
+              HostName ${{ secrets.SERVER_IP }}
+              User root
+              StrictHostKeyChecking no
 
       - name: Deploy Frontend Files (rsync)
-        # Using a simpler rsync command because we already set up the SSH key above
         run: |
-          rsync -avzr --delete -e "ssh -o StrictHostKeyChecking=no" dist/ root@${{ secrets.SERVER_IP }}:/var/www/3dprintings.xyz/dist
+          # We use the 'myserver' alias defined in the step above
+          rsync -avzr --delete dist/ myserver:/var/www/3dprintings.xyz/dist
 
       - name: Update Backend via SSH
         uses: appleboy/ssh-action@master
@@ -41,7 +47,15 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Ensure the backend directory exists
+            mkdir -p ~/3Dprintings.xyz/src/backend
             cd ~/3Dprintings.xyz/src/backend
+            
+            # Pull latest code
             git pull origin master
+            
+            # Install production dependencies only
             npm install --production
+            
+            # Restart the process (or start it if it's new)
             pm2 restart api-backend || pm2 start index.js --name "api-backend"
