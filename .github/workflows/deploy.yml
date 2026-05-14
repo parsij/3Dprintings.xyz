@@ -7,6 +7,10 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.SERVER_IP || secrets.SERVER_HOST }}
+      DEPLOY_USER: ${{ secrets.SERVER_USER || 'root' }}
+      DEPLOY_PORT: ${{ secrets.SERVER_PORT || '22' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -28,17 +32,23 @@ jobs:
           known_hosts: unnecessary
           if_key_exists: replace
 
-      - name: Deploy Frontend Files (rsync)
-        env:
-          SERVER_IP: ${{ secrets.SERVER_IP }}
+      - name: Validate Deploy Secrets
         run: |
-          rsync -avzr --delete -e "ssh -o StrictHostKeyChecking=no" dist/ root@${SERVER_IP}:/var/www/3dprintings.xyz/dist
+          if [ -z "${DEPLOY_HOST}" ]; then
+            echo "Missing deploy host secret. Set SERVER_IP (or SERVER_HOST) in GitHub repository secrets."
+            exit 1
+          fi
+
+      - name: Deploy Frontend Files (rsync)
+        run: |
+          rsync -avzr --delete -e "ssh -i ~/.ssh/id_rsa -p ${DEPLOY_PORT} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/3dprintings.xyz/dist
 
       - name: Update Backend via SSH
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SERVER_IP }}
-          username: root
+          host: ${{ secrets.SERVER_IP || secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER || 'root' }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # Ensure the backend directory exists
