@@ -27,20 +27,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: unnecessary
           if_key_exists: replace
-          # We use ${SRV_IP} here because the 'env' block below
-          # allows it to bypass GitHub's logger masking.
-          config: |
-            Host myserver
-              HostName ${SRV_IP}
-              User root
-              StrictHostKeyChecking no
-        env:
-          SRV_IP: ${{ secrets.SERVER_IP }}
 
       - name: Deploy Frontend Files (rsync)
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          # rsync now uses the alias 'myserver' which has the real IP mapped
-          rsync -avzr --delete dist/ myserver:/var/www/3dprintings.xyz/dist
+          rsync -avzr --delete -e "ssh -o StrictHostKeyChecking=no" dist/ root@${SERVER_IP}:/var/www/3dprintings.xyz/dist
 
       - name: Update Backend via SSH
         uses: appleboy/ssh-action@master
