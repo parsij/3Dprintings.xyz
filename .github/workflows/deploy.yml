@@ -36,9 +36,11 @@ jobs:
 
       - name: Deploy Frontend Files (rsync)
         run: |
-          rsync -avzr --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no" dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/3dprintings.xyz/dist
+          # UPDATED PATH: Pointing to the new unified main-app directory
+          rsync -avzr --delete -e "ssh -i ~/.ssh/id_ed25519 -p ${DEPLOY_PORT} -o StrictHostKeyChecking=no" \
+          dist/ ${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/main-app/dist
 
-      - name: Update Backend via SSH
+      - name: Update Backend & Permissions via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP || secrets.SERVER_HOST }}
@@ -46,28 +48,29 @@ jobs:
           port: ${{ secrets.SERVER_PORT || '22' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # 1. Navigate to backend directory
+            # 1. FIX PERMISSIONS: Ensure Nginx can read the newly uploaded files immediately
+            sudo chown -R www-data:www-data /var/www/main-app/dist
+            sudo chmod -R 755 /var/www/main-app/dist
+
+            # 2. Navigate to backend directory
             cd ~/3Dprintings.xyz/src/backend || exit 1
 
-            # 2. Sync code with GitHub
+            # 3. Sync code with GitHub
             git fetch origin master
             git reset --hard origin/master
 
-            # 3. Install production dependencies
+            # 4. Install production dependencies
             npm install --omit=dev
 
-            # 4. PM2 Management
+            # 5. PM2 Management
             PM2_PATH=$(which pm2 || echo "/usr/local/bin/pm2")
             
-            # Check if 'api-backend' is already in the list
             if $PM2_PATH info api-backend > /dev/null 2>&1; then
               echo "Restarting api-backend..."
               $PM2_PATH restart api-backend --update-env
             else
               echo "Starting api-backend for the first time..."
-              # Target server.cjs as requested
               $PM2_PATH start server.cjs --name "api-backend"
             fi
             
-            # Ensure PM2 restarts this process if the server ever reboots
             $PM2_PATH save

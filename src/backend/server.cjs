@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
+app.set("trust proxy", 1);
 const pool = require("./db.cjs");
 const cors = require('cors');
 const bcrypt = require("bcrypt");
@@ -179,6 +180,7 @@ const upload = multer({
 
 const defaultAllowedOrigins = [
   "https://3dprintings.xyz",
+  'https://www.3dprintings.xyz',
   "https://seller.3dprintings.xyz",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
@@ -191,12 +193,25 @@ const envAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
 
 const allowedOrigins = new Set([...defaultAllowedOrigins, ...envAllowedOrigins]);
 
+function isAllowedOrigin(origin) {
+  if (allowedOrigins.has(origin)) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol === "https:" && parsed.hostname.endsWith(".3dprintings.xyz");
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
   origin(origin, callback) {
     if (!origin) {
       return callback(null, true);
     }
-    if (allowedOrigins.has(origin)) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     return callback(new Error(`CORS blocked for origin: ${origin}`));
@@ -480,6 +495,12 @@ async function initializeDatabase() {
        ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)
      `);
      console.log('Google identity column ensured in users table');
+
+     await pool.query(`
+       ALTER TABLE users
+       ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'customer'
+     `);
+     console.log("User role column ensured in users table");
 
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`
