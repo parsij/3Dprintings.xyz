@@ -16,6 +16,7 @@ import Checkout from "./components/Checkout.jsx";
 import PaymentSuccess from "./routes/PaymentSuccess.jsx";
 import PaymentCancel from "./routes/PaymentCancel.jsx";
 import SellerDashboard from "./routes/SellerDashboard.jsx";
+import BecomeSeller from "./routes/BecomeSeller.jsx";
 
 const Router = ({ user, setUser }) => {
   return (
@@ -43,6 +44,7 @@ const Router = ({ user, setUser }) => {
         <Route path="/success" element={user ? <PaymentSuccess user={user} /> : <Navigate to="/signin" replace />} />
         <Route path="/cancel" element={<PaymentCancel />} />
         <Route path="/create" element={<SubmitModel user={user} />} />
+        <Route path="/become-seller" element={user ? <BecomeSeller /> : <Navigate to="/signin" replace />} />
         <Route path="/seller" element={user ? <SellerDashboard /> : <Navigate to="/signin" replace />} />
         <Route
           path="/account/*"

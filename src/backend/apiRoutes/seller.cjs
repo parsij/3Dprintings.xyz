@@ -39,6 +39,43 @@ module.exports = function sellerRoutes(deps) {
     return res.status(403).json({ message: "Access denied. Sellers only." });
   };
 
+  app.post("/api/seller/become", attachAuthenticatedUser, async (req, res) => {
+    try {
+      if (req.user.role === "seller") {
+        return res.status(200).json({
+          message: "You already have seller access.",
+          user: { ...req.user, role: "seller" },
+        });
+      }
+
+      const updatedUserResult = await pool.query(
+        `UPDATE users
+         SET role = 'seller'
+         WHERE id = $1
+         RETURNING id, username, email, role`,
+        [req.user.id]
+      );
+
+      if (updatedUserResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      const updatedUser = updatedUserResult.rows[0];
+      return res.status(200).json({
+        message: "Seller access granted.",
+        user: {
+          id: Number(updatedUser.id),
+          username: updatedUser.username,
+          email: updatedUser.email,
+          role: updatedUser.role,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to promote user to seller:", error);
+      return res.status(500).json({ message: "Failed to grant seller access." });
+    }
+  });
+
   app.get("/api/seller/dashboard", attachAuthenticatedUser, isSeller, async (req, res) => {
     try {
       const snapshot = await refreshSellerDashboard(pool, req.user.id);

@@ -32,6 +32,7 @@ const SideMenu = () => {
           <Link to="/saved-products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Saved Products</Link>
           <Link to="/your-reviews" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">My Reviews</Link>
           <Link to="/account/orders" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">My Orders</Link>
+          <Link to="/become-seller" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Become a Seller</Link>
           <Link to="/create" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">List a 3D Printed Model</Link>
         </div>
       </aside>
