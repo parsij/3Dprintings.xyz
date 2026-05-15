@@ -12,6 +12,7 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { ensureSellerDashboardTable } = require("./utils/sellerDashboardMetrics.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
@@ -20,6 +21,8 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const uploadDir = path.join(__dirname, "imgUploads");
 const JWT_SECRET = process.env.JWT_SECRET;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN || "";
 
 if (!JWT_SECRET) {
   throw new Error("Missing JWT_SECRET. Add it to src/backend/.env");
@@ -174,8 +177,30 @@ const upload = multer({
   },
 });
 
+const defaultAllowedOrigins = [
+  "https://3dprintings.xyz",
+  "https://seller.3dprintings.xyz",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+const envAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = new Set([...defaultAllowedOrigins, ...envAllowedOrigins]);
+
 app.use(cors({
-  origin: true, // Echoes back the requesting origin
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true,
 }));
 
@@ -275,14 +300,17 @@ function createAuthToken(user) {
 }
 
 function setAuthCookie(res, token) {
-  // Use Lax for localhost/IP development without HTTPS
-  res.cookie("token", token, {
+  const cookieOptions = {
     httpOnly: true,
-    secure: false, // Must be false for HTTP (IP address)
-    sameSite: "lax", // Lax works for same-site (same IP, different port)
+    secure: IS_PRODUCTION,
+    sameSite: "lax",
     maxAge: 93 * 24 * 60 * 60 * 1000,
-    path: "/", // Ensure cookie is available for all paths
-  });
+    path: "/",
+  };
+  if (AUTH_COOKIE_DOMAIN) {
+    cookieOptions.domain = AUTH_COOKIE_DOMAIN;
+  }
+  res.cookie("token", token, cookieOptions);
 }
 
 function isAuthenticatedAnIisValid(req, res, type = "cart") {
@@ -369,12 +397,16 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
 }
 
 function clearAuthCookie(res) {
-  res.clearCookie("token", {
+  const cookieOptions = {
     httpOnly: true,
-    secure: false,
+    secure: IS_PRODUCTION,
     sameSite: "lax",
     path: "/",
-  });
+  };
+  if (AUTH_COOKIE_DOMAIN) {
+    cookieOptions.domain = AUTH_COOKIE_DOMAIN;
+  }
+  res.clearCookie("token", cookieOptions);
 }
 
 function getAuthUserFromRequest(req) {
@@ -423,6 +455,10 @@ app.use((error, req, res, next) => {
 
   if (error?.message === "Only image files are allowed.") {
     return res.status(400).json({ message: error.message });
+  }
+
+  if (typeof error?.message === "string" && error.message.startsWith("CORS blocked for origin:")) {
+    return res.status(403).json({ message: error.message });
   }
 
   return next(error);
@@ -483,6 +519,9 @@ async function initializeDatabase() {
        );
      `);
     console.log('✅ Orders table initialized');
+
+    await ensureSellerDashboardTable(pool);
+    console.log("Seller dashboard metrics table ensured.");
   } catch (error) {
     console.error('⚠️ Error initializing database:', error.message);
   }
