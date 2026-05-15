@@ -22,7 +22,7 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const uploadDir = path.join(__dirname, "imgUploads");
 const JWT_SECRET = process.env.JWT_SECRET;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN || "";
+const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN || ".3dprintings.xyz";
 
 if (!JWT_SECRET) {
   throw new Error("Missing JWT_SECRET. Add it to src/backend/.env");
