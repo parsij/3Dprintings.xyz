@@ -4,11 +4,11 @@ export default function SellerDashboardAverageScore({ score }) {
   return (
     <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <h3 className="mb-6 text-md font-bold text-black">My Products average score</h3>
-      <div className="flex flex-grow items-center justify-center gap-6">
+      <div className="flex grow items-center justify-center gap-6">
         <svg width="150" height="150" viewBox="0 0 24 24">
           <defs>
             <linearGradient id="star-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset={`${fillPercentage}%`} stopColor="#f97316" />
+              <stop offset={`${fillPercentage}%`} stopColor="#E5DC40" />
               <stop offset={`${fillPercentage}%`} stopColor="#e5e7eb" />
             </linearGradient>
           </defs>
