@@ -5,7 +5,7 @@ const pool = require("../db.cjs");
 const {
   ensureSellerDashboardTable,
   refreshSellerDashboard,
-} = require("../utils/sellerDashboardMetrics.cjs");
+} = require("../apiRoutes/sellerShared.cjs");
 
 async function run() {
   try {

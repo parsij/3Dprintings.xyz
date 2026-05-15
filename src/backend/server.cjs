@@ -12,7 +12,7 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { ensureSellerDashboardTable } = require("./utils/sellerDashboardMetrics.cjs");
+const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;

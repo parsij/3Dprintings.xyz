@@ -1,4 +1,4 @@
-const { refreshSellerDashboard } = require("../utils/sellerDashboardMetrics.cjs");
+const { refreshSellerDashboard } = require("./sellerShared.cjs");
 
 module.exports = function sellerRoutes(deps) {
   const { app, pool, isAuthenticatedAnIisValid } = deps;
