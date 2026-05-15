@@ -19,11 +19,18 @@ import SellerDashboard from "./routes/SellerDashboard.jsx";
 import BecomeSeller from "./routes/BecomeSeller.jsx";
 
 const Router = ({ user, setUser }) => {
+  const hostname = typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "";
+  const isSellerHost = hostname === "seller.3dprintings.xyz";
+  const defaultPath = isSellerHost ? "/seller" : "/home";
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/home" replace />} />
-        <Route path="/home" element={<Home user={user} setUser={setUser} />} />
+        <Route path="/" element={<Navigate to={defaultPath} replace />} />
+        <Route
+          path="/home"
+          element={isSellerHost ? <Navigate to="/seller" replace /> : <Home user={user} setUser={setUser} />}
+        />
         <Route
           path="/signin"
           element={user ? <Navigate to="/account" replace /> : <SignIn setUser={setUser} />}
