@@ -76,7 +76,7 @@ export default function Dashboard() {
             <button className="rounded-md px-4 py-1 text-sm hover:bg-gray-50">Withdraw Funds</button>
             <button className="rounded-md px-4 py-1 text-sm hover:bg-gray-50">Preferences</button>
           </div>
-          <h2 className="text-5xl font-extrabold tracking-tight">3DPrintings.xyz</h2>
+          <h2 className="hidden md:text-2xl md:block xl:text-5xl font-extrabold tracking-tight">3DPrintings.xyz</h2>
         </div>
 
         <SellerDashboardTopMetricsRow metrics={metrics.length ? metrics : [
