@@ -457,7 +457,7 @@ export default function AccountSettings({ user, setUser }) {
                     : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
-                My Orders
+                Orders
               </Link>
             </nav>
           </div>

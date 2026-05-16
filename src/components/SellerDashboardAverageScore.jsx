@@ -3,7 +3,7 @@ export default function SellerDashboardAverageScore({ score }) {
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-6 text-md font-bold text-black">My Products average score</h3>
+      <h3 className="mb-6 text-md font-bold text-black">Overall Product Rating</h3>
       <div className="flex grow items-center justify-center gap-6">
         <svg width="150" height="150" viewBox="0 0 24 24">
           <defs>
@@ -22,6 +22,7 @@ export default function SellerDashboardAverageScore({ score }) {
         </svg>
         <span className="text-7xl font-bold text-black">{score.toFixed(2)}</span>
       </div>
+      <div className="text-sm text-gray-600"> The average rating of all your products combined.</div>
     </div>
   );
 }

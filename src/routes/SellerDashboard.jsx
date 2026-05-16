@@ -45,7 +45,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 p-8 font-sans text-black">
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-xl font-bold">My Dashboard</h1>
+        <h1 className="text-xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-3">
           <button className="rounded-lg bg-gray-200 p-2 transition-colors hover:bg-gray-300">
             <MoreHorizontal size={20} />
