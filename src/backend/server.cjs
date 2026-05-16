@@ -506,7 +506,7 @@ async function initializeDatabase() {
        ALTER TABLE users
        ADD COLUMN IF NOT EXISTS seller_preferences JSONB NOT NULL DEFAULT '{}'::jsonb
      `);
-     console.log("Seller preferences column ensured in users table");
+     console.log("seller preferences column ensured in users table");
 
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`
@@ -538,7 +538,7 @@ async function initializeDatabase() {
        ALTER TABLE reviews
        ADD COLUMN IF NOT EXISTS seller_reply_updated_at TIMESTAMPTZ
      `);
-     console.log("Seller reply columns ensured in reviews table");
+     console.log("seller reply columns ensured in reviews table");
 
      // Create orders table if it doesn't exist
      await pool.query(`
@@ -558,7 +558,7 @@ async function initializeDatabase() {
     console.log('✅ Orders table initialized');
 
     await ensureSellerDashboardTable(pool);
-    console.log("Seller dashboard metrics table ensured.");
+    console.log("seller dashboard metrics table ensured.");
   } catch (error) {
     console.error('⚠️ Error initializing database:', error.message);
   }

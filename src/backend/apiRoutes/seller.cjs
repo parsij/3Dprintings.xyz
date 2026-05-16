@@ -137,7 +137,7 @@ module.exports = function sellerRoutes(deps) {
 
       const updatedUser = updatedUserResult.rows[0];
       return res.status(200).json({
-        message: "Seller access granted.",
+        message: "seller access granted.",
         user: {
           id: Number(updatedUser.id),
           username: updatedUser.username,
@@ -178,7 +178,7 @@ module.exports = function sellerRoutes(deps) {
     try {
       const snapshot = await refreshSellerDashboard(pool, req.user.id);
       return res.status(200).json({
-        message: "Seller dashboard metrics refreshed.",
+        message: "seller dashboard metrics refreshed.",
         updatedAt: new Date().toISOString(),
         totals: {
           lifetimeRevenue: snapshot.lifetimeRevenue,

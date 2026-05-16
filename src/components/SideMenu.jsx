@@ -9,7 +9,7 @@ const defaultItems = [
   { label: "Saved Products", to: "/saved-products" },
   { label: "My Reviews", to: "/your-reviews" },
   { label: "My Orders", to: "/account/orders" },
-  { label: "Become a Seller", to: "/become-seller" },
+  { label: "Become a seller", to: "/become-seller" },
   { label: "List a 3D Printed Model", to: "/create" },
 ];
 

@@ -10,7 +10,7 @@ const {
 async function run() {
   try {
     await ensureSellerDashboardTable(pool);
-    console.log("Seller dashboard metrics table ensured.");
+    console.log("seller dashboard metrics table ensured.");
 
     const sellersResult = await pool.query(`
       SELECT DISTINCT user_id
@@ -27,9 +27,9 @@ async function run() {
       console.log(`Backfilled seller dashboard metrics for user_id=${sellerId}`);
     }
 
-    console.log("Seller dashboard setup completed.");
+    console.log("seller dashboard setup completed.");
   } catch (error) {
-    console.error("Seller dashboard setup failed:", error);
+    console.error("seller dashboard setup failed:", error);
     process.exitCode = 1;
   } finally {
     await pool.end();

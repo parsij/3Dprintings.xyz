@@ -22,7 +22,7 @@ export default function BecomeSeller() {
         withCredentials: true,
       });
 
-      setMessage(response.data?.message || "Seller access granted.");
+      setMessage(response.data?.message || "seller access granted.");
       setTimeout(() => {
         navigate("/seller");
       }, 500);
@@ -67,7 +67,7 @@ export default function BecomeSeller() {
                 : "cursor-pointer bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
             }`}
           >
-            {loading ? "Updating..." : "Become a Seller"}
+            {loading ? "Updating..." : "Become a seller"}
           </button>
         </section>
       </main>

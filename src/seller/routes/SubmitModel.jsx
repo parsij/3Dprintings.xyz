@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { submitModelListing } from "../services/modelListingService.js";
-import Tags from "../components/Tags.jsx";
+import Tags from "../../components/Tags.jsx";
 
 const defaultForm = {
   modelName: "",
