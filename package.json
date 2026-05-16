@@ -8,9 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start:server": "node user/backend/server.cjs",
-    "dev:server": "nodemon --watch user/backend --ext cjs,js,json,env --exec \"node user/backend/server.cjs\"",
-    "seller:setup": "node user/backend/scripts/setupSellerDashboard.cjs"
+    "start:server": "node src/backend/server.cjs",
+    "dev:server": "nodemon --watch src/backend --ext cjs,js,json,env --exec \"node src/backend/server.cjs\"",
+    "seller:setup": "node src/backend/scripts/setupSellerDashboard.cjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",

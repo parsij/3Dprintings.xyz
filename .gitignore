@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-user/backend/imgUploads/
+src/backend/imgUploads/
 dist
 dist-ssr
 *.local
@@ -23,5 +23,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-/user/backend/.env
+/src/backend/.env
 /.junie/
