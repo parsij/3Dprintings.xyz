@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Home from "./routes/Home.jsx";
 import SignIn from "./routes/SignIn.jsx";
 import SignUp from "./routes/SignUp.jsx";
@@ -18,22 +19,63 @@ import PaymentCancel from "./routes/PaymentCancel.jsx";
 import SellerDashboard from "./routes/SellerDashboard.jsx";
 import BecomeSeller from "./routes/BecomeSeller.jsx";
 
+const MAIN_SITE_ORIGIN = "https://3dprintings.xyz";
+const SELLER_SITE_ORIGIN = "https://seller.3dprintings.xyz";
+
+function ExternalRedirect({ to }) {
+  useEffect(() => {
+    window.location.replace(to);
+  }, [to]);
+
+  return null;
+}
+
+function SignInRoute({ user, setUser }) {
+  const location = useLocation();
+  const next = new URLSearchParams(location.search).get("next");
+
+  if (user) {
+    if (next === "seller") {
+      if (String(user.role || "").toLowerCase() === "seller") {
+        return <ExternalRedirect to={SELLER_SITE_ORIGIN} />;
+      }
+      return <Navigate to="/become-seller" replace />;
+    }
+
+    return <Navigate to="/account" replace />;
+  }
+
+  return <SignIn setUser={setUser} postLoginSellerFlow={next === "seller"} />;
+}
+
 const Router = ({ user, setUser }) => {
   const hostname = typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "";
   const isSellerHost = hostname === "seller.3dprintings.xyz";
-  const defaultPath = isSellerHost ? "/seller" : "/home";
+  const defaultPath = isSellerHost ? "/" : "/home";
+  const isSellerUser = String(user?.role || "").toLowerCase() === "seller";
+
+  if (isSellerHost && !user) {
+    return <ExternalRedirect to={`${MAIN_SITE_ORIGIN}/signin?next=seller`} />;
+  }
+
+  if (isSellerHost && user && !isSellerUser) {
+    return <ExternalRedirect to={`${MAIN_SITE_ORIGIN}/become-seller`} />;
+  }
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to={defaultPath} replace />} />
+        <Route
+          path="/"
+          element={isSellerHost ? <SellerDashboard /> : <Navigate to={defaultPath} replace />}
+        />
         <Route
           path="/home"
-          element={isSellerHost ? <Navigate to="/seller" replace /> : <Home user={user} setUser={setUser} />}
+          element={isSellerHost ? <Navigate to="/" replace /> : <Home user={user} setUser={setUser} />}
         />
         <Route
           path="/signin"
-          element={user ? <Navigate to="/account" replace /> : <SignIn setUser={setUser} />}
+          element={<SignInRoute user={user} setUser={setUser} />}
         />
         <Route
           path="/signup"
@@ -52,7 +94,10 @@ const Router = ({ user, setUser }) => {
         <Route path="/cancel" element={<PaymentCancel />} />
         <Route path="/create" element={<SubmitModel user={user} />} />
         <Route path="/become-seller" element={user ? <BecomeSeller /> : <Navigate to="/signin" replace />} />
-        <Route path="/seller" element={user ? <SellerDashboard /> : <Navigate to="/signin" replace />} />
+        <Route
+          path="/seller"
+          element={user ? (isSellerUser ? <Navigate to="/" replace /> : <Navigate to="/become-seller" replace />) : <Navigate to="/signin" replace />}
+        />
         <Route
           path="/account/*"
           element={user ? <AccountSettings user={user} setUser={setUser} /> : <Navigate to="/signin" replace />}

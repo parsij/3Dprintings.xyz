@@ -5,6 +5,8 @@ import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import axios from "axios";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
 export default function SignUp({ setUser }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -63,7 +65,6 @@ export default function SignUp({ setUser }) {
     if (!isFormValid) return;
 
     try {
-      const API_BASE = `https://3dprintings.xyz`;
       const response = await axios.post(
         `${API_BASE}/api/signup`,
         {

@@ -31,6 +31,19 @@ function normalizeOrigin(origin) {
     .toLowerCase();
 }
 
+function isAllowedFrontendOrigin(origin, configuredFrontendOrigin) {
+  if (!origin) return false;
+  if (configuredFrontendOrigin && origin === configuredFrontendOrigin) return true;
+
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol !== 'https:') return false;
+    return parsed.hostname === '3dprintings.xyz' || parsed.hostname.endsWith('.3dprintings.xyz');
+  } catch {
+    return false;
+  }
+}
+
 module.exports = function authRoutes(deps) {
   const {
     app,
@@ -77,7 +90,7 @@ module.exports = function authRoutes(deps) {
       const query = `
       INSERT INTO users (username, email, password)
       VALUES ($1, $2, $3)
-      RETURNING id, username, email
+      RETURNING id, username, email, COALESCE(role, 'customer') AS role
     `;
 
       const values = [normalizedUsername, normalizedEmail, hashedPassword];
@@ -112,7 +125,7 @@ module.exports = function authRoutes(deps) {
         return res.status(400).json({ message: 'Invalid email format' });
       }
 
-      const result = await pool.query('SELECT id, username, email, password FROM users WHERE email = $1', [
+      const result = await pool.query('SELECT id, username, email, password, COALESCE(role, \'customer\') AS role FROM users WHERE email = $1', [
         normalizedEmail,
       ]);
 
@@ -130,7 +143,12 @@ module.exports = function authRoutes(deps) {
       setAuthCookie(res, token);
       return res.json({
         message: 'Signed in',
-        user: { username: user.username, email: user.email },
+        user: {
+          id: Number(user.id),
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
       });
     } catch (err) {
       console.error('Login error:', err.message);
@@ -149,7 +167,7 @@ module.exports = function authRoutes(deps) {
   app.post('/api/auth/google', async (req, res) => {
     try {
       const requestOrigin = normalizeOrigin(req.headers.origin);
-      if (frontendOrigin && requestOrigin && requestOrigin !== frontendOrigin) {
+      if (requestOrigin && !isAllowedFrontendOrigin(requestOrigin, frontendOrigin)) {
         return res.status(403).json({ message: 'Blocked origin' });
       }
 
@@ -205,7 +223,7 @@ module.exports = function authRoutes(deps) {
 
       const usernameCandidate = buildUsernameFromGoogleProfile(payload.name, email);
       const existingBySub = await pool.query(
-        `SELECT id, username, email, google_sub
+        `SELECT id, username, email, google_sub, COALESCE(role, 'customer') AS role
          FROM users
          WHERE google_sub = $1
          LIMIT 1`,
@@ -234,7 +252,7 @@ module.exports = function authRoutes(deps) {
             `UPDATE users
              SET email = $1
              WHERE id = $2
-             RETURNING id, username, email, google_sub`,
+             RETURNING id, username, email, google_sub, COALESCE(role, 'customer') AS role`,
             [email, matchedBySub.id]
           );
           user = updatedEmailUser.rows[0];
@@ -243,7 +261,7 @@ module.exports = function authRoutes(deps) {
         }
       } else {
         const existingByEmail = await pool.query(
-        `SELECT id, username, email, google_sub
+        `SELECT id, username, email, google_sub, COALESCE(role, 'customer') AS role
          FROM users
          WHERE email = $1
          LIMIT 1`,
@@ -264,7 +282,7 @@ module.exports = function authRoutes(deps) {
               `UPDATE users
                SET google_sub = $1
                WHERE id = $2
-               RETURNING id, username, email, google_sub`,
+               RETURNING id, username, email, google_sub, COALESCE(role, 'customer') AS role`,
               [googleSub, matchedUser.id]
             );
             user = updated.rows[0];
@@ -277,7 +295,7 @@ module.exports = function authRoutes(deps) {
           const inserted = await pool.query(
             `INSERT INTO users (username, email, password, google_sub)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, username, email, google_sub`,
+             RETURNING id, username, email, google_sub, COALESCE(role, 'customer') AS role`,
             [usernameCandidate, email, hashedPassword, googleSub]
           );
           user = inserted.rows[0];
@@ -290,9 +308,10 @@ module.exports = function authRoutes(deps) {
       return res.json({
         message: 'Signed in with Google',
         user: {
-          id: user.id,
+          id: Number(user.id),
           username: user.username,
           email: user.email,
+          role: user.role,
           profile: {
             name: payload.name || null,
             given_name: payload.given_name || null,
@@ -319,12 +338,33 @@ module.exports = function authRoutes(deps) {
 
   app.get('/api/auth', async (req, res) => {
     try {
-      const user = getAuthUserFromRequest(req);
-      if (!user) {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser?.id) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
-      return res.json({ user, message: 'Authentication successfully' });
+      const userResult = await pool.query(
+        `SELECT id, username, email, COALESCE(role, 'customer') AS role
+         FROM users
+         WHERE id = $1
+         LIMIT 1`,
+        [authUser.id]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(401).json({ message: 'Not signed in' });
+      }
+
+      const user = userResult.rows[0];
+      return res.json({
+        user: {
+          id: Number(user.id),
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
+        message: 'Authentication successfully',
+      });
     } catch (error) {
       return res.status(401).json({ message: 'Invalid token' });
     }

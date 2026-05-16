@@ -7,10 +7,11 @@ import SmallNavBar from "../components/SmallNavBar.jsx";
 import axios from "axios";
 
 const GOOGLE_GSI_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
+const SELLER_SITE_ORIGIN = "https://seller.3dprintings.xyz";
 
-export default function SignIn({ setUser }) {
+export default function SignIn({ setUser, postLoginSellerFlow = false }) {
   const navigate = useNavigate();
-  const API_BASE = `https://3dprintings.xyz`;
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -52,6 +53,23 @@ export default function SignIn({ setUser }) {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const redirectAfterAuth = useCallback(
+    (signedInUser) => {
+      if (!postLoginSellerFlow) {
+        navigate("/home", { replace: true });
+        return;
+      }
+
+      const isSeller = String(signedInUser?.role || "").toLowerCase() === "seller";
+      if (isSeller) {
+        window.location.replace(SELLER_SITE_ORIGIN);
+      } else {
+        navigate("/become-seller", { replace: true });
+      }
+    },
+    [navigate, postLoginSellerFlow]
+  );
+
   const onSubmit = async (e) => {
     e.preventDefault();
 
@@ -82,7 +100,7 @@ export default function SignIn({ setUser }) {
       setSubmitMessage(response.data?.message || "Authentication successful.");
 
       setTimeout(() => {
-        navigate("/home");
+        redirectAfterAuth(response.data.user);
       }, 700);
     } catch (error) {
       const message = error.response?.data?.message || "Signin failed";
@@ -116,7 +134,7 @@ export default function SignIn({ setUser }) {
         setUser(response.data.user);
         setSubmitError(false);
         setSubmitMessage(response.data?.message || "Signed in with Google.");
-        navigate("/home", { replace: true });
+        redirectAfterAuth(response.data.user);
       } catch (error) {
         const message = error.response?.data?.message || "Google sign-in failed";
         setSubmitError(true);
@@ -125,7 +143,7 @@ export default function SignIn({ setUser }) {
         setIsGoogleSubmitting(false);
       }
     },
-    [API_BASE, navigate, setUser]
+    [API_BASE, redirectAfterAuth, setUser]
   );
 
   useEffect(() => {

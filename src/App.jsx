@@ -3,6 +3,8 @@ import "./App.css";
 import Router from "./Router.jsx";
 import axios from "axios";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
 const App = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -10,7 +12,7 @@ const App = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await axios.get("https://3dprintings.xyz/api/auth", {
+        const response = await axios.get(`${API_BASE}/api/auth`, {
           withCredentials: true,
         });
         setUser(response.data.user);
