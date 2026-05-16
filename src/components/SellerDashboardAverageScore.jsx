@@ -22,7 +22,7 @@ export default function SellerDashboardAverageScore({ score }) {
         </svg>
         <span className="text-7xl font-bold text-black">{score.toFixed(2)}</span>
       </div>
-      <div className="text-sm text-gray-600"> The average rating of all your products combined.</div>
+      <div className="text-sm text-gray-600 mt-2.5 text-center"> The average rating of all your products combined.</div>
     </div>
   );
 }
