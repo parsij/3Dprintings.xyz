@@ -133,7 +133,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
           <button
               onClick={() => setMenuOpen((prev) => !prev)}
-              className="group flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
+              className="group ml-1 md:ml-2 flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
               aria-label="Open menu"
           >
             <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>

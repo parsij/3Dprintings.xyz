@@ -3,7 +3,7 @@ import axios from "axios";
 import { isProfane } from "../services/profanityFilter.js";
 
 const axiosWithCredentials = axios.create({
-  baseURL: "https://3dprintings.xyz",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "",
   withCredentials: true,
 });
 

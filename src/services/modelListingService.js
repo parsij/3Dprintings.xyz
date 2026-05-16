@@ -1,5 +1,7 @@
 import axios from "axios";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
 export async function submitModelListing({
   modelName,
   description,
@@ -28,7 +30,7 @@ export async function submitModelListing({
 
   try {
       const response = await axios.post(
-      "https://3dprintings.xyz/api/create",
+      `${API_BASE}/api/create`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
@@ -44,4 +46,3 @@ export async function submitModelListing({
     throw new Error(message);
   }
 }
-

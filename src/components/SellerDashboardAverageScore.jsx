@@ -8,7 +8,7 @@ export default function SellerDashboardAverageScore({ score }) {
         <svg width="150" height="150" viewBox="0 0 24 24">
           <defs>
             <linearGradient id="star-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset={`${fillPercentage}%`} stopColor="#E5DC40" />
+              <stop offset={`${fillPercentage}%`} stopColor="#F7F16D" />
               <stop offset={`${fillPercentage}%`} stopColor="#e5e7eb" />
             </linearGradient>
           </defs>

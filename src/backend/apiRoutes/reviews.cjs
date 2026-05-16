@@ -75,7 +75,7 @@ module.exports = function reviewsRoutes(deps) {
        }
 
        const reviewsResult = await pool.query(
-         `SELECT r.id, r.product_id, r.user_id, r.rating, r.content, r.created_at, u.username
+         `SELECT r.id, r.product_id, r.user_id, r.rating, r.content, r.created_at, r.seller_reply, r.seller_reply_updated_at, u.username
           FROM reviews r
           LEFT JOIN users u ON r.user_id = u.id
           WHERE r.product_id = $1
@@ -86,6 +86,8 @@ module.exports = function reviewsRoutes(deps) {
        const reviews = reviewsResult.rows.map((review) => ({
          ...review,
          isLiked: likedReviewIds.includes(review.id),
+         sellerReply: review.seller_reply || "",
+         sellerReplyUpdatedAt: review.seller_reply_updated_at || null,
        }));
 
        return res.json({ reviews });

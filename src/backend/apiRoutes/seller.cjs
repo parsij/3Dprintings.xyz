@@ -1,7 +1,49 @@
 const { refreshSellerDashboard } = require("./sellerShared.cjs");
+const { ensureLikesColumns, normalizeNumericArray } = require("./likesShared.cjs");
+
+function normalizeTagList(tags) {
+  if (!Array.isArray(tags)) return [];
+  return [...new Set(tags.map((tag) => String(tag || "").trim().toLowerCase()).filter(Boolean))];
+}
+
+function parseProductTags(rawValue) {
+  if (!rawValue) return [];
+  if (Array.isArray(rawValue)) return normalizeTagList(rawValue);
+  if (typeof rawValue === "string") {
+    try {
+      return normalizeTagList(JSON.parse(rawValue));
+    } catch {
+      return normalizeTagList(rawValue.split(","));
+    }
+  }
+  return [];
+}
+
+function normalizeSellerPreferences(input) {
+  const payload = input && typeof input === "object" ? input : {};
+  const storeName = String(payload.storeName || "").trim();
+  const supportEmail = String(payload.supportEmail || "").trim().toLowerCase();
+  const storeDescription = String(payload.storeDescription || "").trim();
+
+  return {
+    storeName,
+    supportEmail,
+    storeDescription,
+    notifyNewOrders: Boolean(payload.notifyNewOrders),
+    notifyNewReviews: Boolean(payload.notifyNewReviews),
+    notifyPayouts: Boolean(payload.notifyPayouts),
+  };
+}
+
+function buildImageUrl(req, fileName) {
+  if (!fileName) return null;
+  const protocol = req.protocol || "https";
+  const host = req.get("host");
+  return `${protocol}://${host}/api/imgUploads/${fileName}`;
+}
 
 module.exports = function sellerRoutes(deps) {
-  const { app, pool, getAuthUserFromRequest } = deps;
+  const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid, EMAIL_REGEX } = deps;
 
   const attachAuthenticatedUser = async (req, res, next) => {
     try {
@@ -37,6 +79,39 @@ module.exports = function sellerRoutes(deps) {
       return next();
     }
     return res.status(403).json({ message: "Access denied. Sellers only." });
+  };
+
+  const ensureSellerWriteAuth = (req, res, next) => {
+    const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+    if (!auth?.userId) return;
+    req.auth = auth;
+    return next();
+  };
+
+  const adjustTagUsageCounts = async (currentTags, nextTags) => {
+    const currentSet = new Set(normalizeTagList(currentTags));
+    const nextSet = new Set(normalizeTagList(nextTags));
+    const removedTags = [...currentSet].filter((tag) => !nextSet.has(tag));
+    const addedTags = [...nextSet].filter((tag) => !currentSet.has(tag));
+
+    for (const tag of removedTags) {
+      await pool.query(
+        `UPDATE tags
+         SET uses = GREATEST(uses - 1, 0)
+         WHERE tag_name = $1`,
+        [tag]
+      );
+    }
+
+    for (const tag of addedTags) {
+      await pool.query(
+        `INSERT INTO tags (tag_name, uses)
+         VALUES ($1, 1)
+         ON CONFLICT (tag_name) DO UPDATE
+         SET uses = tags.uses + 1`,
+        [tag]
+      );
+    }
   };
 
   app.post("/api/seller/become", attachAuthenticatedUser, async (req, res) => {
@@ -213,6 +288,286 @@ module.exports = function sellerRoutes(deps) {
     } catch (error) {
       console.error("Error loading seller orders:", error);
       return res.status(500).json({ message: "Failed to load seller orders." });
+    }
+  });
+
+  app.get("/api/seller/preferences", attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT username, email, phone_number, COALESCE(seller_preferences, '{}'::jsonb) AS seller_preferences
+         FROM users
+         WHERE id = $1
+         LIMIT 1`,
+        [req.user.id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      const row = result.rows[0];
+      return res.status(200).json({
+        profile: {
+          username: row.username,
+          email: row.email,
+          phoneNumber: row.phone_number || "",
+        },
+        preferences: normalizeSellerPreferences(row.seller_preferences),
+      });
+    } catch (error) {
+      console.error("Error loading seller preferences:", error);
+      return res.status(500).json({ message: "Failed to load seller preferences." });
+    }
+  });
+
+  app.put("/api/seller/preferences", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const preferences = normalizeSellerPreferences(req.body);
+      if (preferences.storeName.length > 80) {
+        return res.status(400).json({ message: "Store name must be 80 characters or less." });
+      }
+      if (preferences.supportEmail && !EMAIL_REGEX.test(preferences.supportEmail)) {
+        return res.status(400).json({ message: "Support email format is invalid." });
+      }
+      if (preferences.storeDescription.length > 2000) {
+        return res.status(400).json({ message: "Store description must be 2000 characters or less." });
+      }
+
+      await pool.query(
+        `UPDATE users
+         SET seller_preferences = $1::jsonb
+         WHERE id = $2`,
+        [JSON.stringify(preferences), req.user.id]
+      );
+
+      return res.status(200).json({
+        message: "Preferences updated.",
+        preferences,
+      });
+    } catch (error) {
+      console.error("Error updating seller preferences:", error);
+      return res.status(500).json({ message: "Failed to update seller preferences." });
+    }
+  });
+
+  app.get("/api/seller/products", attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT p.*,
+                COALESCE(r.review_count, 0)::int AS reviews_count
+         FROM products p
+         LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS review_count
+            FROM reviews
+            WHERE reviews.product_id = p.id
+         ) r ON true
+         WHERE p.user_id = $1
+         ORDER BY p.id DESC`,
+        [req.user.id]
+      );
+
+      const products = result.rows.map((product) => {
+        const firstImage = Array.isArray(product.img_path) && product.img_path.length > 0 ? product.img_path[0] : null;
+        return {
+          ...product,
+          tags: parseProductTags(product.tags),
+          category: typeof product.category === "string" ? product.category.trim() : "",
+          image_url: buildImageUrl(req, firstImage),
+        };
+      });
+
+      return res.status(200).json({ products });
+    } catch (error) {
+      console.error("Error loading seller products:", error);
+      return res.status(500).json({ message: "Failed to load seller products." });
+    }
+  });
+
+  app.put("/api/seller/products/:productId", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const productId = Number.parseInt(req.params.productId, 10);
+      if (!Number.isInteger(productId) || productId <= 0) {
+        return res.status(400).json({ message: "Invalid product ID." });
+      }
+
+      const existingProductResult = await pool.query(
+        `SELECT id, user_id, tags
+         FROM products
+         WHERE id = $1
+         LIMIT 1`,
+        [productId]
+      );
+
+      if (existingProductResult.rows.length === 0) {
+        return res.status(404).json({ message: "Product not found." });
+      }
+
+      const existingProduct = existingProductResult.rows[0];
+      if (Number(existingProduct.user_id) !== Number(req.user.id)) {
+        return res.status(403).json({ message: "You can only edit your own products." });
+      }
+
+      const { isProfane } = await import("../../services/profanityFilter.js");
+      const modelName = String(req.body?.modelName || "").trim();
+      const description = String(req.body?.description || "").trim();
+      const category = String(req.body?.category || "").trim();
+      const parsedPrice = Number(req.body?.price);
+      const nextTags = normalizeTagList(req.body?.tags);
+
+      if (modelName.length < 3 || !/^[a-zA-Z0-9 ]+$/.test(modelName)) {
+        return res.status(400).json({ message: "Model name must be at least 3 characters and contain letters/numbers/spaces only." });
+      }
+      if (description.length < 20) {
+        return res.status(400).json({ message: "Description must be at least 20 characters." });
+      }
+      if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+        return res.status(400).json({ message: "Price must be a positive number." });
+      }
+      if (isProfane(modelName) || isProfane(description) || nextTags.some((tag) => isProfane(tag))) {
+        return res.status(400).json({ message: "Explicit content is not allowed in title, description, or tags." });
+      }
+
+      const currentTags = parseProductTags(existingProduct.tags);
+      await adjustTagUsageCounts(currentTags, nextTags);
+
+      const updatedResult = await pool.query(
+        `UPDATE products
+         SET name = $1,
+             description = $2,
+             original_price = $3,
+             current_price = $3,
+             category = $4,
+             tags = $5::jsonb
+         WHERE id = $6
+         RETURNING *`,
+        [modelName, description, parsedPrice, category || null, JSON.stringify(nextTags), productId]
+      );
+
+      const updatedProduct = updatedResult.rows[0];
+      const firstImage = Array.isArray(updatedProduct.img_path) && updatedProduct.img_path.length > 0 ? updatedProduct.img_path[0] : null;
+
+      return res.status(200).json({
+        message: "Product updated.",
+        product: {
+          ...updatedProduct,
+          tags: parseProductTags(updatedProduct.tags),
+          category: typeof updatedProduct.category === "string" ? updatedProduct.category.trim() : "",
+          image_url: buildImageUrl(req, firstImage),
+        },
+      });
+    } catch (error) {
+      console.error("Error updating seller product:", error);
+      return res.status(500).json({ message: "Failed to update product." });
+    }
+  });
+
+  app.get("/api/seller/reviews", attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      await ensureLikesColumns(pool);
+      const likedResult = await pool.query(
+        `SELECT COALESCE(liked_reviews, '[]'::jsonb) AS liked_reviews
+         FROM users
+         WHERE id = $1`,
+        [req.user.id]
+      );
+      const likedReviewIds = likedResult.rows.length > 0 ? normalizeNumericArray(likedResult.rows[0].liked_reviews) : [];
+
+      const reviewsResult = await pool.query(
+        `SELECT r.id,
+                r.product_id,
+                r.user_id,
+                r.rating,
+                r.content,
+                r.created_at,
+                r.seller_reply,
+                r.seller_reply_updated_at,
+                u.username AS reviewer_username,
+                p.name AS product_name,
+                p.img_path AS product_img_path
+         FROM reviews r
+         JOIN products p ON p.id = r.product_id
+         LEFT JOIN users u ON u.id = r.user_id
+         WHERE p.user_id = $1
+         ORDER BY r.created_at DESC, r.id DESC`,
+        [req.user.id]
+      );
+
+      const reviews = reviewsResult.rows.map((row) => {
+        const firstImage = Array.isArray(row.product_img_path) && row.product_img_path.length > 0
+          ? row.product_img_path[0]
+          : null;
+
+        return {
+          id: Number(row.id),
+          productId: Number(row.product_id),
+          productName: row.product_name,
+          productImageUrl: buildImageUrl(req, firstImage),
+          userId: row.user_id ? Number(row.user_id) : null,
+          username: row.reviewer_username || "Anonymous",
+          rating: Number(row.rating),
+          content: row.content || "",
+          createdAt: row.created_at,
+          sellerReply: row.seller_reply || "",
+          sellerReplyUpdatedAt: row.seller_reply_updated_at || null,
+          isLiked: likedReviewIds.includes(Number(row.id)),
+        };
+      });
+
+      return res.status(200).json({ reviews });
+    } catch (error) {
+      console.error("Error loading seller reviews:", error);
+      return res.status(500).json({ message: "Failed to load seller reviews." });
+    }
+  });
+
+  app.put("/api/seller/reviews/:reviewId/reply", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const reviewId = Number.parseInt(req.params.reviewId, 10);
+      if (!Number.isInteger(reviewId) || reviewId <= 0) {
+        return res.status(400).json({ message: "Invalid review ID." });
+      }
+
+      const reply = String(req.body?.reply || "").trim();
+      if (reply.length > 2000) {
+        return res.status(400).json({ message: "Reply must be 2000 characters or less." });
+      }
+
+      const reviewResult = await pool.query(
+        `SELECT r.id
+         FROM reviews r
+         JOIN products p ON p.id = r.product_id
+         WHERE r.id = $1
+           AND p.user_id = $2
+         LIMIT 1`,
+        [reviewId, req.user.id]
+      );
+
+      if (reviewResult.rows.length === 0) {
+        return res.status(404).json({ message: "Review not found for this seller." });
+      }
+
+      const replyValue = reply || null;
+      const updatedResult = await pool.query(
+        `UPDATE reviews
+         SET seller_reply = $1,
+             seller_reply_updated_at = CASE WHEN $1::text IS NULL THEN NULL ELSE NOW() END
+         WHERE id = $2
+         RETURNING id, seller_reply, seller_reply_updated_at`,
+        [replyValue, reviewId]
+      );
+
+      const updated = updatedResult.rows[0];
+      return res.status(200).json({
+        message: replyValue ? "Reply saved." : "Reply removed.",
+        review: {
+          id: Number(updated.id),
+          sellerReply: updated.seller_reply || "",
+          sellerReplyUpdatedAt: updated.seller_reply_updated_at || null,
+        },
+      });
+    } catch (error) {
+      console.error("Error saving seller review reply:", error);
+      return res.status(500).json({ message: "Failed to save reply." });
     }
   });
 };

@@ -502,6 +502,12 @@ async function initializeDatabase() {
      `);
      console.log("User role column ensured in users table");
 
+     await pool.query(`
+       ALTER TABLE users
+       ADD COLUMN IF NOT EXISTS seller_preferences JSONB NOT NULL DEFAULT '{}'::jsonb
+     `);
+     console.log("Seller preferences column ensured in users table");
+
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`
        CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_unique_idx
@@ -523,6 +529,16 @@ async function initializeDatabase() {
        ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255)
      `);
      console.log('Stripe session id column ensured in orders table');
+
+     await pool.query(`
+       ALTER TABLE reviews
+       ADD COLUMN IF NOT EXISTS seller_reply TEXT
+     `);
+     await pool.query(`
+       ALTER TABLE reviews
+       ADD COLUMN IF NOT EXISTS seller_reply_updated_at TIMESTAMPTZ
+     `);
+     console.log("Seller reply columns ensured in reviews table");
 
      // Create orders table if it doesn't exist
      await pool.query(`

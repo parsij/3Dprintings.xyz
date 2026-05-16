@@ -2,7 +2,18 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useMenu } from "../MenuContext.jsx";
 
-const SideMenu = () => {
+const defaultItems = [
+  { label: "Home", to: "/home" },
+  { label: "3D Printed Models", to: "/products" },
+  { label: "Liked Products", to: "/liked-products" },
+  { label: "Saved Products", to: "/saved-products" },
+  { label: "My Reviews", to: "/your-reviews" },
+  { label: "My Orders", to: "/account/orders" },
+  { label: "Become a Seller", to: "/become-seller" },
+  { label: "List a 3D Printed Model", to: "/create" },
+];
+
+const SideMenu = ({ title = "Menu", items = defaultItems }) => {
   const { menuOpen, setMenuOpen } = useMenu();
   return (
     <>
@@ -19,21 +30,23 @@ const SideMenu = () => {
         }`}
       >
         <div className="flex items-center justify-between border-b border-orange-100 p-4">
-          <h2 className="text-lg font-bold">Menu</h2>
+          <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={() => setMenuOpen(false)} className="text-gray-700 hover:text-orange-500 transition cursor-pointer">
             ✕
           </button>
         </div>
 
-          <div className="p-4 space-y-3">
-          <Link to="/home" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Home</Link>
-          <Link to="/products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">3D Printed Models</Link>
-          <Link to="/liked-products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Liked Products</Link>
-          <Link to="/saved-products" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Saved Products</Link>
-          <Link to="/your-reviews" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">My Reviews</Link>
-          <Link to="/account/orders" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">My Orders</Link>
-          <Link to="/become-seller" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">Become a Seller</Link>
-          <Link to="/create" onClick={() => setMenuOpen(false)} className="block hover:text-orange-500 transition">List a 3D Printed Model</Link>
+        <div className="p-4 space-y-3">
+          {items.map((item) => (
+            <Link
+              key={`${item.to}-${item.label}`}
+              to={item.to}
+              onClick={() => setMenuOpen(false)}
+              className="block hover:text-orange-500 transition"
+            >
+              {item.label}
+            </Link>
+          ))}
         </div>
       </aside>
     </>

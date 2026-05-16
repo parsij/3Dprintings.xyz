@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = `https://3dprintings.xyz`;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 export const toggleLike = async (productId) => {
   try {
@@ -82,4 +82,3 @@ export const getProductStatus = async (productId) => {
     return { isLiked: false, isSaved: false };
   }
 };
-
