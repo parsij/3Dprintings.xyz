@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import SmallNavBar from "../components/SmallNavBar.jsx";
-import SideMenu from "../components/SideMenu.jsx";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../components/Tags.jsx";
 
@@ -33,7 +31,7 @@ function mergePhotos(existingPhotos, incomingPhotos) {
   return unique.slice(0, MAX_PHOTOS);
 }
 
-export default function SubmitModel() {
+export default function SubmitModel({ onSubmissionSuccess }) {
   const [form, setForm] = useState(defaultForm);
   const [photos, setPhotos] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
@@ -139,6 +137,9 @@ export default function SubmitModel() {
       setForm(defaultForm);
       setPhotos([]);
       setSubmitted(false);
+      if (onSubmissionSuccess) {
+        onSubmissionSuccess();
+      }
     } catch (error) {
       setSubmitMessage(error?.message || "Failed to prepare listing. Please try again.");
     } finally {
@@ -147,21 +148,7 @@ export default function SubmitModel() {
   }
 
   return (
-    <>
-      <SmallNavBar />
-      <SideMenu />
-
-      <main className="min-h-screen bg-orange-50 px-4 pb-12 pt-24 text-gray-900">
-        <section className="mx-auto w-full max-w-4xl rounded-2xl border border-orange-100 bg-white p-5 shadow-xl sm:p-8 transition-all duration-300 hover:shadow-2xl hover:scale-[1.01] animate-fade-in-up">
-          <header className="mb-6 text-center sm:text-left group">
-            <h1 className="text-3xl font-extrabold tracking-tight transition-all duration-300 group-hover:translate-x-2">
-              List a new <span className="text-orange-500 group-hover:text-orange-600 transition-colors duration-300">3D printed model</span>
-            </h1>
-            <p className="mt-2 text-sm text-gray-600 transition-colors duration-300 group-hover:text-gray-700">
-              Upload photos and details so buyers can discover your printed models.
-            </p>
-          </header>
-
+    <div className="mx-auto w-full max-w-4xl">
           <form className="space-y-5" onSubmit={handleSubmit} noValidate>
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700 transition-colors duration-300">Printed model photos *</label>
@@ -307,8 +294,6 @@ export default function SubmitModel() {
               </p>
             )}
           </form>
-        </section>
-      </main>
-    </>
+        </div>
   );
 }

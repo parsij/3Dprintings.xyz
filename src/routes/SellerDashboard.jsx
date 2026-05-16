@@ -11,7 +11,6 @@ import SellerDashboardTopSellingProducts from "../components/SellerDashboardTopS
 import SellerDashboardAverageScore from "../components/SellerDashboardAverageScore.jsx";
 import SellerDashboardRevenueBarChart from "../components/SellerDashboardRevenueBarChart.jsx";
 import { getSellerDashboard } from "../services/sellerDashboardService.js";
-import { submitModelListing } from "../services/modelListingService.js";
 import { toggleReviewLike } from "../services/likesService.js";
 import {
   getSellerPreferences,
@@ -21,6 +20,7 @@ import {
   getSellerReviews,
   updateSellerReviewReply,
 } from "../services/sellerPortalService.js";
+import SubmitModel from "./SubmitModel.jsx"; // Import SubmitModel
 
 const TABS = ["dashboard", "products", "reviews", "preferences"];
 
@@ -30,15 +30,6 @@ const SELLER_MENU_ITEMS = [
   { label: "Reviews", to: "/?tab=reviews" },
   { label: "Preferences", to: "/?tab=preferences" },
 ];
-
-const defaultCreateForm = {
-  modelName: "",
-  description: "",
-  price: "",
-  category: "",
-  tags: [],
-  photos: [],
-};
 
 function SellerTopBar({ activeTab, onTabChange }) {
   const { setMenuOpen } = useMenu();
@@ -117,8 +108,6 @@ export default function SellerDashboard() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState("");
   const [productMessage, setProductMessage] = useState("");
-  const [createSubmitting, setCreateSubmitting] = useState(false);
-  const [createForm, setCreateForm] = useState(defaultCreateForm);
   const [sellerProducts, setSellerProducts] = useState([]);
   const [editForms, setEditForms] = useState({});
   const [savingProductId, setSavingProductId] = useState(null);
@@ -135,16 +124,6 @@ export default function SellerDashboard() {
     const next = new URLSearchParams(searchParams);
     next.set("tab", nextTab);
     setSearchParams(next, { replace: true });
-  };
-
-  const handleCreateFieldChange = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleCreatePhotoChange = (event) => {
-    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/"));
-    setCreateForm((prev) => ({ ...prev, photos: files.slice(0, 10) }));
   };
 
   const reloadProducts = async () => {
@@ -260,30 +239,6 @@ export default function SellerDashboard() {
   }, [activeTab, reviewsLoading, sellerReviews.length]);
 
   const formattedProductsCount = useMemo(() => sellerProducts.length, [sellerProducts.length]);
-
-  const handleSubmitCreateProduct = async (event) => {
-    event.preventDefault();
-    setProductMessage("");
-    setProductsError("");
-    try {
-      setCreateSubmitting(true);
-      const response = await submitModelListing({
-        modelName: createForm.modelName,
-        description: createForm.description,
-        price: Number(createForm.price),
-        category: createForm.category,
-        tags: createForm.tags,
-        photos: createForm.photos,
-      });
-      setProductMessage(response?.message || "Product created.");
-      setCreateForm(defaultCreateForm);
-      await reloadProducts();
-    } catch (error) {
-      setProductsError(error?.message || "Failed to create product.");
-    } finally {
-      setCreateSubmitting(false);
-    }
-  };
 
   const handleSaveProduct = async (productId) => {
     const form = editForms[productId];
@@ -410,72 +365,7 @@ export default function SellerDashboard() {
             <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
               <h2 className="text-lg font-bold">Create Product</h2>
               <p className="mt-1 text-sm text-gray-600">Add a new listing directly from seller dashboard.</p>
-              <form className="mt-4 space-y-3" onSubmit={handleSubmitCreateProduct}>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    name="modelName"
-                    value={createForm.modelName}
-                    onChange={handleCreateFieldChange}
-                    placeholder="Model name"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    required
-                  />
-                  <input
-                    name="price"
-                    value={createForm.price}
-                    onChange={handleCreateFieldChange}
-                    placeholder="Price"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    required
-                  />
-                  <input
-                    name="category"
-                    value={createForm.category}
-                    onChange={handleCreateFieldChange}
-                    placeholder="Category"
-                    className="rounded-lg border border-gray-300 px-3 py-2 md:col-span-2"
-                  />
-                  <textarea
-                    name="description"
-                    value={createForm.description}
-                    onChange={handleCreateFieldChange}
-                    placeholder="Description"
-                    rows={4}
-                    className="rounded-lg border border-gray-300 px-3 py-2 md:col-span-2"
-                    required
-                  />
-                  <div className="md:col-span-2">
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleCreatePhotoChange}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                      required
-                    />
-                    <p className="mt-1 text-xs text-gray-500">{createForm.photos.length} photo(s) selected</p>
-                  </div>
-                </div>
-                <Tags
-                  tags={createForm.tags}
-                  setTags={(updater) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      tags: typeof updater === "function" ? updater(prev.tags) : updater,
-                    }))
-                  }
-                />
-                <button
-                  type="submit"
-                  disabled={createSubmitting}
-                  className="rounded-lg bg-orange-500 px-4 py-2 font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
-                >
-                  {createSubmitting ? "Creating..." : "Create Product"}
-                </button>
-              </form>
+              <SubmitModel onSubmissionSuccess={reloadProducts} />
             </div>
 
             <div className="mb-3 text-sm text-gray-600">{formattedProductsCount} product(s)</div>
