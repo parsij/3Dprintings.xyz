@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { useMenu } from "../MenuContext.jsx";
 import SideMenu from "../components/SideMenu.jsx";
@@ -20,26 +20,24 @@ import {
   getSellerReviews,
   updateSellerReviewReply,
 } from "../services/sellerPortalService.js";
-import SubmitModel from "./SubmitModel.jsx"; // Import SubmitModel
-
-const TABS = ["dashboard", "products", "reviews", "preferences"];
+import SubmitModel from "./SubmitModel.jsx";
 
 const SELLER_MENU_ITEMS = [
-  { label: "Dashboard", to: "/?tab=dashboard" },
-  { label: "Products", to: "/?tab=products" },
-  { label: "Reviews", to: "/?tab=reviews" },
-  { label: "Preferences", to: "/?tab=preferences" },
+  { label: "Dashboard", to: "/" },
+  { label: "Products", to: "/products" },
+  { label: "Reviews", to: "/reviews" },
+  { label: "Preferences", to: "/preferences" },
 ];
 
-function SellerTopBar({ activeTab, onTabChange }) {
+function SellerTopBar() {
   const { setMenuOpen } = useMenu();
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center px-4 py-3">
-        <a href="/" className="text-xl font-extrabold text-gray-900 hover:text-orange-500 transition">
+        <Link to="/" className="text-xl font-extrabold text-gray-900 hover:text-orange-500 transition">
           3z Seller
-        </a>
+        </Link>
         <button
           onClick={() => setMenuOpen((prev) => !prev)}
           className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:border-orange-300 hover:text-orange-500 transition"
@@ -48,37 +46,13 @@ function SellerTopBar({ activeTab, onTabChange }) {
           <Menu size={18} />
         </button>
       </div>
-
-      <div className="mx-auto max-w-7xl px-4 pb-3">
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab;
-            const label = tab[0].toUpperCase() + tab.slice(1);
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => onTabChange(tab)}
-                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                  isActive
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-orange-100 hover:text-orange-600"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </header>
   );
 }
 
 export default function SellerDashboard() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTabParam = String(searchParams.get("tab") || "dashboard").toLowerCase();
-  const activeTab = TABS.includes(activeTabParam) ? activeTabParam : "dashboard";
+  const location = useLocation();
+  const activePath = location.pathname;
 
   const [metrics, setMetrics] = useState([
     { title: "Total revenue of this month", value: "$0.00", subtext: "No change month over month" },
@@ -118,13 +92,6 @@ export default function SellerDashboard() {
   const [sellerReviews, setSellerReviews] = useState([]);
   const [replyDrafts, setReplyDrafts] = useState({});
   const [savingReplyId, setSavingReplyId] = useState(null);
-
-  const updateActiveTab = (nextTab) => {
-    if (!TABS.includes(nextTab)) return;
-    const next = new URLSearchParams(searchParams);
-    next.set("tab", nextTab);
-    setSearchParams(next, { replace: true });
-  };
 
   const reloadProducts = async () => {
     setProductsLoading(true);
@@ -192,14 +159,16 @@ export default function SellerDashboard() {
         if (!cancelled) setDashboardLoading(false);
       }
     }
-    loadDashboard();
+    if (activePath === "/") {
+      loadDashboard();
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activePath]);
 
   useEffect(() => {
-    if (activeTab !== "preferences") return;
+    if (activePath !== "/preferences") return;
     let cancelled = false;
 
     async function loadPreferences() {
@@ -224,19 +193,19 @@ export default function SellerDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab]);
+  }, [activePath]);
 
   useEffect(() => {
-    if (activeTab === "products" && sellerProducts.length === 0 && !productsLoading) {
+    if (activePath === "/products" && sellerProducts.length === 0 && !productsLoading) {
       reloadProducts();
     }
-  }, [activeTab, productsLoading, sellerProducts.length]);
+  }, [activePath, productsLoading, sellerProducts.length]);
 
   useEffect(() => {
-    if (activeTab === "reviews" && sellerReviews.length === 0 && !reviewsLoading) {
+    if (activePath === "/reviews" && sellerReviews.length === 0 && !reviewsLoading) {
       reloadReviews();
     }
-  }, [activeTab, reviewsLoading, sellerReviews.length]);
+  }, [activePath, reviewsLoading, sellerReviews.length]);
 
   const formattedProductsCount = useMemo(() => sellerProducts.length, [sellerProducts.length]);
 
@@ -320,11 +289,11 @@ export default function SellerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      <SellerTopBar activeTab={activeTab} onTabChange={updateActiveTab} />
+      <SellerTopBar />
       <SideMenu title="Seller Menu" items={SELLER_MENU_ITEMS} />
 
       <main className="mx-auto max-w-7xl px-4 pb-12 pt-36">
-        {activeTab === "dashboard" && (
+        {activePath === "/" && (
           <section>
             {dashboardError ? (
               <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{dashboardError}</div>
@@ -360,7 +329,7 @@ export default function SellerDashboard() {
           </section>
         )}
 
-        {activeTab === "products" && (
+        {activePath === "/products" && (
           <section>
             <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
               <h2 className="text-lg font-bold">Create Product</h2>
@@ -394,7 +363,6 @@ export default function SellerDashboard() {
                       ) : null}
                       <div>
                         <h3 className="font-semibold text-gray-900">{product.name}</h3>
-                        <p className="text-xs text-gray-500">Product ID: {product.id}</p>
                       </div>
                     </div>
 
@@ -478,7 +446,7 @@ export default function SellerDashboard() {
           </section>
         )}
 
-        {activeTab === "reviews" && (
+        {activePath === "/reviews" && (
           <section>
             {reviewMessage ? <p className="mb-4 text-sm text-green-700">{reviewMessage}</p> : null}
             {reviewsError ? <p className="mb-4 text-sm text-red-600">{reviewsError}</p> : null}
@@ -556,7 +524,7 @@ export default function SellerDashboard() {
           </section>
         )}
 
-        {activeTab === "preferences" && (
+        {activePath === "/preferences" && (
           <section className="max-w-3xl">
             <div className="rounded-lg border border-gray-200 bg-white p-5">
               <h2 className="text-lg font-bold text-gray-900">Seller Preferences</h2>
