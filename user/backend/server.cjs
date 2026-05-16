@@ -26,7 +26,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN || ".3dprintings.xyz";
 
 if (!JWT_SECRET) {
-  throw new Error("Missing JWT_SECRET. Add it to src/backend/.env");
+  throw new Error("Missing JWT_SECRET. Add it to user/backend/.env");
 }
 
 fs.mkdirSync(uploadDir, { recursive: true });
