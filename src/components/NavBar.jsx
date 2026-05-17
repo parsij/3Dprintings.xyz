@@ -54,6 +54,16 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
         }`}
       >
         <nav className="flex items-center gap-3 md:gap-4 max-w-7xl mx-auto px-3 md:px-4 py-3">
+
+          <button
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="group ml-1 md:ml-2 flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
+              aria-label="Open menu"
+          >
+            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+            <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
+            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+          </button>
           <Link
             to="/home"
             className="w-10 h-10 flex items-center justify-center rounded-full border border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
@@ -65,7 +75,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             to={"/products"}
             className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
           >
-            3D Printed Models
+            Products
           </Link>
 
           <div className="flex-1 min-w-0">
@@ -130,17 +140,6 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
             />
           </Link>
-
-          <button
-              onClick={() => setMenuOpen((prev) => !prev)}
-              className="group ml-1 md:ml-2 flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
-              aria-label="Open menu"
-          >
-            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-            <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
-            <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-          </button>
-
         </nav>
       </header>
 

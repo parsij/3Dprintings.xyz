@@ -6,6 +6,7 @@ import SideMenu from "../components/SideMenu.jsx";
 import ShippingAddress from "../components/ShippingAddress.jsx";
 import Orders from "../components/Orders.jsx";
 import OrderDetails from "../components/OrderDetails.jsx";
+import Navbar from "../components/NavBar.jsx";
 import {
   changeAccountPassword,
   getAccountAddress,
@@ -14,7 +15,7 @@ import {
   updateAccountAddress,
   updateAccountProfile,
 } from "../services/accountSettingsService.js";
-import Navbar from "../components/NavBar.jsx";
+
 
 const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const ADDRESS_AUTOCOMPLETE_DEBOUNCE_MS = 100;
