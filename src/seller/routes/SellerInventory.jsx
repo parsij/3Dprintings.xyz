@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Tags from "../../components/Tags.jsx";
 import {
   getSellerProducts,
   updateSellerProduct,
 } from "../services/sellerPortalService.js";
 import SubmitModel from "./SubmitModel.jsx";
+import SideMenu from "../../components/SideMenu.jsx";
+import SellerNavBar from "../components/SellerNavBar.jsx";
 
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
@@ -72,7 +74,10 @@ export default function SellerInventory() {
   };
 
   return (
-    <section>
+      <>
+        <SellerNavBar pageName={"Inventory"}/>
+        <SideMenu role={"seller"} title={"Seller Options"}/>
+        <section>
       <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 mx-3.5 md:mx-7 lg:mx-10">
         <h2 className="text-lg font-bold">Create Product</h2>
         <p className="mt-1 text-sm text-gray-600">Add a new listing directly from seller dashboard.</p>
@@ -186,5 +191,6 @@ export default function SellerInventory() {
         })}
       </div>
     </section>
+      </>
   );
 }

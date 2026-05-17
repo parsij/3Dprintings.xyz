@@ -401,8 +401,7 @@ export default function AccountSettings({ user, setUser }) {
 
   return (
     <>
-      <Navbar isSignedIn={!!user} NoNavBarLimit={false
-      } />
+      <Navbar isSignedIn={!!user} NoNavBarLimit={false} />
       <SideMenu />
 
       <main className="flex min-h-screen pt-16 bg-gray-50 flex-col md:flex-row text-gray-900">

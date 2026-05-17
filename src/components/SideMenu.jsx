@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useMenu } from "../MenuContext.jsx";
 
-const defaultItems = [
+const main = [
   { label: "Home", to: "/home" },
   { label: "3D Printed Models", to: "/products" },
   { label: "Liked Products", to: "/liked-products" },
@@ -13,43 +13,61 @@ const defaultItems = [
   { label: "List a 3D Printed Model", to: "/create" },
 ];
 
-const SideMenu = ({ title = "Menu", items = defaultItems }) => {
+const seller = [
+  { label: "Dashboard", to: "/dashboard" },
+  { label: "Manage Products", to: "/inventory" },
+  { label: "Orders", to: "/order" },
+  { label: "Reviews", to: "/reviews" },
+  { label: "Preferences", to: "/preferences" },
+  { label: "Back to Marketplace", to: "https://3dprintings.xyz/home" },
+];
+
+const SideMenu = ({ title = "Menu", role = "customer" }) => {
   const { menuOpen, setMenuOpen } = useMenu();
+
+  const activeItems = role === "seller" ? seller : main;
+
   return (
-    <>
-      <div
-        onClick={() => setMenuOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/25 transition-opacity duration-300 ${
-          menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-      />
+      <>
+        {/* Overlay Backdrop */}
+        <div
+            onClick={() => setMenuOpen(false)}
+            className={`fixed inset-0 z-40 bg-black/25 transition-opacity duration-300 ${
+                menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            }`}
+        />
 
-      <aside
-        className={`fixed top-0 right-0 z-50 h-full w-72 bg-white text-gray-800 shadow-xl border-l border-orange-100 transition-transform duration-300 ${
-          menuOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-orange-100 p-4">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={() => setMenuOpen(false)} className="text-gray-700 hover:text-orange-500 transition cursor-pointer">
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4 space-y-3">
-          {items.map((item) => (
-            <Link
-              key={`${item.to}-${item.label}`}
-              to={item.to}
-              onClick={() => setMenuOpen(false)}
-              className="block hover:text-orange-500 transition"
+        {/* Sidebar Drawer */}
+        <aside
+            className={`fixed top-0 right-0 z-50 h-full w-72 bg-white text-gray-800 shadow-xl border-l border-orange-100 transition-transform duration-300 ${
+                menuOpen ? "translate-x-0" : "translate-x-full"
+            }`}
+        >
+          <div className="flex items-center justify-between border-b border-orange-100 p-4">
+            <h2 className="text-lg font-bold">{title}</h2>
+            <button
+                onClick={() => setMenuOpen(false)}
+                className="text-gray-700 hover:text-orange-500 transition cursor-pointer"
             >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </aside>
-    </>
+              ✕
+            </button>
+          </div>
+
+          {/* Navigation Links rendering from the safely computed array */}
+          <div className="p-4 space-y-3">
+            {activeItems.map((item) => (
+                <Link
+                    key={`${item.to}-${item.label}`}
+                    to={item.to}
+                    onClick={() => setMenuOpen(false)}
+                    className="block hover:text-orange-500 transition"
+                >
+                  {item.label}
+                </Link>
+            ))}
+          </div>
+        </aside>
+      </>
   );
 };
 
