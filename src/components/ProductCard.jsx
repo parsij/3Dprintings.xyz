@@ -59,7 +59,7 @@ const ProductCard = ({
   return (
     <div
       onClick={handleCardClick}
-      className="flex flex-col rounded-xl bg-white overflow-hidden hover:shadow-xl hover:scale-105 cursor-pointer transition-transform duration-300 text-sm"
+      className="flex flex-col rounded-xl bg-white overflow-hidden hover:shadow-xl hover:scale-105 cursor-pointer transition-transform duration-300 transform-gpu text-sm"
     >
       <div className="h-70 overflow-hidden bg-gray-200">
         <img
