@@ -57,7 +57,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
           <button
               onClick={() => setMenuOpen((prev) => !prev)}
-              className="group ml-1 md:ml-2 flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
+              className="group ml-auto flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
               aria-label="Open menu"
           >
             <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
@@ -66,19 +66,19 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
           </button>
           <Link
             to="/home"
-            className="w-10 h-10 flex items-center justify-center rounded-full border border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
+            className="ml-auto w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
           >
             3z
           </Link>
 
           <Link
             to={"/products"}
-            className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
+            className="ml-auto font-bold hidden md:block transition hover:text-orange-500 shrink-0"
           >
             Products
           </Link>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 ml-auto">
             <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
               <input
                 type="text"
@@ -96,7 +96,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             </form>
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 ml-auto">
             {isSignedIn ? (
               <Link
                 to="/account"
@@ -126,7 +126,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
           <Link
               to="/cart"
-              className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
+              className="ml-auto group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
               aria-label="Cart"
           >
             <img
@@ -143,8 +143,8 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
         </nav>
       </header>
 
-      {/* spacer so fixed navbar does not overlap page content */}
       <div />
+
 
       <SideMenu />
     </>
