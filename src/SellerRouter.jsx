@@ -6,9 +6,9 @@ import ForgotPassword from "./routes/ForgotPassword.jsx";
 
 // FIXED: Corrected path imports from absolute "/" to relative "./routes/"
 import SellerDashboard from "./seller/routes/SellerDashboard.jsx";
-import Inventory from "./seller/routes/SellerInventory.jsx";
-// import Orders from "./routes/seller/Orders.jsx";
-
+import SellerInventory from "./seller/routes/SellerInventory.jsx";
+import SellerPreferences from "./seller/routes/SellerPreferences.jsx";
+import SellerReviews from "./seller/routes/SellerReviews.jsx";
 // Safety Wrapper: Ensures the user is logged in AND is actually a seller
 function ProtectedSellerRoute({ user, children }) {
 
@@ -69,12 +69,26 @@ const SellerRouter = ({ user, setUser }) => {
                     path="/inventory"
                     element={
                         <ProtectedSellerRoute user={user}>
-                            {/* You can now swap this placeholder out for your real component when ready: */}
-                            {/* <Inventory user={user} /> */}
-                            <div className="p-8"><h1>Manage 3D Prints Inventory</h1></div>
+                            <SellerInventory user={user} />
                         </ProtectedSellerRoute>
                     }
                 />
+                <Route
+                path="/preferences"
+                element={
+                    <ProtectedSellerRoute user={user}>
+                        <SellerPreferences user={user} />
+                    </ProtectedSellerRoute>
+                }
+            />
+                <Route
+                path="/reviews"
+                element={
+                    <ProtectedSellerRoute user={user}>
+                        <SellerReviews user={user} />
+                    </ProtectedSellerRoute>
+                }
+            />
 
                 <Route
                     path="/orders"
