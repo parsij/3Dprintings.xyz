@@ -53,14 +53,12 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 showNavbar ? "translate-y-0" : "-translate-y-full"
             }`}
         >
-          {/* Main Nav Container */}
-          <nav className="flex items-center justify-between w-full max-w-7xl mx-auto px-4 py-3 gap-4 md:gap-6">
+          {/* Changed to justify-between to push the outer groups to the edges */}
+          <nav className="flex items-center justify-between mx-auto w-full max-w-7xl px-4 py-3 gap-2 md:gap-4">
 
-            {/* ======================================= */}
-            {/* 1. LEFT SIDE: Menu, Logo, and Products  */}
-            {/* ======================================= */}
-            <div className="flex items-center flex-1 gap-3 md:gap-6 min-w-0 shrink-0">
-              {/* Menu Button - Locked to the far left */}
+            {/* LEFT GROUP: Menu, Logo, and Products. flex-1 acts as a counterweight */}
+            <div className="flex items-center gap-3 md:gap-5 flex-1 min-w-0">
+              {/* Menu Button flows naturally on the left, no absolute positioning needed */}
               <button
                   onClick={() => setMenuOpen((prev) => !prev)}
                   className="group flex cursor-pointer flex-col gap-1 shrink-0"
@@ -71,7 +69,6 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
               </button>
 
-              {/* Logo */}
               <Link
                   to="/home"
                   className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500 shrink-0"
@@ -79,7 +76,6 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 3z
               </Link>
 
-              {/* Products */}
               <Link
                   to={"/products"}
                   className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
@@ -88,10 +84,8 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               </Link>
             </div>
 
-            {/* ======================================= */}
-            {/* 2. CENTER: Search Bar                   */}
-            {/* ======================================= */}
-            <div className="flex-[2] w-full max-w-3xl min-w-0">
+            {/* CENTER GROUP: Search Bar. flex-[2] allows it to be wider than the side menus */}
+            <div className="flex-[2] max-w-3xl min-w-0">
               <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
                 <input
                     type="text"
@@ -109,11 +103,8 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               </form>
             </div>
 
-            {/* ======================================= */}
-            {/* 3. RIGHT SIDE: Account and Cart         */}
-            {/* ======================================= */}
-            <div className="flex items-center justify-end flex-1 gap-3 md:gap-5 min-w-0 shrink-0">
-              {/* Account / Sign Up */}
+            {/* RIGHT GROUP: Account and Cart. flex-1 acts as the second counterweight */}
+            <div className="flex items-center justify-end gap-3 md:gap-5 flex-1 shrink-0">
               <div className="shrink-0 flex items-center justify-center">
                 {isSignedIn ? (
                     <Link
@@ -142,7 +133,6 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 )}
               </div>
 
-              {/* Cart - Locked to the far right */}
               <Link
                   to="/cart"
                   className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
