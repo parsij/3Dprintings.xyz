@@ -95,7 +95,7 @@ export default function SellerInventory() {
             <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="bg-gray-950 text-white font-bold px-5 py-2.5 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 hover:text-orange-500 shadow-md cursor-pointer whitespace-nowrap"
+                className="bg-gray-950 text-white font-bold px-5 py-2.5 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105  shadow-md cursor-pointer whitespace-nowrap"
             >
               + New Product
             </button>
