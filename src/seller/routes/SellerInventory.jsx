@@ -73,7 +73,7 @@ export default function SellerInventory() {
 
   return (
     <section>
-      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 mx-2 md:mx-3 lg:mx-4">
         <h2 className="text-lg font-bold">Create Product</h2>
         <p className="mt-1 text-sm text-gray-600">Add a new listing directly from seller dashboard.</p>
         <SubmitModel onSubmissionSuccess={reloadProducts} />
