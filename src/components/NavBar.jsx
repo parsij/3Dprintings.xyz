@@ -53,7 +53,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
           showNavbar ? "translate-y-0" : "-translate-y-full"
         }`}
       >
-        <nav className="flex items-center gap-3 md:gap-4 max-w-7xl mx-auto px-3 md:px-4 py-3">
+        <nav className="flex gap-3 md:gap-4 max-w-7xl mx-auto px-3 md:px-4 py-3">
 
           <button
               onClick={() => setMenuOpen((prev) => !prev)}
