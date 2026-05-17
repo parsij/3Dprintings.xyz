@@ -7,6 +7,7 @@ import {
 import SubmitModel from "./SubmitModel.jsx";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
+import { PencilLine as EditIcon } from "lucide-react";
 
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
@@ -16,8 +17,9 @@ export default function SellerInventory() {
   const [editForms, setEditForms] = useState({});
   const [savingProductId, setSavingProductId] = useState(null);
 
-  // State to manage the popup modal view
+  // States to manage the independent popup windows
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   const reloadProducts = async () => {
     setProductsLoading(true);
@@ -69,6 +71,8 @@ export default function SellerInventory() {
       setSellerProducts((prev) =>
           prev.map((product) => (Number(product.id) === Number(productId) ? { ...product, ...response.product } : product))
       );
+      // Automatically dismiss the edit window popup when saving successfully finishes
+      setEditingProduct(null);
     } catch (error) {
       setProductsError(error?.response?.data?.message || "Failed to update product.");
     } finally {
@@ -91,11 +95,10 @@ export default function SellerInventory() {
               <div className="text-sm text-gray-500 mt-1">{formattedProductsCount} product(s) registered</div>
             </div>
 
-
             <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="bg-gray-950 text-white font-bold px-5 py-2.5 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105  shadow-md cursor-pointer whitespace-nowrap"
+                className="bg-gray-950 text-white font-bold px-5 py-2.5 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 shadow-md cursor-pointer whitespace-nowrap"
             >
               + New Product
             </button>
@@ -113,131 +116,54 @@ export default function SellerInventory() {
               </div>
           )}
 
-          {/* Editable Inventory List Grid */}
-          <div className="space-y-4">
+          {/* Clean Dynamic Product Item Display List */}
+          <div className="space-y-3">
             {sellerProducts.map((product) => {
               const form = editForms[product.id];
               if (!form) return null;
 
               return (
-                  <article key={product.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
-                    <div className="mb-4 flex items-start gap-4">
+                  <article key={product.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-2xs flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
                       {product.image_url ? (
                           <img
                               src={product.image_url}
                               alt={product.name}
-                              className="h-16 w-16 rounded-lg border border-gray-200 object-cover shadow-2xs"
+                              className="h-14 w-14 rounded-lg border border-gray-200 object-cover shadow-3xs shrink-0"
                           />
-                      ) : null}
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-900">{product.name}</h3>
-                        <p className="text-xs text-gray-400 mt-0.5">Product ID Reference: #{product.id}</p>
+                      ) : (
+                          <div className="h-14 w-14 rounded-lg bg-gray-100 border border-gray-200 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-gray-900 truncate">{product.name}</h3>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs text-gray-500">
+                          <span className="font-semibold text-gray-800">${Number(product.current_price).toFixed(2)}</span>
+                          <span>•</span>
+                          <span className="truncate">{product.category || "No Category"}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-500 pl-1">Model Name</label>
-                        <input
-                            type="text"
-                            value={form.modelName}
-                            onChange={(event) =>
-                                setEditForms((prev) => ({
-                                  ...prev,
-                                  [product.id]: { ...prev[product.id], modelName: event.target.value },
-                                }))
-                            }
-                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-500 pl-1">Price ($)</label>
-                        <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={form.price}
-                            onChange={(event) =>
-                                setEditForms((prev) => ({
-                                  ...prev,
-                                  [product.id]: { ...prev[product.id], price: event.target.value },
-                                }))
-                            }
-                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1 md:col-span-2">
-                        <label className="text-xs font-bold text-gray-500 pl-1">Category Placement</label>
-                        <input
-                            type="text"
-                            value={form.category}
-                            onChange={(event) =>
-                                setEditForms((prev) => ({
-                                  ...prev,
-                                  [product.id]: { ...prev[product.id], category: event.target.value },
-                                }))
-                            }
-                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
-                            placeholder="Category"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1 md:col-span-2">
-                        <label className="text-xs font-bold text-gray-500 pl-1">Model Description</label>
-                        <textarea
-                            rows={4}
-                            value={form.description}
-                            onChange={(event) =>
-                                setEditForms((prev) => ({
-                                  ...prev,
-                                  [product.id]: { ...prev[product.id], description: event.target.value },
-                                }))
-                            }
-                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800 resize-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <Tags
-                          tags={form.tags}
-                          setTags={(updater) =>
-                              setEditForms((prev) => ({
-                                ...prev,
-                                [product.id]: {
-                                  ...prev[product.id],
-                                  tags: typeof updater === "function" ? updater(prev[product.id].tags) : updater,
-                                },
-                              }))
-                          }
-                      />
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
-                      <button
-                          type="button"
-                          onClick={() => handleSaveProduct(product.id)}
-                          disabled={Number(savingProductId) === Number(product.id)}
-                          className="rounded-lg bg-gray-950 font-bold px-5 py-2 text-white hover:bg-orange-600 transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
-                      >
-                        {Number(savingProductId) === Number(product.id) ? "Saving Updates..." : "Save Changes"}
-                      </button>
-                    </div>
+                    {/* Premium GPU-accelerated Edit Activation Button */}
+                    <button
+                        type="button"
+                        onClick={() => setEditingProduct(product)}
+                        className="bg-gray-950 text-white font-bold p-2.5 sm:px-4 sm:py-2 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 hover:text-orange-500 shadow-xs cursor-pointer flex items-center gap-2 shrink-0"
+                    >
+                      <EditIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">Edit Product</span>
+                    </button>
                   </article>
               );
             })}
           </div>
         </main>
 
-        {/* POPUP MODAL COMPONENT WINDOW */}
+        {/* POPUP MODAL COMPONENT WINDOW (NEW PRODUCT CREATION) */}
         {isModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-              {/* Outer modal card container */}
               <div className="relative bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-100 max-h-[90vh] overflow-y-auto pt-14">
 
-                {/* Standardized Close Button ("X") positioned at the TOP LEFT */}
                 <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
@@ -249,13 +175,144 @@ export default function SellerInventory() {
                   </svg>
                 </button>
 
-                {/* Injected Content form - dismisses popup automatically upon success validation */}
                 <SubmitModel
                     onSubmissionSuccess={() => {
                       reloadProducts();
                       setIsModalOpen(false);
                     }}
                 />
+              </div>
+            </div>
+        )}
+
+        {/* POPUP MODAL COMPONENT WINDOW (EDIT EXISTING PRODUCT DETAIL) */}
+        {editingProduct && editForms[editingProduct.id] && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+              <div className="relative bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-100 max-h-[90vh] overflow-y-auto pt-14">
+
+                {/* Standardized Close Button ("X") positioned at the TOP LEFT */}
+                <button
+                    type="button"
+                    onClick={() => setEditingProduct(null)}
+                    className="absolute top-4 left-4 text-gray-400 hover:text-orange-500 transition-colors cursor-pointer p-1.5 rounded-xl hover:bg-gray-100 flex items-center justify-center"
+                    aria-label="Close editor popup"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                {/* Inline Product Modal Content Block */}
+                <div>
+                  <div className="mb-4 flex items-center gap-3">
+                    {editingProduct.image_url && (
+                        <img src={editingProduct.image_url} alt="" className="h-12 w-12 rounded-lg object-cover border" />
+                    )}
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900">Modify Listing Information</h2>
+                      <p className="text-xs text-gray-400">Updating adjustments for item reference #{editingProduct.id}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-bold text-gray-500 pl-1">Model Name</label>
+                      <input
+                          type="text"
+                          value={editForms[editingProduct.id].modelName}
+                          onChange={(event) =>
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [editingProduct.id]: { ...prev[editingProduct.id], modelName: event.target.value },
+                              }))
+                          }
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-bold text-gray-500 pl-1">Price ($)</label>
+                      <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={editForms[editingProduct.id].price}
+                          onChange={(event) =>
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [editingProduct.id]: { ...prev[editingProduct.id], price: event.target.value },
+                              }))
+                          }
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1 md:col-span-2">
+                      <label className="text-xs font-bold text-gray-500 pl-1">Category Placement</label>
+                      <input
+                          type="text"
+                          value={editForms[editingProduct.id].category}
+                          onChange={(event) =>
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [editingProduct.id]: { ...prev[editingProduct.id], category: event.target.value },
+                              }))
+                          }
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
+                          placeholder="Category"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1 md:col-span-2">
+                      <label className="text-xs font-bold text-gray-500 pl-1">Model Description</label>
+                      <textarea
+                          rows={4}
+                          value={editForms[editingProduct.id].description}
+                          onChange={(event) =>
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [editingProduct.id]: { ...prev[editingProduct.id], description: event.target.value },
+                              }))
+                          }
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800 resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <Tags
+                        tags={editForms[editingProduct.id].tags}
+                        setTags={(updater) =>
+                            setEditForms((prev) => ({
+                              ...prev,
+                              [editingProduct.id]: {
+                                ...prev[editingProduct.id],
+                                tags: typeof updater === "function" ? updater(prev[editingProduct.id].tags) : updater,
+                              },
+                            }))
+                        }
+                    />
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-gray-100 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={() => setEditingProduct(null)}
+                        className="rounded-lg border border-gray-300 font-bold px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleSaveProduct(editingProduct.id)}
+                        disabled={Number(savingProductId) === Number(editingProduct.id)}
+                        className="rounded-lg bg-gray-950 font-bold px-5 py-2 text-white hover:bg-orange-600 transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
+                    >
+                      {Number(savingProductId) === Number(editingProduct.id) ? "Saving Updates..." : "Save Changes"}
+                    </button>
+                  </div>
+                </div>
+
               </div>
             </div>
         )}
