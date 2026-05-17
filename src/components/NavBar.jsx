@@ -51,11 +51,11 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
         <header
             className={`fixed top-0 left-0 w-full z-50 bg-black/65 backdrop-blur-xs shadow-sm border-b border-white/20 text-white transition-transform duration-300 ${
                 showNavbar ? "translate-y-0" : "-translate-y-full"
-            }`}
-        >
-          {/* Added mx-auto to center, and gap-3 / md:gap-5 to enforce uniform spacing */}
-          <nav className="flex items-center mx-auto w-full max-w-7xl gap-3 md:gap-5 px-4 py-3">
+            }`}>
+          {/* Change gap-3 md:gap-5 back to justify-between to force edge-to-edge alignment */}
+          <nav className="flex items-center justify-between mx-auto w-full max-w-7xl px-4 py-3 gap-4">
 
+            {/* 1. Menu Button (Stays far left) */}
             <button
                 onClick={() => setMenuOpen((prev) => !prev)}
                 className="group flex cursor-pointer flex-col gap-1 shrink-0"
@@ -66,6 +66,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
             </button>
 
+            {/* 2. Logo */}
             <Link
                 to="/home"
                 className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500 shrink-0"
@@ -73,6 +74,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               3z
             </Link>
 
+            {/* 3. Products Link */}
             <Link
                 to={"/products"}
                 className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
@@ -80,7 +82,8 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               Products
             </Link>
 
-            <div className="flex-1 min-w-0">
+            {/* 4. Search Bar Container (Grows dynamically but stays balanced) */}
+            <div className="flex-1 max-w-2xl mx-4 min-w-0">
               <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
                 <input
                     type="text"
@@ -98,6 +101,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               </form>
             </div>
 
+            {/* 5. Account/Sign Up */}
             <div className="shrink-0 flex items-center justify-center">
               {isSignedIn ? (
                   <Link
@@ -126,6 +130,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               )}
             </div>
 
+            {/* 6. Cart Button (Stays far right) */}
             <Link
                 to="/cart"
                 className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
@@ -143,7 +148,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               />
             </Link>
           </nav>
-        </header>
+            </header>
 
         <div />
 
