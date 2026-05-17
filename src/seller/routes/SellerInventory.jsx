@@ -77,7 +77,7 @@ export default function SellerInventory() {
       <>
         <SellerNavBar pageName={"Inventory"}/>
         <SideMenu role={"seller"} title={"Seller Options"}/>
-        <section>
+        <section className={"mt-20"}>
       <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 mx-3.5 md:mx-7 lg:mx-10">
         <h2 className="text-lg font-bold">Create Product</h2>
         <p className="mt-1 text-sm text-gray-600">Add a new listing directly from seller dashboard.</p>
