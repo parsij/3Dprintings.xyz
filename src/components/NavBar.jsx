@@ -53,12 +53,11 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 showNavbar ? "translate-y-0" : "-translate-y-full"
             }`}
         >
-          {/* Changed to justify-between to push the outer groups to the edges */}
-          <nav className="flex items-center justify-between mx-auto w-full max-w-7xl px-4 py-3 gap-2 md:gap-4">
+          {/* Adjusted padding to use fluid 5vw on desktops to align perfectly with the edge of the screen */}
+          <nav className="flex items-center justify-between w-full px-4 lg:px-[5vw] py-3">
 
-            {/* LEFT GROUP: Menu, Logo, and Products. flex-1 acts as a counterweight */}
-            <div className="flex items-center gap-3 md:gap-5 flex-1 min-w-0">
-              {/* Menu Button flows naturally on the left, no absolute positioning needed */}
+            {/* LEFT CONTAINER: Menu Button is isolated and stays completely on the far left */}
+            <div className="flex items-center flex-1 min-w-0">
               <button
                   onClick={() => setMenuOpen((prev) => !prev)}
                   className="group flex cursor-pointer flex-col gap-1 shrink-0"
@@ -68,7 +67,11 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
                 <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
               </button>
+            </div>
 
+            {/* MIDDLE CONTAINER: Logo, Links, and Search Bar sit comfortably in the center */}
+            <div className="flex items-center justify-center gap-4 md:gap-6 flex-[3] max-w-4xl min-w-0">
+              {/* Logo */}
               <Link
                   to="/home"
                   className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500 shrink-0"
@@ -76,34 +79,35 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 3z
               </Link>
 
+              {/* Products */}
               <Link
                   to={"/products"}
                   className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
               >
                 Products
               </Link>
+
+              {/* Search Bar */}
+              <div className="w-full max-w-xl min-w-0">
+                <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
+                  <input
+                      type="text"
+                      placeholder="Search"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      className="w-full bg-transparent text-white placeholder:text-gray-300 px-4 py-2 pr-14 md:pr-16 outline-none"
+                  />
+                  <button
+                      type="submit"
+                      className="absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center"
+                  >
+                    <img src={Search} alt="Search" className="h-4 w-4 md:h-5 md:w-5" />
+                  </button>
+                </form>
+              </div>
             </div>
 
-            {/* CENTER GROUP: Search Bar. flex-[2] allows it to be wider than the side menus */}
-            <div className="flex-[2] max-w-3xl min-w-0">
-              <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
-                <input
-                    type="text"
-                    placeholder="Search"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    className="w-full bg-transparent text-white placeholder:text-gray-300 px-4 py-2 pr-14 md:pr-16 outline-none"
-                />
-                <button
-                    type="submit"
-                    className="absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center"
-                >
-                  <img src={Search} alt="Search" className="h-4 w-4 md:h-5 md:w-5" />
-                </button>
-              </form>
-            </div>
-
-            {/* RIGHT GROUP: Account and Cart. flex-1 acts as the second counterweight */}
+            {/* RIGHT CONTAINER: Profile and Cart elements stay anchored to the far right */}
             <div className="flex items-center justify-end gap-3 md:gap-5 flex-1 shrink-0">
               <div className="shrink-0 flex items-center justify-center">
                 {isSignedIn ? (
