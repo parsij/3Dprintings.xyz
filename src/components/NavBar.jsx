@@ -57,7 +57,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
           <button
               onClick={() => setMenuOpen((prev) => !prev)}
-              className="group ml-auto flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
+              className="group mx-auto flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
               aria-label="Open menu"
           >
             <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
@@ -66,19 +66,19 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
           </button>
           <Link
             to="/home"
-            className="ml-auto w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
+            className="mx-auto w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
           >
             3z
           </Link>
 
           <Link
             to={"/products"}
-            className="ml-auto font-bold hidden md:block transition hover:text-orange-500 shrink-0"
+            className="mx-auto font-bold hidden md:block transition hover:text-orange-500 shrink-0"
           >
             Products
           </Link>
 
-          <div className="flex-1 min-w-0 ml-auto">
+          <div className="flex-1 min-w-0 mx-auto">
             <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
               <input
                 type="text"
@@ -87,7 +87,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="w-full bg-transparent text-white placeholder:text-gray-300 px-4 py-2 pr-14 md:pr-16 outline-none"
               />
-              <button 
+              <button
                 type="submit"
                 className="absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center"
               >
@@ -96,7 +96,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             </form>
           </div>
 
-          <div className="shrink-0 ml-auto">
+          <div className="shrink-0 mx-auto">
             {isSignedIn ? (
               <Link
                 to="/account"
@@ -126,7 +126,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
           <Link
               to="/cart"
-              className="ml-auto group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
+              className="mx-auto group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
               aria-label="Cart"
           >
             <img
