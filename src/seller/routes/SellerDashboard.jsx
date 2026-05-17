@@ -49,8 +49,8 @@ export default function SellerDashboard() {
 
   return (
     <section className={"mt-20 mx-2.5 md:mx-4 lg:mx-7"}>
-      <SellerNavBar pageName={"Inventory"}/>
-      <SideMenu role={"Dashboard"} title={"Seller Options"}/>
+      <SellerNavBar pageName={"Dashboard"}/>
+      <SideMenu role={"seller"} title={"Seller Options"}/>
       {dashboardError ? (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{dashboardError}</div>
       ) : null}
