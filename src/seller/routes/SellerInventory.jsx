@@ -6,7 +6,7 @@ import {
 } from "../services/sellerPortalService.js";
 import SubmitModel from "./SubmitModel.jsx";
 
-export default function SellerProducts() {
+export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState("");
   const [productMessage, setProductMessage] = useState("");
