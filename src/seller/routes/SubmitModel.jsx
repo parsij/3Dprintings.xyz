@@ -2,6 +2,113 @@ import { useEffect, useMemo, useState } from "react";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
 
+// Your complete, community-specific 3D printing taxonomy
+const CATEGORY_DATA = [
+  {
+    title: "3D Printer Parts & Upgrades",
+    slug: "3d-printer-parts",
+    subcategories: [
+      { label: "Extruder & Hotend Mods", slug: "extruder-hotend" },
+      { label: "Cooling Fan Ducts", slug: "fan-ducts" },
+      { label: "Bed Leveling Mounts & Spacers", slug: "bed-leveling" },
+      { label: "Spool Holders & Filament Guides", slug: "spool-holders" },
+      { label: "Enclosure Parts & Vents", slug: "enclosures" },
+      { label: "Printer Tool Holders & Trays", slug: "tool-holders" },
+      { label: "Cable Management Chains", slug: "cable-chains" },
+      { label: "Other 3D Printer Parts & Upgrades", slug: "other-printer-parts" }
+    ]
+  },
+  {
+    title: "Functional Parts & Hardware",
+    slug: "functional-hardware",
+    subcategories: [
+      { label: "Adapters & Converters", slug: "adapters-converters" },
+      { label: "Brackets & Mounts", slug: "brackets-mounts" },
+      { label: "Hooks & Hangers", slug: "hooks-hangers" },
+      { label: "Hinges, Clasps & Joints", slug: "hinges-joints" },
+      { label: "Knobs, Dials & Handles", slug: "knobs-handles" },
+      { label: "Spacers, Washers & Shims", slug: "spacers-washers" },
+      { label: "Replacement Appliance Parts", slug: "replacement-parts" },
+      { label: "Other Functional Parts & Hardware", slug: "other-functional" }
+    ]
+  },
+  {
+    title: "Toys & Play",
+    slug: "toys-play",
+    subcategories: [
+      { label: "Articulated & Flexi Toys", slug: "articulated-flexi" },
+      { label: "Multicolor & Multi-material Models", slug: "multicolor" },
+      { label: "Fidget Toys & Spinners", slug: "fidget-toys" },
+      { label: "Action Figures & Mechs", slug: "action-figures" },
+      { label: "Puzzles & Brain Teasers", slug: "puzzles" },
+      { label: "Dollhouse & Miniatures", slug: "dollhouse-miniatures" },
+      { label: "Vehicles (Cars, Planes, Boats)", slug: "toy-vehicles" },
+      { label: "Other Toys & Play", slug: "other-toys" }
+    ]
+  },
+  {
+    title: "Tabletop & Board Games",
+    slug: "tabletop-board-games",
+    subcategories: [
+      { label: "Tabletop RPG Miniatures", slug: "rpg-miniatures" },
+      { label: "Terrain & Scenery Set Pieces", slug: "terrain-scenery" },
+      { label: "Dice Towers & Storage Boxes", slug: "dice-towers" },
+      { label: "Board Game Inserts & Organizers", slug: "board-game-inserts" },
+      { label: "Card Holders & Deck Boxes", slug: "deck-boxes" },
+      { label: "Tokens, Trackers & Coins", slug: "tokens-trackers" },
+      { label: "Other Tabletop & Board Games", slug: "other-tabletop" }
+    ]
+  },
+  {
+    title: "Tech & Gadget Accessories",
+    slug: "tech-gadgets",
+    subcategories: [
+      { label: "Phone & Tablet Stands", slug: "phone-stands" },
+      { label: "Laptop Mounts & Monitor Risers", slug: "laptop-mounts" },
+      { label: "Controller & Headphone Stands", slug: "controller-stands" },
+      { label: "Cable Clips & Desk Routing", slug: "cable-clips" },
+      { label: "Smart Home Device Mounts", slug: "smart-home-mounts" },
+      { label: "SD Card & USB Drive Organizers", slug: "sd-usb-organizers" },
+      { label: "Other Tech & Gadget Accessories", slug: "other-tech" }
+    ]
+  },
+  {
+    title: "Home & Office Organizers",
+    slug: "home-office",
+    subcategories: [
+      { label: "Vases & Plant Pots", slug: "vases-planters" },
+      { label: "Desk Organizers & Pen Holders", slug: "desk-organizers" },
+      { label: "Bathroom & Kitchen Accessories", slug: "kitchen-bath" },
+      { label: "Pegboard Accessories & Hooks", slug: "pegboard" },
+      { label: "Keychains & Bag Tags", slug: "keychains" },
+      { label: "Custom Lithophanes & Lighting", slug: "lithophanes" },
+      { label: "Other Home & Office Organizers", slug: "other-home-office" }
+    ]
+  },
+  {
+    title: "RC, Drones & Robotics",
+    slug: "rc-robotics",
+    subcategories: [
+      { label: "RC Car Chassis & Upgrades", slug: "rc-upgrades" },
+      { label: "Drone Frames & Camera Mounts", slug: "drone-frames" },
+      { label: "Microcontroller & Pi Cases", slug: "pi-cases" },
+      { label: "Gears, Racks & Pinions", slug: "gears-racks" },
+      { label: "Other RC, Drones & Robotics", slug: "other-robotics" }
+    ]
+  },
+  {
+    title: "Props & Cosplay",
+    slug: "props-cosplay",
+    subcategories: [
+      { label: "Helmets & Masks", slug: "helmets-masks" },
+      { label: "Armor Pieces", slug: "armor-pieces" },
+      { label: "Weapon Replicas", slug: "weapon-replicas" },
+      { label: "Costume Jewelry & Wearables", slug: "wearables" },
+      { label: "Other Props & Cosplay", slug: "other-cosplay" }
+    ]
+  }
+];
+
 const defaultForm = {
   modelName: "",
   description: "",
@@ -40,7 +147,6 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   const [submitMessage, setSubmitMessage] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
 
-
   useEffect(() => {
     const urls = photos.map((file) => URL.createObjectURL(file));
     setPreviewUrls(urls);
@@ -62,7 +168,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     if (form.modelName.trim().length < 3) {
       nextErrors.modelName = "Model name must be at least 3 characters.";
     } else if (!/^[a-zA-Z0-9 ]+$/.test(form.modelName.trim())) {
-     nextErrors.modelName = "Model name can only contain letters, numbers and space.";
+      nextErrors.modelName = "Model name can only contain letters, numbers and space.";
     }
 
     if (form.description.trim().length < 20) {
@@ -72,6 +178,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     const parsedPrice = Number(form.price);
     if (!form.price || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
       nextErrors.price = "Enter a valid price greater than 0.";
+    }
+
+    // NEW VALIDATION: Ensure user picked a valid subcategory option
+    if (!form.category) {
+      nextErrors.category = "Please select a specific category.";
     }
 
     return nextErrors;
@@ -120,7 +231,6 @@ export default function SubmitModel({ onSubmissionSuccess }) {
       return;
     }
 
-
     try {
       setIsSubmitting(true);
 
@@ -148,25 +258,26 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
-          <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700 transition-colors duration-300">Printed model photos *</label>
-              <label
+      <div className="mx-auto w-full max-w-4xl">
+        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+          {/* Photo Upload Section */}
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700 transition-colors duration-300">Printed model photos *</label>
+            <label
                 htmlFor="modelPhotos"
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-all duration-300 ${
-                  isDragActive
-                    ? "border-orange-500 bg-orange-100 scale-[1.01] shadow-lg"
-                    : "border-orange-200 bg-orange-50/60 hover:border-orange-400 hover:bg-orange-100/40 hover:scale-[1.01]"
+                    isDragActive
+                        ? "border-orange-500 bg-orange-100 scale-[1.01] shadow-lg"
+                        : "border-orange-200 bg-orange-50/60 hover:border-orange-400 hover:bg-orange-100/40 hover:scale-[1.01]"
                 }`}
-              >
-                <span className="text-sm font-medium text-gray-700">Drag and drop images here, or click to upload</span>
-                <span className="mt-1 text-xs text-gray-500">PNG, JPG, WEBP or GIF (max {MAX_PHOTOS} photos)</span>
-              </label>
-              <input
+            >
+              <span className="text-sm font-medium text-gray-700">Drag and drop images here, or click to upload</span>
+              <span className="mt-1 text-xs text-gray-500">PNG, JPG, WEBP or GIF (max {MAX_PHOTOS} photos)</span>
+            </label>
+            <input
                 id="modelPhotos"
                 name="photos"
                 type="file"
@@ -174,34 +285,35 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 multiple
                 onChange={handlePhotoChange}
                 className="hidden"
-              />
-              {submitted && errors.photos && <p className="mt-2 text-xs text-red-500 animate-pulse">{errors.photos}</p>}
+            />
+            {submitted && errors.photos && <p className="mt-2 text-xs text-red-500 animate-pulse">{errors.photos}</p>}
 
-              {previewUrls.length > 0 && (
+            {previewUrls.length > 0 && (
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {previewUrls.map((url, index) => (
-                    <div key={url} style={{ animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both` }} className="relative overflow-hidden rounded-lg border border-orange-100 bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:scale-105">
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(index)}
-                        className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-sm font-bold text-gray-600 shadow-sm transition-all duration-300 hover:border-orange-300 hover:text-orange-500 hover:scale-110 active:scale-95 cursor-pointer"
-                        aria-label={`Remove photo ${index + 1}`}
-                      >
-                        x
-                      </button>
-                      <img src={url} alt={`Printed model preview ${index + 1}`} className="h-24 w-full object-cover transition-all duration-300 hover:scale-110" />
-                    </div>
+                      <div key={url} style={{ animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both` }} className="relative overflow-hidden rounded-lg border border-orange-100 bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:scale-105">
+                        <button
+                            type="button"
+                            onClick={() => removePhoto(index)}
+                            className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-sm font-bold text-gray-600 shadow-sm transition-all duration-300 hover:border-orange-300 hover:text-orange-500 hover:scale-110 active:scale-95 cursor-pointer"
+                            aria-label={`Remove photo ${index + 1}`}
+                        >
+                          x
+                        </button>
+                        <img src={url} alt={`Printed model preview ${index + 1}`} className="h-24 w-full object-cover transition-all duration-300 hover:scale-110" />
+                      </div>
                   ))}
                 </div>
-              )}
-            </div>
+            )}
+          </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">
-                <label htmlFor="modelName" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                  Model name *
-                </label>
-                <input
+          {/* Inputs Fields Grid */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">
+              <label htmlFor="modelName" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
+                Model name *
+              </label>
+              <input
                   id="modelName"
                   name="modelName"
                   type="text"
@@ -209,48 +321,57 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   onChange={handleChange}
                   placeholder="Model's name"
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
-                />
-                {submitted && errors.modelName && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelName}</p>}
-              </div>
+              />
+              {submitted && errors.modelName && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelName}</p>}
+            </div>
 
-              <div className="group transition-all duration-300 hover:translate-x-1">
-                <label htmlFor="price" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                  Price (USD) *
-                </label>
-                <input
+            <div className="group transition-all duration-300 hover:translate-x-1">
+              <label htmlFor="price" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
+                Price (USD) *
+              </label>
+              <input
                   id="price"
                   name="price"
-                  type="price"
-                  min="0"
-                  step="0.01"
+                  type="text"
                   value={form.price}
                   onChange={handleChange}
                   placeholder="19.99"
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
-                />
-                {submitted && errors.price && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.price}</p>}
-              </div>
+              />
+              {submitted && errors.price && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.price}</p>}
+            </div>
 
-              <div className="group transition-all duration-300 hover:translate-x-1">
-                <label htmlFor="category" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                  Category *
-                </label>
-                <input
+            {/* FIXED: Dropdown Select implementation with strict optgroup nesting */}
+            <div className="group transition-all duration-300 hover:translate-x-1">
+              <label htmlFor="category" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
+                Category *
+              </label>
+              <select
                   id="category"
                   name="category"
-                  type="text"
                   value={form.category}
                   onChange={handleChange}
-                  placeholder="Toys, Home Decor, Tools..."
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
-                />
-              </div>
+              >
+                <option value="">Select a category...</option>
+                {CATEGORY_DATA.map((group) => (
+                    <optgroup key={group.slug} label={group.title} className="font-bold text-gray-900 bg-gray-50">
+                      {group.subcategories.map((sub) => (
+                          <option key={sub.slug} value={sub.label} className="font-normal text-gray-700 bg-white">
+                            {sub.label}
+                          </option>
+                      ))}
+                    </optgroup>
+                ))}
+              </select>
+              {submitted && errors.category && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.category}</p>}
+            </div>
 
-              <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">
-                <label htmlFor="description" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                  Model description *
-                </label>
-                <textarea
+            <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">
+              <label htmlFor="description" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
+                Model description *
+              </label>
+              <textarea
                   id="description"
                   name="description"
                   rows="5"
@@ -258,42 +379,41 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   onChange={handleChange}
                   placeholder="Describe size, print settings, material suggestions, and use cases..."
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer resize-none"
-                />
-                {submitted && errors.description && (
+              />
+              {submitted && errors.description && (
                   <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.description}</p>
-                )}
-              </div>
-
-                 <Tags
-              tags={form.tags}
-              setTags={(updater) =>
-                setForm((prev) => ({
-                  ...prev,
-                  tags: typeof updater === "function" ? updater(prev.tags) : updater,
-                }))
-              }
-            />
-
+              )}
             </div>
 
-            <button
+            <Tags
+                tags={form.tags}
+                setTags={(updater) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      tags: typeof updater === "function" ? updater(prev.tags) : updater,
+                    }))
+                }
+            />
+          </div>
+
+          <button
               type="submit"
               disabled={isSubmitting}
               className={`w-full rounded-xl py-3 font-semibold text-white transition-all duration-300 ${
-                isSubmitting
-                  ? "cursor-not-allowed bg-orange-300 opacity-70"
-                  : "cursor-pointer bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+                  isSubmitting
+                      ? "cursor-not-allowed bg-orange-300 opacity-70"
+                      : "cursor-pointer bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
               }`}
-            >
-              {isSubmitting ? "Preparing listing..." : "Submit listing"}
-            </button>
+          >
+            {isSubmitting ? "Preparing listing..." : "Submit listing"}
+          </button>
 
-            {submitMessage && (
+          {submitMessage && (
               <p className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-gray-700 animate-fade-in-up transition-all duration-300 hover:shadow-md hover:scale-[1.01]">
                 {submitMessage}
               </p>
-            )}
-          </form>
-        </div>
+          )}
+        </form>
+      </div>
   );
 }

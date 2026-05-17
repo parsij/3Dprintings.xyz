@@ -7,7 +7,7 @@ import {
 import SubmitModel from "./SubmitModel.jsx";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
-import { PencilLine as EditIcon } from "lucide-react";
+import { PenLine as EditIcon } from "lucide-react";
 
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
@@ -144,11 +144,10 @@ export default function SellerInventory() {
                       </div>
                     </div>
 
-                    {/* Premium GPU-accelerated Edit Activation Button */}
                     <button
                         type="button"
                         onClick={() => setEditingProduct(product)}
-                        className="bg-gray-950 text-white font-bold p-2.5 sm:px-4 sm:py-2 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 hover:text-orange-500 shadow-xs cursor-pointer flex items-center gap-2 shrink-0"
+                        className="bg-gray-950 text-white font-bold p-2.5 sm:px-4 sm:py-2 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 shadow-xs cursor-pointer flex items-center gap-2 shrink-0"
                     >
                       <EditIcon className="h-4 w-4" />
                       <span className="hidden sm:inline">Edit Product</span>
