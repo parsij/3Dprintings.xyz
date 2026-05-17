@@ -54,7 +54,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             }`}
         >
           {/* Adjusted padding to use fluid 5vw on desktops to align perfectly with the edge of the screen */}
-          <nav className="flex items-center justify-between w-full px-4 lg:px-[5vw] py-3">
+          <nav className="flex items-center justify-between w-full px-2 lg:px-[5vw] py-3">
 
             {/* LEFT CONTAINER: Menu Button is isolated and stays completely on the far left */}
             <div className="flex items-center flex-1 min-w-0">
@@ -113,7 +113,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 {isSignedIn ? (
                     <Link
                         to="/account"
-                        className="group relative inline-flex h-6 w-6 md:h-8 md:w-8 items-center justify-center cursor-pointer"
+                        className="group relative inline-flex h-7.5 w-7.5 md:h-9 md:w-9 items-center justify-center cursor-pointer"
                         aria-label="Account"
                     >
                       <img
@@ -139,7 +139,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
               <Link
                   to="/cart"
-                  className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
+                  className="group relative cursor-pointer flex items-center justify-center shrink-0 h-7.5 w-7.5 md:h-9 md:w-9"
                   aria-label="Cart"
               >
                 <img
