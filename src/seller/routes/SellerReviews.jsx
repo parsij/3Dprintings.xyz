@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import StarRating from "../../components/StarRating.jsx";
 import { toggleReviewLike } from "../../services/likesService.js";
+import SideMenu from "../../components/SideMenu.jsx";
+import SellerNavBar from "../components/SellerNavBar.jsx";
 import {
   getSellerReviews,
   updateSellerReviewReply,
@@ -77,7 +79,9 @@ export default function SellerReviews() {
   };
 
   return (
-    <section>
+    <section className={"mt-20"}>
+      <SellerNavBar pageName={"Reviews"}/>
+      <SideMenu role={"seller"} title={"Seller Options"}/>
       {reviewMessage ? <p className="mb-4 text-sm text-green-700">{reviewMessage}</p> : null}
       {reviewsError ? <p className="mb-4 text-sm text-red-600">{reviewsError}</p> : null}
       {reviewsLoading ? <p className="text-sm text-gray-600">Loading reviews...</p> : null}

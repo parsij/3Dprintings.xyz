@@ -5,6 +5,8 @@ import SellerDashboardTopSellingProducts from "../components/SellerDashboardTopS
 import SellerDashboardAverageScore from "../components/SellerDashboardAverageScore.jsx";
 import SellerDashboardRevenueBarChart from "../components/SellerDashboardRevenueBarChart.jsx";
 import { getSellerDashboard } from "../services/sellerDashboardService.js";
+import SideMenu from "../../components/SideMenu.jsx";
+import SellerNavBar from "../components/SellerNavBar.jsx";
 
 export default function SellerDashboard() {
   const [metrics, setMetrics] = useState([
@@ -46,7 +48,9 @@ export default function SellerDashboard() {
   }, []);
 
   return (
-    <section>
+    <section className={"mt-20"}>
+      <SellerNavBar pageName={"Inventory"}/>
+      <SideMenu role={"Dashboard"} title={"Seller Options"}/>
       {dashboardError ? (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{dashboardError}</div>
       ) : null}

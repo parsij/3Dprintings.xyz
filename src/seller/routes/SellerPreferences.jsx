@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import SideMenu from "../../components/SideMenu.jsx";
+import SellerNavBar from "../components/SellerNavBar.jsx";
 import {
   getSellerPreferences,
   updateSellerPreferences,
@@ -61,7 +63,9 @@ export default function SellerPreferences() {
   };
 
   return (
-    <section className="max-w-3xl">
+    <section className="max-w-3xl m-20">
+      <SellerNavBar pageName={"Preferences"}/>
+      <SideMenu role={"seller"} title={"Seller Options"}/>
       <div className="rounded-lg border border-gray-200 bg-white p-5">
         <h2 className="text-lg font-bold text-gray-900">Seller Preferences</h2>
         <p className="mt-1 text-sm text-gray-600">Control storefront details and seller notifications.</p>
