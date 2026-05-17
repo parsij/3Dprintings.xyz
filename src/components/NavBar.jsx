@@ -53,38 +53,45 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 showNavbar ? "translate-y-0" : "-translate-y-full"
             }`}
         >
-          {/* Back to your exact old design layout styles */}
-          <nav className="flex items-center justify-between max-w-7xl px-3 md:px-4 py-3">
+          {/* Main Nav Container */}
+          <nav className="flex items-center justify-between w-full max-w-7xl mx-auto px-4 py-3 gap-4 md:gap-6">
 
-            {/* 1. Menu Button (Moved back to the far left) */}
-            <button
-                onClick={() => setMenuOpen((prev) => !prev)}
-                className="group flex cursor-pointer flex-col gap-1 px-1 md:px-2 shrink-0"
-                aria-label="Open menu"
-            >
-              <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-              <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
-              <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-            </button>
+            {/* ======================================= */}
+            {/* 1. LEFT SIDE: Menu, Logo, and Products  */}
+            {/* ======================================= */}
+            <div className="flex items-center flex-1 gap-3 md:gap-6 min-w-0 shrink-0">
+              {/* Menu Button - Locked to the far left */}
+              <button
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  className="group flex cursor-pointer flex-col gap-1 shrink-0"
+                  aria-label="Open menu"
+              >
+                <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+                <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
+                <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+              </button>
 
-            {/* 2. Logo */}
-            <Link
-                to="/home"
-                className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500"
-            >
-              3z
-            </Link>
+              {/* Logo */}
+              <Link
+                  to="/home"
+                  className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500 shrink-0"
+              >
+                3z
+              </Link>
 
-            {/* 3. Products */}
-            <Link
-                to={"/products"}
-                className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
-            >
-              Products
-            </Link>
+              {/* Products */}
+              <Link
+                  to={"/products"}
+                  className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
+              >
+                Products
+              </Link>
+            </div>
 
-            {/* 4. Search Bar */}
-            <div className="flex-1 min-w-0">
+            {/* ======================================= */}
+            {/* 2. CENTER: Search Bar                   */}
+            {/* ======================================= */}
+            <div className="flex-[2] w-full max-w-3xl min-w-0">
               <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
                 <input
                     type="text"
@@ -102,52 +109,57 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
               </form>
             </div>
 
-            {/* 5. Account */}
-            <div className="shrink-0">
-              {isSignedIn ? (
-                  <Link
-                      to="/account"
-                      className="group relative inline-flex h-6 w-6 md:h-8 md:w-8 items-center justify-center cursor-pointer"
-                      aria-label="Account"
-                  >
-                    <img
-                        src={accountLogo}
-                        alt="account"
-                        className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
-                    />
-                    <img
-                        src={accountLogoHover}
-                        alt="account hover"
-                        className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                    />
-                  </Link>
-              ) : (
-                  <Link
-                      to="/signup"
-                      className="border-2 font-bold border-orange-300 rounded-2xl px-4 py-0.5 transition hover:border-orange-500 hover:text-orange-500 shrink-0"
-                  >
-                    Sign Up
-                  </Link>
-              )}
-            </div>
+            {/* ======================================= */}
+            {/* 3. RIGHT SIDE: Account and Cart         */}
+            {/* ======================================= */}
+            <div className="flex items-center justify-end flex-1 gap-3 md:gap-5 min-w-0 shrink-0">
+              {/* Account / Sign Up */}
+              <div className="shrink-0 flex items-center justify-center">
+                {isSignedIn ? (
+                    <Link
+                        to="/account"
+                        className="group relative inline-flex h-6 w-6 md:h-8 md:w-8 items-center justify-center cursor-pointer"
+                        aria-label="Account"
+                    >
+                      <img
+                          src={accountLogo}
+                          alt="account"
+                          className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
+                      />
+                      <img
+                          src={accountLogoHover}
+                          alt="account hover"
+                          className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                      />
+                    </Link>
+                ) : (
+                    <Link
+                        to="/signup"
+                        className="border-2 font-bold border-orange-300 rounded-2xl px-4 py-0.5 transition hover:border-orange-500 hover:text-orange-500 shrink-0 whitespace-nowrap"
+                    >
+                      Sign Up
+                    </Link>
+                )}
+              </div>
 
-            {/* 6. Cart */}
-            <Link
-                to="/cart"
-                className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
-                aria-label="Cart"
-            >
-              <img
-                  src={Cart}
-                  alt="Cart"
-                  className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
-              />
-              <img
-                  src={CartHover}
-                  alt="Cart hover"
-                  className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-              />
-            </Link>
+              {/* Cart - Locked to the far right */}
+              <Link
+                  to="/cart"
+                  className="group relative cursor-pointer flex items-center justify-center shrink-0 h-6 w-6 md:h-8 md:w-8"
+                  aria-label="Cart"
+              >
+                <img
+                    src={Cart}
+                    alt="Cart"
+                    className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
+                />
+                <img
+                    src={CartHover}
+                    alt="Cart hover"
+                    className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                />
+              </Link>
+            </div>
 
           </nav>
         </header>
