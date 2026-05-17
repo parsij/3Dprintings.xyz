@@ -16,7 +16,7 @@ const main = [
 const seller = [
   { label: "Dashboard", to: "/dashboard" },
   { label: "Manage Products", to: "/inventory" },
-  { label: "Orders", to: "/order" },
+  { label: "Orders", to: "/orders" },
   { label: "Reviews", to: "/reviews" },
   { label: "Preferences", to: "/preferences" },
   { label: "Back to Marketplace", to: "https://3dprintings.xyz/home" },
