@@ -146,7 +146,7 @@ export default function SellerInventory() {
                             type="number"
                             min="0"
                             step="1"
-                            value={editForms[product.id]?.quantity || "0"}
+                            value={editForms[product.id]?.quantity ?? ""}
                             onChange={(event) =>
                                 setEditForms((prev) => ({
                                   ...prev,
