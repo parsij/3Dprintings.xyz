@@ -1,5 +1,6 @@
 module.exports = function paymentController(deps) {
     const { app, pool, isAuthenticatedAnIisValid, stripe } = deps;
+    const { fulfillPaidOrder } = require("./orderFulfillment.cjs");
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const ORDER_PAYMENT_POLL_INTERVAL_MS = 10_000;
     const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -39,36 +40,6 @@ module.exports = function paymentController(deps) {
              `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
              [customerId]
          );
-     };
-
-     const decrementProductInventory = async (orderId) => {
-         if (!orderId) return;
-
-         const orderResult = await pool.query(
-             `SELECT items FROM orders WHERE id = $1`,
-             [orderId]
-         );
-
-         if (orderResult.rows.length === 0) return;
-
-         const order = orderResult.rows[0];
-         const items = order.items?.items || [];
-
-         if (!Array.isArray(items) || items.length === 0) return;
-
-         for (const item of items) {
-             const productId = item.id || item.productId;
-             const quantity = Number(item.quantity) || 0;
-
-             if (productId && quantity > 0) {
-                 await pool.query(
-                     `UPDATE products 
-                      SET quantity = GREATEST(0, quantity - $1)
-                      WHERE id = $2`,
-                     [quantity, productId]
-                 );
-             }
-         }
      };
 
     const stopOrderPaymentPolling = (orderId) => {
@@ -134,17 +105,8 @@ module.exports = function paymentController(deps) {
         }
 
          const paymentType = getPaymentTypeFromSession(session, order.payment_type || "card");
-         const updateResult = await pool.query(
-             `UPDATE orders
-              SET status = 'completed',
-                  payment_type = COALESCE(payment_type, $2),
-                  updated_at = NOW()
-              WHERE id = $1 AND status = 'pending'`,
-             [orderId, paymentType]
-         );
-
-         if (updateResult.rowCount > 0) {
-             await decrementProductInventory(orderId);
+         const fulfillment = await fulfillPaidOrder(pool, orderId, paymentType);
+         if (fulfillment.completed) {
              await clearCartForOrderCustomer(orderId);
          }
 
@@ -593,9 +555,10 @@ module.exports = function paymentController(deps) {
 
             const existingOrder = orderResult.rows[0];
             if (existingOrder.status === "completed") {
+                const fulfillment = await fulfillPaidOrder(pool, orderId, existingOrder.payment_type || "card");
                 await clearCartForOrderCustomer(orderId);
                 return res.json({
-                    order: existingOrder,
+                    order: fulfillment.order || existingOrder,
                     paymentStatus: "paid",
                     paymentVerified: true,
                 });
@@ -624,19 +587,11 @@ module.exports = function paymentController(deps) {
                 paymentType = methodType || "card";
             }
 
-            const updatedOrder = await pool.query(
-                `UPDATE orders
-                 SET status = 'completed',
-                     updated_at = NOW(),
-                     payment_type = COALESCE(payment_type, $2)
-                 WHERE id = $1
-                 RETURNING id, customer_id, status, total_amount, payment_type, created_at, updated_at, stripe_session_id`,
-                [orderId, paymentType]
-            );
+            const fulfillment = await fulfillPaidOrder(pool, orderId, paymentType);
             await clearCartForOrderCustomer(orderId);
 
             return res.json({
-                order: updatedOrder.rows[0] || existingOrder,
+                order: fulfillment.order || existingOrder,
                 paymentStatus: session.payment_status,
                 paymentVerified: true,
             });

@@ -14,6 +14,7 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
+const { ensureInventoryDeductedColumn, fulfillPaidOrder } = require("./apiRoutes/orderFulfillment.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
@@ -269,25 +270,12 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
                   }
               }
 
-              const updateResult = await pool.query(
-                  `UPDATE orders SET status = 'completed', payment_type = $1, updated_at = NOW() WHERE id = $2 AND status = 'pending' RETURNING items`,
-                  [paymentType, orderId]
-              );
-              if (updateResult.rows.length > 0) {
+              const fulfillment = await fulfillPaidOrder(pool, orderId, paymentType);
+              if (fulfillment.completed) {
                   console.log(`Order ${orderId} marked as completed with payment type: ${paymentType}`);
-                  const itemsData = updateResult.rows[0].items?.items || [];
-                  for (const item of itemsData) {
-                      const productId = item.id || item.productId;
-                      const quantity = Number(item.quantity) || 0;
-                      if (productId && quantity > 0) {
-                          await pool.query(
-                              `UPDATE products 
-                               SET quantity = GREATEST(0, quantity - $1)
-                               WHERE id = $2`,
-                              [quantity, productId]
-                          );
-                      }
-                  }
+              }
+              if (fulfillment.inventoryDeducted) {
+                  console.log(`Inventory deducted for order ${orderId}.`);
               }
 
               // Clear cart for this order's customer. Prefer explicit userId metadata, fallback to DB lookup.
@@ -545,6 +533,9 @@ async function initializeDatabase() {
      `);
      console.log('Stripe session id column ensured in orders table');
 
+     await ensureInventoryDeductedColumn(pool);
+     console.log('Inventory deducted column ensured in orders table');
+
      await pool.query(`
        ALTER TABLE reviews
        ADD COLUMN IF NOT EXISTS seller_reply TEXT
@@ -566,6 +557,7 @@ async function initializeDatabase() {
          shipping_address_id INT,
          payment_type VARCHAR(100),
          stripe_session_id VARCHAR(255),
+         inventory_deducted BOOLEAN NOT NULL DEFAULT FALSE,
          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
        );
