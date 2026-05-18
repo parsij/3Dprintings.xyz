@@ -50,7 +50,17 @@ function buildImageUrl(req, fileName) {
 }
 
 module.exports = function sellerRoutes(deps) {
-  const { app, pool, upload, cleanupUploadedFiles, getAuthUserFromRequest, isAuthenticatedAnIisValid, EMAIL_REGEX } = deps;
+  const {
+    app,
+    pool,
+    upload,
+    cleanupUploadedFiles,
+    createAuthToken,
+    setAuthCookie,
+    getAuthUserFromRequest,
+    isAuthenticatedAnIisValid,
+    EMAIL_REGEX,
+  } = deps;
 
   const attachAuthenticatedUser = async (req, res, next) => {
     try {
@@ -124,6 +134,7 @@ module.exports = function sellerRoutes(deps) {
   app.post("/api/seller/become", attachAuthenticatedUser, async (req, res) => {
     try {
       if (req.user.role === "seller") {
+        setAuthCookie(res, createAuthToken(req.user));
         return res.status(200).json({
           message: "You already have seller access.",
           user: { ...req.user, role: "seller" },
@@ -143,14 +154,17 @@ module.exports = function sellerRoutes(deps) {
       }
 
       const updatedUser = updatedUserResult.rows[0];
+      const responseUser = {
+        id: Number(updatedUser.id),
+        username: updatedUser.username,
+        email: updatedUser.email,
+        role: updatedUser.role,
+      };
+      setAuthCookie(res, createAuthToken(responseUser));
+
       return res.status(200).json({
         message: "seller access granted.",
-        user: {
-          id: Number(updatedUser.id),
-          username: updatedUser.username,
-          email: updatedUser.email,
-          role: updatedUser.role,
-        },
+        user: responseUser,
       });
     } catch (error) {
       console.error("Failed to promote user to seller:", error);

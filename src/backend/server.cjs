@@ -312,7 +312,7 @@ app.use("/api/imgUploads", express.static(uploadDir));
 
 function createAuthToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, username: user.username },
+    { id: user.id, email: user.email, username: user.username, role: user.role },
     JWT_SECRET,
     { expiresIn: "365d" }
   );
@@ -428,17 +428,49 @@ function clearAuthCookie(res) {
   res.clearCookie("token", cookieOptions);
 }
 
-function getAuthUserFromRequest(req) {
-  const token = req.cookies.token;
-  if (!token) {
-    return null;
+function getCookieValuesFromRequest(req, cookieName) {
+  const rawCookieHeader = String(req.headers.cookie || "");
+  const values = rawCookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith(`${cookieName}=`))
+    .map((part) => part.slice(cookieName.length + 1))
+    .map((value) => {
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return value;
+      }
+    })
+    .filter(Boolean);
+
+  if (values.length === 0 && req.cookies?.[cookieName]) {
+    values.push(req.cookies[cookieName]);
   }
 
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (err) {
-    return null;
+  return [...new Set(values)];
+}
+
+function getAuthUserFromRequest(req) {
+  const tokens = getCookieValuesFromRequest(req, "token");
+  const validUsers = [];
+
+  for (const token of tokens) {
+    try {
+      validUsers.push(jwt.verify(token, JWT_SECRET));
+    } catch {
+      // Ignore invalid duplicate cookies and keep looking for a valid auth token.
+    }
   }
+
+  validUsers.sort((left, right) => {
+    const leftIsSeller = String(left.role || "").trim().toLowerCase() === "seller";
+    const rightIsSeller = String(right.role || "").trim().toLowerCase() === "seller";
+    if (leftIsSeller !== rightIsSeller) return leftIsSeller ? -1 : 1;
+    return Number(right.iat || 0) - Number(left.iat || 0);
+  });
+
+  return validUsers[0] || null;
 }
 
 require(path.join(__dirname, "apiRoutes", "index.cjs"))({
