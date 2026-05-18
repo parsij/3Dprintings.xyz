@@ -10,8 +10,7 @@ const main = [
   { label: "My Reviews", to: "/your-reviews" },
   { label: "My Orders", to: "/account/orders" },
     { label: "Become a seller", to: "/become-seller" },
-    // Removed the "List a 3D Printed Model" entry from the marketplace menu
-    // It should remain accessible only via seller routes if needed
+
 ];
 
 const seller = [

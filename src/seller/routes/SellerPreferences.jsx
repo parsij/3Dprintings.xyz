@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Cropper from "react-easy-crop";
+import "react-easy-crop/react-easy-crop.css";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
 import {
   getSellerPreferences,
   updateSellerPreferences,
+  uploadSellerProfileImage,
 } from "../services/sellerPortalService.js";
 
 const PRINTER_OPTIONS = [
@@ -13,12 +16,59 @@ const PRINTER_OPTIONS = [
   { value: "both", label: "Both" },
 ];
 const DESIGN_SOFTWARE_OPTIONS = ["Blender", "Fusion360", "ZBrush", "SolidWorks", "Onshape", "Other"];
+const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+function loadImage(imageUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", reject);
+    image.src = imageUrl;
+  });
+}
+
+async function getCroppedImageBlob(imageUrl, cropPixels) {
+  const image = await loadImage(imageUrl);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = cropPixels.width;
+  canvas.height = cropPixels.height;
+  context.drawImage(
+    image,
+    cropPixels.x,
+    cropPixels.y,
+    cropPixels.width,
+    cropPixels.height,
+    0,
+    0,
+    cropPixels.width,
+    cropPixels.height
+  );
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error("Failed to crop image."));
+    }, "image/jpeg", 0.92);
+  });
+}
 
 export default function SellerPreferences() {
   const [preferencesLoading, setPreferencesLoading] = useState(false);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [preferencesMessage, setPreferencesMessage] = useState("");
   const [preferencesError, setPreferencesError] = useState("");
+  const [selectedImageUrl, setSelectedImageUrl] = useState("");
+  const [selectedImageName, setSelectedImageName] = useState("");
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState("");
   const [preferencesForm, setPreferencesForm] = useState({
     storeName: "",
     supportEmail: "",
@@ -64,6 +114,13 @@ export default function SellerPreferences() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedImageUrl) return undefined;
+    return () => {
+      URL.revokeObjectURL(selectedImageUrl);
+    };
+  }, [selectedImageUrl]);
+
   const handleSavePreferences = async (event) => {
     event.preventDefault();
     setPreferencesError("");
@@ -80,6 +137,62 @@ export default function SellerPreferences() {
       setPreferencesError(error?.response?.data?.message || "Failed to update preferences.");
     } finally {
       setPreferencesSaving(false);
+    }
+  };
+
+  const handleImageSelect = (event) => {
+    const file = event.target.files?.[0];
+    setImageError("");
+    setPreferencesMessage("");
+
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setImageError("Choose an image file.");
+      return;
+    }
+    if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+      setImageError("Profile image must be 5MB or less.");
+      return;
+    }
+
+    setSelectedImageName(file.name);
+    setSelectedImageUrl(URL.createObjectURL(file));
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  };
+
+  const onCropComplete = useCallback((_, nextCroppedAreaPixels) => {
+    setCroppedAreaPixels(nextCroppedAreaPixels);
+  }, []);
+
+  const handleUploadCroppedImage = async () => {
+    setImageError("");
+    setPreferencesMessage("");
+
+    if (!selectedImageUrl || !croppedAreaPixels) {
+      setImageError("Choose and crop an image before uploading.");
+      return;
+    }
+
+    try {
+      setImageUploading(true);
+      const croppedBlob = await getCroppedImageBlob(selectedImageUrl, croppedAreaPixels);
+      const baseName = (selectedImageName || "profile-image").replace(/\.[^.]+$/, "") || "profile-image";
+      const croppedFile = new File([croppedBlob], `${baseName}-cropped.jpg`, { type: "image/jpeg" });
+      const formData = new FormData();
+      formData.append("profileImage", croppedFile);
+
+      const response = await uploadSellerProfileImage(formData);
+      updateField("shopLogoUrl", response.imageUrl || "");
+      setPreferencesMessage("Profile image uploaded. Save preferences to publish it.");
+      setSelectedImageUrl("");
+      setSelectedImageName("");
+      setCroppedAreaPixels(null);
+    } catch (error) {
+      setImageError(error?.response?.data?.message || error?.message || "Failed to upload profile image.");
+    } finally {
+      setImageUploading(false);
     }
   };
 
@@ -156,13 +269,64 @@ export default function SellerPreferences() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Shop Logo / Avatar URL</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">Shop Logo / Avatar</label>
+              {preferencesForm.shopLogoUrl ? (
+                <img
+                  src={preferencesForm.shopLogoUrl}
+                  alt="Current shop avatar"
+                  className="mb-3 h-24 w-24 rounded-full border border-gray-200 object-cover"
+                />
+              ) : null}
               <input
                 value={preferencesForm.shopLogoUrl}
                 onChange={(event) => updateField("shopLogoUrl", event.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2"
                 placeholder="https://example.com/logo.webp"
               />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              {selectedImageUrl ? (
+                <div className="mt-3 space-y-3">
+                  <div className="relative h-64 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                    <Cropper
+                      image={selectedImageUrl}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      cropShape="round"
+                      showGrid={false}
+                      onCropChange={setCrop}
+                      onCropComplete={onCropComplete}
+                      onZoomChange={setZoom}
+                    />
+                  </div>
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Zoom
+                    <input
+                      type="range"
+                      min={1}
+                      max={3}
+                      step={0.1}
+                      value={zoom}
+                      onChange={(event) => setZoom(Number(event.target.value))}
+                      className="mt-2 w-full"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleUploadCroppedImage}
+                    disabled={imageUploading}
+                    className="rounded-lg border border-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-60"
+                  >
+                    {imageUploading ? "Uploading..." : "Upload Cropped Image"}
+                  </button>
+                </div>
+              ) : null}
+              {imageError ? <p className="mt-2 text-sm text-red-600">{imageError}</p> : null}
             </div>
 
             <div>

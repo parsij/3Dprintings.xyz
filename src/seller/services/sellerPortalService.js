@@ -16,6 +16,13 @@ export async function updateSellerPreferences(payload) {
   return response.data;
 }
 
+export async function uploadSellerProfileImage(formData) {
+  const response = await axios.post(`${API_BASE}/api/seller/preferences/profile-image`, formData, {
+    withCredentials: true,
+  });
+  return response.data;
+}
+
 export async function getSellerProducts() {
   const response = await axios.get(`${API_BASE}/api/seller/products`, {
     withCredentials: true,

@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const { refreshSellerDashboard } = require("./sellerShared.cjs");
 const { ensureLikesColumns, normalizeNumericArray } = require("./likesShared.cjs");
 const {
@@ -48,7 +50,7 @@ function buildImageUrl(req, fileName) {
 }
 
 module.exports = function sellerRoutes(deps) {
-  const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid, EMAIL_REGEX } = deps;
+  const { app, pool, upload, cleanupUploadedFiles, getAuthUserFromRequest, isAuthenticatedAnIisValid, EMAIL_REGEX } = deps;
 
   const attachAuthenticatedUser = async (req, res, next) => {
     try {
@@ -415,6 +417,50 @@ module.exports = function sellerRoutes(deps) {
       return res.status(500).json({ message: "Failed to update seller preferences." });
     }
   });
+
+  app.post(
+    "/api/seller/preferences/profile-image",
+    ensureSellerWriteAuth,
+    attachAuthenticatedUser,
+    isSeller,
+    upload.single("profileImage"),
+    async (req, res) => {
+      const uploadedFile = req.file;
+
+      try {
+        if (!uploadedFile) {
+          return res.status(400).json({ message: "Upload a profile image." });
+        }
+
+        const originalExt = path.extname(uploadedFile.originalname || uploadedFile.filename || "").toLowerCase();
+        const mimeExtMap = {
+          "image/jpeg": ".jpg",
+          "image/png": ".png",
+          "image/webp": ".webp",
+        };
+        const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+        const normalizedExt = allowedExtensions.has(originalExt)
+          ? originalExt.replace(".jpeg", ".jpg")
+          : mimeExtMap[uploadedFile.mimetype] || ".jpg";
+        const fileName = `seller-${req.user.id}-profile-${Date.now()}${normalizedExt}`;
+        const nextPath = path.join(path.dirname(uploadedFile.path), fileName);
+
+        await fs.promises.rename(uploadedFile.path, nextPath);
+        uploadedFile.filename = fileName;
+        uploadedFile.path = nextPath;
+
+        return res.status(201).json({
+          message: "Profile image uploaded.",
+          imageUrl: buildImageUrl(req, fileName),
+          fileName,
+        });
+      } catch (error) {
+        await cleanupUploadedFiles(uploadedFile ? [uploadedFile] : []);
+        console.error("Error uploading seller profile image:", error);
+        return res.status(500).json({ message: "Failed to upload profile image." });
+      }
+    }
+  );
 
   app.get("/api/seller/products", attachAuthenticatedUser, isSeller, async (req, res) => {
     try {
