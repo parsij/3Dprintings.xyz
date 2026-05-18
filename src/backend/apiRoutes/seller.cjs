@@ -1,5 +1,10 @@
 const { refreshSellerDashboard } = require("./sellerShared.cjs");
 const { ensureLikesColumns, normalizeNumericArray } = require("./likesShared.cjs");
+const {
+  normalizeSellerProfile,
+  sellerProfileFromRow,
+  validateSellerProfile,
+} = require("./sellerProfileShared.cjs");
 
 function normalizeTagList(tags) {
   if (!Array.isArray(tags)) return [];
@@ -294,9 +299,22 @@ module.exports = function sellerRoutes(deps) {
   app.get("/api/seller/preferences", attachAuthenticatedUser, isSeller, async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT username, email, phone_number, COALESCE(seller_preferences, '{}'::jsonb) AS seller_preferences
-         FROM users
-         WHERE id = $1
+        `SELECT u.username,
+                u.email,
+                u.phone_number,
+                COALESCE(u.seller_preferences, '{}'::jsonb) AS seller_preferences,
+                sp.seller_user_id,
+                sp.shop_name,
+                sp.shop_bio,
+                sp.shop_logo_url,
+                sp.primary_printer_specialization,
+                sp.design_software,
+                sp.external_portfolio_link,
+                sp.intellectual_property_certified,
+                sp.terms_of_service_accepted
+         FROM users u
+         LEFT JOIN seller_profiles sp ON sp.seller_user_id = u.id
+         WHERE u.id = $1
          LIMIT 1`,
         [req.user.id]
       );
@@ -306,13 +324,15 @@ module.exports = function sellerRoutes(deps) {
       }
 
       const row = result.rows[0];
+      const preferences = normalizeSellerPreferences(row.seller_preferences);
       return res.status(200).json({
         profile: {
           username: row.username,
           email: row.email,
           phoneNumber: row.phone_number || "",
         },
-        preferences: normalizeSellerPreferences(row.seller_preferences),
+        preferences,
+        sellerProfile: sellerProfileFromRow(row, preferences),
       });
     } catch (error) {
       console.error("Error loading seller preferences:", error);
@@ -323,6 +343,7 @@ module.exports = function sellerRoutes(deps) {
   app.put("/api/seller/preferences", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
     try {
       const preferences = normalizeSellerPreferences(req.body);
+      const sellerProfile = normalizeSellerProfile(req.body);
       if (preferences.storeName.length > 80) {
         return res.status(400).json({ message: "Store name must be 80 characters or less." });
       }
@@ -333,6 +354,11 @@ module.exports = function sellerRoutes(deps) {
         return res.status(400).json({ message: "Store description must be 2000 characters or less." });
       }
 
+      const sellerProfileError = validateSellerProfile(sellerProfile);
+      if (sellerProfileError) {
+        return res.status(400).json({ message: sellerProfileError });
+      }
+
       await pool.query(
         `UPDATE users
          SET seller_preferences = $1::jsonb
@@ -340,11 +366,51 @@ module.exports = function sellerRoutes(deps) {
         [JSON.stringify(preferences), req.user.id]
       );
 
+      await pool.query(
+        `INSERT INTO seller_profiles (
+           seller_user_id,
+           shop_name,
+           shop_bio,
+           shop_logo_url,
+           primary_printer_specialization,
+           design_software,
+           external_portfolio_link,
+           intellectual_property_certified,
+           terms_of_service_accepted
+         )
+         VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6::text[], NULLIF($7, ''), $8, $9)
+         ON CONFLICT (seller_user_id) DO UPDATE SET
+           shop_name = EXCLUDED.shop_name,
+           shop_bio = EXCLUDED.shop_bio,
+           shop_logo_url = EXCLUDED.shop_logo_url,
+           primary_printer_specialization = EXCLUDED.primary_printer_specialization,
+           design_software = EXCLUDED.design_software,
+           external_portfolio_link = EXCLUDED.external_portfolio_link,
+           intellectual_property_certified = EXCLUDED.intellectual_property_certified,
+           terms_of_service_accepted = EXCLUDED.terms_of_service_accepted,
+           updated_at = NOW()`,
+        [
+          req.user.id,
+          sellerProfile.shopName,
+          sellerProfile.shopBio,
+          sellerProfile.shopLogoUrl,
+          sellerProfile.primaryPrinterSpecialization,
+          sellerProfile.designSoftware,
+          sellerProfile.externalPortfolioLink,
+          sellerProfile.intellectualPropertyCertified,
+          sellerProfile.termsOfServiceAccepted,
+        ]
+      );
+
       return res.status(200).json({
         message: "Preferences updated.",
         preferences,
+        sellerProfile,
       });
     } catch (error) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "Shop name is already taken." });
+      }
       console.error("Error updating seller preferences:", error);
       return res.status(500).json({ message: "Failed to update seller preferences." });
     }

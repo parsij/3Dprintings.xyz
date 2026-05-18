@@ -5,7 +5,7 @@ export default function SellerDashboardTopSellingProducts({ products }) {
       <div className="flex flex-col gap-5">
         {products.map((product, index) => (
           <div key={index} className="flex items-center gap-4">
-            <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-orange-500 bg-gray-200">
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-200">
               {product.image ? (
                 <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
               ) : (

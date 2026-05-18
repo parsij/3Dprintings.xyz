@@ -14,6 +14,7 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
+const { ensureSellerProfilesTable } = require("./apiRoutes/sellerProfileShared.cjs");
 const { ensureInventoryDeductedColumn, fulfillPaidOrder } = require("./apiRoutes/orderFulfillment.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
@@ -510,6 +511,9 @@ async function initializeDatabase() {
        ADD COLUMN IF NOT EXISTS seller_preferences JSONB NOT NULL DEFAULT '{}'::jsonb
      `);
      console.log("seller preferences column ensured in users table");
+
+     await ensureSellerProfilesTable(pool);
+     console.log("seller profiles table ensured.");
 
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`
