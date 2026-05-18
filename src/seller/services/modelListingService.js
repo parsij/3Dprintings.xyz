@@ -8,6 +8,7 @@ export async function submitModelListing({
   price,
   category,
   tags,
+  quantity,
   photos,
 }) {
   const formData = new FormData();
@@ -15,6 +16,7 @@ export async function submitModelListing({
   formData.append("modelName", modelName.trim());
   formData.append("description", description.trim());
   formData.append("price", String(price));
+  formData.append("quantity", String(quantity));
 
   if (category?.trim()) {
     formData.append("category", category.trim());

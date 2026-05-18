@@ -115,6 +115,7 @@ const defaultForm = {
   price: "",
   category: "",
   tags: [],
+  quantity: "1",
 };
 
 const MAX_PHOTOS = 10;
@@ -185,6 +186,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
       nextErrors.category = "Please select a specific category.";
     }
 
+    const parsedQuantity = Number(form.quantity);
+    if (!form.quantity || Number.isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      nextErrors.quantity = "Enter a valid quantity greater than 0.";
+    }
+
     return nextErrors;
   }, [form, photos]);
 
@@ -240,6 +246,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         price: Number(form.price),
         category: form.category,
         tags: form.tags,
+        quantity: Number(form.quantity),
         photos,
       });
 
@@ -339,6 +346,24 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
               />
               {submitted && errors.price && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.price}</p>}
+            </div>
+
+            <div className="group transition-all duration-300 hover:translate-x-1">
+              <label htmlFor="quantity" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
+                Quantity *
+              </label>
+              <input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={form.quantity}
+                  onChange={handleChange}
+                  placeholder="10"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
+              />
+              {submitted && errors.quantity && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.quantity}</p>}
             </div>
 
             {/* FIXED: Dropdown Select implementation with strict optgroup nesting */}

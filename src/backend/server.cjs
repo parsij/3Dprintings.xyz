@@ -554,15 +554,29 @@ async function initializeDatabase() {
          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
        );
-     `);
-    console.log('✅ Orders table initialized');
+      `);
+     console.log('✅ Orders table initialized');
 
-    await ensureSellerDashboardTable(pool);
-    console.log("seller dashboard metrics table ensured.");
-  } catch (error) {
-    console.error('⚠️ Error initializing database:', error.message);
-  }
-}
+     // Add quantity column to products if it doesn't exist
+     await pool.query(`
+       ALTER TABLE products
+       ADD COLUMN IF NOT EXISTS quantity integer DEFAULT 1
+     `);
+     console.log('Quantity column ensured in products table');
+
+     // Ensure all existing products have quantity value
+     await pool.query(`
+       UPDATE products
+       SET quantity = 1
+       WHERE quantity IS NULL
+     `);
+
+     await ensureSellerDashboardTable(pool);
+     console.log("seller dashboard metrics table ensured.");
+   } catch (error) {
+     console.error('⚠️ Error initializing database:', error.message);
+   }
+ }
 
 // Start Stripe Webhook Listener
 function startStripeWebhookListener() {

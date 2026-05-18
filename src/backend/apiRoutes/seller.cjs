@@ -407,12 +407,13 @@ module.exports = function sellerRoutes(deps) {
         return res.status(403).json({ message: "You can only edit your own products." });
       }
 
-      const { isProfane } = await import("../../services/profanityFilter.js");
-      const modelName = String(req.body?.modelName || "").trim();
-      const description = String(req.body?.description || "").trim();
-      const category = String(req.body?.category || "").trim();
-      const parsedPrice = Number(req.body?.price);
-      const nextTags = normalizeTagList(req.body?.tags);
+       const { isProfane } = await import("../../services/profanityFilter.js");
+       const modelName = String(req.body?.modelName || "").trim();
+       const description = String(req.body?.description || "").trim();
+       const category = String(req.body?.category || "").trim();
+       const parsedPrice = Number(req.body?.price);
+       const parsedQuantity = Math.max(0, Number(req.body?.quantity) || 0);
+       const nextTags = normalizeTagList(req.body?.tags);
 
       if (modelName.length < 3 || !/^[a-zA-Z0-9 ]+$/.test(modelName)) {
         return res.status(400).json({ message: "Model name must be at least 3 characters and contain letters/numbers/spaces only." });
@@ -430,18 +431,19 @@ module.exports = function sellerRoutes(deps) {
       const currentTags = parseProductTags(existingProduct.tags);
       await adjustTagUsageCounts(currentTags, nextTags);
 
-      const updatedResult = await pool.query(
-        `UPDATE products
-         SET name = $1,
-             description = $2,
-             original_price = $3,
-             current_price = $3,
-             category = $4,
-             tags = $5::jsonb
-         WHERE id = $6
-         RETURNING *`,
-        [modelName, description, parsedPrice, category || null, JSON.stringify(nextTags), productId]
-      );
+       const updatedResult = await pool.query(
+         `UPDATE products
+          SET name = $1,
+              description = $2,
+              original_price = $3,
+              current_price = $3,
+              category = $4,
+              tags = $5::jsonb,
+              quantity = $6
+          WHERE id = $7
+          RETURNING *`,
+         [modelName, description, parsedPrice, category || null, JSON.stringify(nextTags), parsedQuantity, productId]
+       );
 
       const updatedProduct = updatedResult.rows[0];
       const firstImage = Array.isArray(updatedProduct.img_path) && updatedProduct.img_path.length > 0 ? updatedProduct.img_path[0] : null;

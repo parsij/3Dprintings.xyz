@@ -14,8 +14,9 @@ module.exports = function createRoutes(deps) {
       if (!auth?.userId) return; // response is already sent in isAuthenticatedAnIisValid or we wait, wait, the response is actually sent inside isAuthenticatedAnIisValid so if it returns an object with user ID it is valid. But if not, it sends res and returns the res object.. Wait, if it fails, it returns res.status().json() which is undefined or object.
 
       const userId = auth.userId;
-      const { modelName = '', description = '', price, category = '', tags } = req.body;
+      const { modelName = '', description = '', price, category = '', tags, quantity } = req.body;
       const parsedPrice = Number(price);
+      const parsedQuantity = Math.max(1, Number(quantity) || 1);
 
       const fieldErrors = {};
 
@@ -67,10 +68,11 @@ module.exports = function createRoutes(deps) {
           rating,
           user_id,
           category,
-          tags
+          tags,
+          quantity
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-        RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+        RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags, quantity
       `;
       // Persist tags as explicit JSON for jsonb columns.
       const normalizedCategory = category ? category.trim() : null;
@@ -84,6 +86,7 @@ module.exports = function createRoutes(deps) {
         userId,
         normalizedCategory,
         tagsJson,
+        parsedQuantity,
       ];
       const productResult = await pool.query(insertProductQuery, productValues);
       const product = productResult.rows[0];

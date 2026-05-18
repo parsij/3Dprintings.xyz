@@ -36,6 +36,7 @@ export default function SellerInventory() {
               price: String(product.current_price ?? ""),
               category: product.category || "",
               tags: Array.isArray(product.tags) ? product.tags : [],
+              quantity: String(product.quantity ?? "1"),
             };
             return acc;
           }, {})
@@ -66,6 +67,7 @@ export default function SellerInventory() {
         price: Number(form.price),
         category: form.category,
         tags: form.tags,
+        quantity: Number(form.quantity),
       });
       setProductMessage(response?.message || "Product updated.");
       setSellerProducts((prev) =>
@@ -137,14 +139,40 @@ export default function SellerInventory() {
                       </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setEditingProduct(product)}
-                        className="bg-gray-950 text-white font-bold p-2.5 sm:px-4 sm:py-2 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 shadow-xs cursor-pointer flex items-center gap-2 shrink-0"
-                    >
-                      <EditIcon className="h-4 w-4" />
-                      <span className="hidden sm:inline">Edit Product</span>
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                        <span className="text-xs font-semibold text-gray-600">Qty:</span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={editForms[product.id]?.quantity || "0"}
+                            onChange={(event) =>
+                                setEditForms((prev) => ({
+                                  ...prev,
+                                  [product.id]: { ...prev[product.id], quantity: event.target.value },
+                                }))
+                            }
+                            className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm outline-none focus:border-orange-500 transition-colors text-gray-800"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => handleSaveProduct(product.id)}
+                            disabled={savingProductId === product.id}
+                            className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {savingProductId === product.id ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                      <button
+                          type="button"
+                          onClick={() => setEditingProduct(product)}
+                          className="bg-gray-950 text-white font-bold p-2.5 sm:px-4 sm:py-2 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 shadow-xs cursor-pointer flex items-center gap-2 shrink-0"
+                      >
+                        <EditIcon className="h-4 w-4" />
+                        <span className="hidden sm:inline">Edit Product</span>
+                      </button>
+                    </div>
                   </article>
               );
             })}
@@ -201,7 +229,7 @@ export default function SellerInventory() {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 md:grid-cols-2">
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-bold text-gray-500 pl-1">Model Name</label>
                       <input
@@ -218,16 +246,32 @@ export default function SellerInventory() {
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-gray-500 pl-1">Price ($)</label>
+                      <label className="text-xs font-bold text-gray-500 pl-1">Price</label>
                       <input
-                          type="number"
+                          type="text"
                           min="0.01"
-                          step="0.01"
                           value={editForms[editingProduct.id].price}
                           onChange={(event) =>
                               setEditForms((prev) => ({
                                 ...prev,
                                 [editingProduct.id]: { ...prev[editingProduct.id], price: event.target.value },
+                              }))
+                          }
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-bold text-gray-500 pl-1">Quantity</label>
+                      <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editForms[editingProduct.id].quantity}
+                          onChange={(event) =>
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [editingProduct.id]: { ...prev[editingProduct.id], quantity: event.target.value },
                               }))
                           }
                           className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"

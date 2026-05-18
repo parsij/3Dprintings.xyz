@@ -26,20 +26,50 @@ module.exports = function paymentController(deps) {
         return fallback;
     };
     const clearCartForOrderCustomer = async (orderId) => {
-        if (!orderId) return;
+         if (!orderId) return;
 
-        const ownerResult = await pool.query(
-            `SELECT customer_id FROM orders WHERE id = $1`,
-            [orderId]
-        );
-        const customerId = ownerResult.rows[0]?.customer_id;
-        if (!customerId) return;
+         const ownerResult = await pool.query(
+             `SELECT customer_id FROM orders WHERE id = $1`,
+             [orderId]
+         );
+         const customerId = ownerResult.rows[0]?.customer_id;
+         if (!customerId) return;
 
-        await pool.query(
-            `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
-            [customerId]
-        );
-    };
+         await pool.query(
+             `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
+             [customerId]
+         );
+     };
+
+     const decrementProductInventory = async (orderId) => {
+         if (!orderId) return;
+
+         const orderResult = await pool.query(
+             `SELECT items FROM orders WHERE id = $1`,
+             [orderId]
+         );
+
+         if (orderResult.rows.length === 0) return;
+
+         const order = orderResult.rows[0];
+         const items = order.items?.items || [];
+
+         if (!Array.isArray(items) || items.length === 0) return;
+
+         for (const item of items) {
+             const productId = item.id || item.productId;
+             const quantity = Number(item.quantity) || 0;
+
+             if (productId && quantity > 0) {
+                 await pool.query(
+                     `UPDATE products 
+                      SET quantity = GREATEST(0, quantity - $1)
+                      WHERE id = $2`,
+                     [quantity, productId]
+                 );
+             }
+         }
+     };
 
     const stopOrderPaymentPolling = (orderId) => {
         const existingInterval = orderPaymentPollers.get(orderId);
@@ -103,17 +133,18 @@ module.exports = function paymentController(deps) {
             return;
         }
 
-        const paymentType = getPaymentTypeFromSession(session, order.payment_type || "card");
-        await pool.query(
-            `UPDATE orders
-             SET status = 'completed',
-                 payment_type = COALESCE(payment_type, $2),
-                 updated_at = NOW()
-             WHERE id = $1 AND status = 'pending'`,
-            [orderId, paymentType]
-        );
-        await clearCartForOrderCustomer(orderId);
-        stopOrderPaymentPolling(orderId);
+         const paymentType = getPaymentTypeFromSession(session, order.payment_type || "card");
+         await pool.query(
+             `UPDATE orders
+              SET status = 'completed',
+                  payment_type = COALESCE(payment_type, $2),
+                  updated_at = NOW()
+              WHERE id = $1 AND status = 'pending'`,
+             [orderId, paymentType]
+         );
+         await decrementProductInventory(orderId);
+         await clearCartForOrderCustomer(orderId);
+         stopOrderPaymentPolling(orderId);
     };
 
     const startOrderPaymentPolling = (orderId) => {
