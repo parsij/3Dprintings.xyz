@@ -361,7 +361,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.quantity}
                   onChange={handleChange}
                   placeholder="10"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               {submitted && errors.quantity && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.quantity}</p>}
             </div>

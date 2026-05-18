@@ -8,7 +8,7 @@ import {
 import SubmitModel, { CATEGORY_DATA } from "./SubmitModel.jsx";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
-import { PenLine as EditIcon } from "lucide-react";
+import { PenLine as EditIcon, Save as SaveIcon, Check as CheckIcon } from "lucide-react";
 
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
@@ -153,16 +153,36 @@ export default function SellerInventory() {
                                   [product.id]: { ...prev[product.id], quantity: event.target.value },
                                 }))
                             }
-                            className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm outline-none focus:border-orange-500 transition-colors text-gray-800"
+                            className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm outline-none focus:border-orange-500 transition-colors text-gray-800 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
-                        <button
-                            type="button"
-                            onClick={() => handleSaveProduct(product.id)}
-                            disabled={savingProductId === product.id}
-                            className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          {savingProductId === product.id ? "Saving..." : "Save"}
-                        </button>
+                        {(() => {
+                           const originalQty = String(product.quantity ?? "1");
+                           const currentQty = String(editForms[product.id]?.quantity ?? "");
+                           const isChanged = originalQty !== currentQty;
+                           const isDisabled = !isChanged || savingProductId === product.id;
+
+                           return (
+                               <button
+                                   type="button"
+                                   onClick={() => handleSaveProduct(product.id)}
+                                   disabled={isDisabled}
+                                   title={isDisabled ? "No changes to save" : "Save changes"}
+                                   className={`p-1.5 rounded-md flex items-center justify-center transition-all ${
+                                       isDisabled
+                                           ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                           : "bg-green-500 text-white hover:bg-green-600 cursor-pointer shadow-sm"
+                                   }`}
+                               >
+                                   {savingProductId === product.id ? (
+                                       <span className="h-4 w-4 border-2 border-t-transparent border-gray-400 rounded-full animate-spin"></span>
+                                   ) : isChanged ? (
+                                       <CheckIcon className="h-4 w-4" />
+                                   ) : (
+                                       <SaveIcon className="h-4 w-4" />
+                                   )}
+                               </button>
+                           );
+                        })()}
                       </div>
                       <button
                           type="button"
@@ -274,7 +294,7 @@ export default function SellerInventory() {
                                 [editingProduct.id]: { ...prev[editingProduct.id], quantity: event.target.value },
                               }))
                           }
-                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
 

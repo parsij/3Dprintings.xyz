@@ -68,6 +68,7 @@ export async function getCart() {
           rating: product.rating,
           reviews_count: product.reviews_count,
           image_url: product.image_url,
+          max_quantity: Number(product.quantity || 0),
         });
       } catch (error) {
         console.error(`Error fetching product ${productId}:`, error);

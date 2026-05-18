@@ -134,7 +134,7 @@ module.exports = function paymentController(deps) {
         }
 
          const paymentType = getPaymentTypeFromSession(session, order.payment_type || "card");
-         await pool.query(
+         const updateResult = await pool.query(
              `UPDATE orders
               SET status = 'completed',
                   payment_type = COALESCE(payment_type, $2),
@@ -142,8 +142,12 @@ module.exports = function paymentController(deps) {
               WHERE id = $1 AND status = 'pending'`,
              [orderId, paymentType]
          );
-         await decrementProductInventory(orderId);
-         await clearCartForOrderCustomer(orderId);
+
+         if (updateResult.rowCount > 0) {
+             await decrementProductInventory(orderId);
+             await clearCartForOrderCustomer(orderId);
+         }
+
          stopOrderPaymentPolling(orderId);
     };
 
@@ -302,6 +306,31 @@ module.exports = function paymentController(deps) {
                 items.reduce((sum, item) => sum + (item.current_price * item.quantity), 0) * 100
             );
 
+            // Server-side limits validation
+            const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+            if (totalItemsCount > 3) {
+                return res.status(400).json({ error: "Order limit of 3 items exceeded." });
+            }
+            if (subtotalCents > 200000) {
+                return res.status(400).json({ error: "Spend limit of $2,000 exceeded." });
+            }
+
+            // Validate inventory against DB
+            const productIds = items.map(i => i.id || i.productId);
+            const dbProductsResult = await pool.query(
+                `SELECT id, quantity FROM products WHERE id = ANY($1::int[])`,
+                [productIds]
+            );
+            const dbProductsMap = {};
+            dbProductsResult.rows.forEach(row => dbProductsMap[row.id] = row.quantity);
+
+            for (const item of items) {
+                const dbQty = dbProductsMap[item.id || item.productId] || 0;
+                if (item.quantity > dbQty) {
+                    return res.status(400).json({ error: `Not enough stock for item: ${item.name || item.id}` });
+                }
+            }
+
             try {
                 // Use Stripe Tax API to calculate tax
                 const calculation = await stripe.tax.calculations.create({
@@ -386,6 +415,31 @@ module.exports = function paymentController(deps) {
             const subtotalCents = Math.round(
                 items.reduce((sum, item) => sum + (item.current_price * item.quantity), 0) * 100
             );
+
+            // Server-side limits validation
+            const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+            if (totalItemsCount > 3) {
+                return res.status(400).json({ error: "Order limit of 3 items exceeded." });
+            }
+            if (subtotalCents > 200000) {
+                return res.status(400).json({ error: "Spend limit of $2,000 exceeded." });
+            }
+
+            // Validate inventory against DB
+            const productIds = items.map(i => i.id || i.productId);
+            const dbProductsResult = await pool.query(
+                `SELECT id, quantity FROM products WHERE id = ANY($1::int[])`,
+                [productIds]
+            );
+            const dbProductsMap = {};
+            dbProductsResult.rows.forEach(row => dbProductsMap[row.id] = row.quantity);
+
+            for (const item of items) {
+                const dbQty = dbProductsMap[item.id || item.productId] || 0;
+                if (item.quantity > dbQty) {
+                    return res.status(400).json({ error: `Not enough stock for item: ${item.name || item.id}` });
+                }
+            }
 
             let taxCents = 0;
             let shippingCents = 500; // $5 fixed shipping

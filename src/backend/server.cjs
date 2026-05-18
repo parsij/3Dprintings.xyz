@@ -269,11 +269,26 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
                   }
               }
 
-              await pool.query(
-                  `UPDATE orders SET status = 'completed', payment_type = $1, updated_at = NOW() WHERE id = $2`,
+              const updateResult = await pool.query(
+                  `UPDATE orders SET status = 'completed', payment_type = $1, updated_at = NOW() WHERE id = $2 AND status = 'pending' RETURNING items`,
                   [paymentType, orderId]
               );
-              console.log(`Order ${orderId} marked as completed with payment type: ${paymentType}`);
+              if (updateResult.rows.length > 0) {
+                  console.log(`Order ${orderId} marked as completed with payment type: ${paymentType}`);
+                  const itemsData = updateResult.rows[0].items?.items || [];
+                  for (const item of itemsData) {
+                      const productId = item.id || item.productId;
+                      const quantity = Number(item.quantity) || 0;
+                      if (productId && quantity > 0) {
+                          await pool.query(
+                              `UPDATE products 
+                               SET quantity = GREATEST(0, quantity - $1)
+                               WHERE id = $2`,
+                              [quantity, productId]
+                          );
+                      }
+                  }
+              }
 
               // Clear cart for this order's customer. Prefer explicit userId metadata, fallback to DB lookup.
               let userId = session.metadata?.userId;

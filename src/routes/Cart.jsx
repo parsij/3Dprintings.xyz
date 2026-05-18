@@ -134,6 +134,11 @@ export default function CartPage() {
                   onQuantityChange={(newQty) => handleQuantityChange(item.id, newQty)}
                   onRemove={() => handleRemoveItem(item.id)}
                 />
+                {(item.quantity > item.max_quantity) && (
+                   <div className="text-red-500 text-sm mt-1 px-4 font-bold">
+                     Only {item.max_quantity} items available in stock.
+                   </div>
+                )}
               </div>
             ))}
             
@@ -154,13 +159,38 @@ export default function CartPage() {
               
               <hr className="my-4 border-orange-100" />
               
-              <button
-                onClick={() => navigate("/checkout", { state: { items: cartItems } })}
-                className="w-full rounded-xl bg-orange-500 px-6 py-3 font-bold text-white transition-all duration-300 hover:bg-orange-600 hover:scale-105 active:scale-95 cursor-pointer shadow-md hover:shadow-lg"
-              >
-                Proceed to Checkout
-              </button>
-              
+              {(() => {
+                 const totalSpend = cartItems.reduce((sum, item) => sum + (item.current_price * item.quantity), 0);
+                 const totalItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+                 const hasExcessQuantity = cartItems.some(item => item.quantity > item.max_quantity);
+
+                 let errorMessage = null;
+                 if (hasExcessQuantity) {
+                     errorMessage = "Cannot proceed to checkout. One or more items exceed available stock.";
+                 } else if (totalSpend > 2000) {
+                     errorMessage = "Cannot proceed to checkout. Spend limit of $2,000 exceeded.";
+                 } else if (totalItemsCount > 3) {
+                     errorMessage = "Cannot proceed to checkout. Order limit of 3 items exceeded.";
+                 }
+
+                 return (
+                     <>
+                       {errorMessage && (
+                         <div className="mb-4 rounded-lg bg-red-100 border border-red-400 p-3 text-red-700 text-sm font-bold shadow-sm">
+                           {errorMessage}
+                         </div>
+                       )}
+                       <button
+                         onClick={() => navigate("/checkout", { state: { items: cartItems } })}
+                         disabled={!!errorMessage}
+                         className={`w-full rounded-xl px-6 py-3 font-bold text-white transition-all duration-300 cursor-pointer shadow-md hover:shadow-lg ${errorMessage ? 'bg-gray-400 cursor-not-allowed transform-none shadow-none' : 'bg-orange-500 hover:bg-orange-600 hover:scale-105 active:scale-95'}`}
+                       >
+                         Proceed to Checkout
+                       </button>
+                     </>
+                 );
+              })()}
+
               <Link
                 to="/home"
                 className="block mt-3 text-center text-orange-500 font-semibold hover:underline transition-colors duration-300 hover:text-orange-600"
