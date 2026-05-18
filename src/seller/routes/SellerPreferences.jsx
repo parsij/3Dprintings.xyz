@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
+import {PenLine as EditIcon} from "lucide-react";
 import {
   getSellerPreferences,
   updateSellerPreferences,
@@ -15,7 +16,7 @@ const PRINTER_OPTIONS = [
   { value: "sla", label: "SLA (Resin)" },
   { value: "both", label: "Both" },
 ];
-const DESIGN_SOFTWARE_OPTIONS = ["Blender", "Fusion360", "ZBrush", "SolidWorks", "Onshape", "Other"];
+const DESIGN_SOFTWARE_OPTIONS = ["Blender", "Fusion", "ZBrush", "SolidWorks", "Onshape", "Other"];
 const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 function loadImage(imageUrl) {
@@ -69,6 +70,7 @@ export default function SellerPreferences() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState("");
+  const fileInputRef = useRef(null);
   const [preferencesForm, setPreferencesForm] = useState({
     storeName: "",
     supportEmail: "",
@@ -160,6 +162,7 @@ export default function SellerPreferences() {
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
+    event.target.value = "";
   };
 
   const onCropComplete = useCallback((_, nextCroppedAreaPixels) => {
@@ -200,6 +203,10 @@ export default function SellerPreferences() {
     setPreferencesForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const openImagePicker = () => {
+    fileInputRef.current?.click();
+  };
+
   const toggleDesignSoftware = (software) => {
     setPreferencesForm((prev) => {
       const current = Array.isArray(prev.designSoftware) ? prev.designSoftware : [];
@@ -223,6 +230,76 @@ export default function SellerPreferences() {
         {preferencesLoading ? <p className="mt-3 text-sm text-gray-600">Loading preferences...</p> : null}
 
         <form className="mt-4 space-y-4" onSubmit={handleSavePreferences}>
+          <div className="flex flex-col items-center">
+            <p className="mb-2 text-sm font-semibold text-gray-700">Avatar</p>
+            <button
+              type="button"
+              onClick={openImagePicker}
+              className="group relative h-36 w-36 overflow-hidden rounded-full border border-gray-200 bg-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+              aria-label="Change avatar"
+            >
+              {preferencesForm.shopLogoUrl ? (
+                <img
+                  src={preferencesForm.shopLogoUrl}
+                  alt="Current shop avatar"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-gray-500">
+                  Avatar
+                </div>
+              )}
+              <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100 group-focus-visible:bg-black/45 group-focus-visible:opacity-100">
+                <EditIcon size={34} strokeWidth={2.3} />
+              </span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            {selectedImageUrl ? (
+              <div className="mt-4 w-full max-w-md space-y-3">
+                <div className="relative h-72 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                  <Cropper
+                    image={selectedImageUrl}
+                    crop={crop}
+                    zoom={zoom}
+                    aspect={1}
+                    cropShape="round"
+                    showGrid={false}
+                    onCropChange={setCrop}
+                    onCropComplete={onCropComplete}
+                    onZoomChange={setZoom}
+                  />
+                </div>
+                <label className="block text-sm font-semibold text-gray-700">
+                  Zoom
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={zoom}
+                    onChange={(event) => setZoom(Number(event.target.value))}
+                    className="mt-2 w-full cursor-pointer"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleUploadCroppedImage}
+                  disabled={imageUploading}
+                  className="rounded-lg border border-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-60"
+                >
+                  {imageUploading ? "Uploading..." : "Upload Cropped Image"}
+                </button>
+              </div>
+            ) : null}
+            {imageError ? <p className="mt-2 text-sm text-red-600">{imageError}</p> : null}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">
@@ -267,78 +344,15 @@ export default function SellerPreferences() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Shop Logo / Avatar</label>
-              {preferencesForm.shopLogoUrl ? (
-                <img
-                  src={preferencesForm.shopLogoUrl}
-                  alt="Current shop avatar"
-                  className="mb-3 h-24 w-24 rounded-full border border-gray-200 object-cover"
-                />
-              ) : null}
-              <input
-                value={preferencesForm.shopLogoUrl}
-                onChange={(event) => updateField("shopLogoUrl", event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                placeholder="https://example.com/logo.webp"
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-              {selectedImageUrl ? (
-                <div className="mt-3 space-y-3">
-                  <div className="relative h-64 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
-                    <Cropper
-                      image={selectedImageUrl}
-                      crop={crop}
-                      zoom={zoom}
-                      aspect={1}
-                      cropShape="round"
-                      showGrid={false}
-                      onCropChange={setCrop}
-                      onCropComplete={onCropComplete}
-                      onZoomChange={setZoom}
-                    />
-                  </div>
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Zoom
-                    <input
-                      type="range"
-                      min={1}
-                      max={3}
-                      step={0.1}
-                      value={zoom}
-                      onChange={(event) => setZoom(Number(event.target.value))}
-                      className="mt-2 w-full"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleUploadCroppedImage}
-                    disabled={imageUploading}
-                    className="rounded-lg border border-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-60"
-                  >
-                    {imageUploading ? "Uploading..." : "Upload Cropped Image"}
-                  </button>
-                </div>
-              ) : null}
-              {imageError ? <p className="mt-2 text-sm text-red-600">{imageError}</p> : null}
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">External Portfolio Link</label>
-              <input
-                type="url"
-                value={preferencesForm.externalPortfolioLink}
-                onChange={(event) => updateField("externalPortfolioLink", event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                placeholder="https://printables.com/@shop"
-              />
-            </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">External Portfolio Link</label>
+            <input
+              type="url"
+              value={preferencesForm.externalPortfolioLink}
+              onChange={(event) => updateField("externalPortfolioLink", event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              placeholder="https://printables.com/@shop"
+            />
           </div>
 
           <div>
