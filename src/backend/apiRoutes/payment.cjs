@@ -308,8 +308,8 @@ module.exports = function paymentController(deps) {
 
             // Server-side limits validation
             const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
-            if (totalItemsCount > 3) {
-                return res.status(400).json({ error: "Order limit of 3 items exceeded." });
+            if (totalItemsCount > 30) {
+                return res.status(400).json({ error: "Order limit of 30 items exceeded." });
             }
             if (subtotalCents > 200000) {
                 return res.status(400).json({ error: "Spend limit of $2,000 exceeded." });
@@ -418,8 +418,8 @@ module.exports = function paymentController(deps) {
 
             // Server-side limits validation
             const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
-            if (totalItemsCount > 3) {
-                return res.status(400).json({ error: "Order limit of 3 items exceeded." });
+            if (totalItemsCount > 30) {
+                return res.status(400).json({ error: "Order limit of 30 items exceeded." });
             }
             if (subtotalCents > 200000) {
                 return res.status(400).json({ error: "Spend limit of $2,000 exceeded." });

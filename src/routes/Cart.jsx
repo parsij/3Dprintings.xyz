@@ -169,8 +169,8 @@ export default function CartPage() {
                      errorMessage = "Cannot proceed to checkout. One or more items exceed available stock.";
                  } else if (totalSpend > 2000) {
                      errorMessage = "Cannot proceed to checkout. Spend limit of $2,000 exceeded.";
-                 } else if (totalItemsCount > 3) {
-                     errorMessage = "Cannot proceed to checkout. Order limit of 3 items exceeded.";
+                 } else if (totalItemsCount > 30) {
+                     errorMessage = "Cannot proceed to checkout. Order limit of 30 items exceeded.";
                  }
 
                  return (
