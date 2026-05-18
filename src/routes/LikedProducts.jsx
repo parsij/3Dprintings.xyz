@@ -77,6 +77,9 @@ const LikedProducts = ({ user }) => {
                 originalPrice={product.original_price}
                 reviewNumber={product.reviews_count || 0}
                 imageUrl={product.image_url}
+                sellerId={product.seller_id || product.user_id}
+                shopName={product.shop_name}
+                shopLogoUrl={product.shop_logo_url}
               />
             ))}
           </div>
@@ -87,4 +90,3 @@ const LikedProducts = ({ user }) => {
 };
 
 export default LikedProducts;
-

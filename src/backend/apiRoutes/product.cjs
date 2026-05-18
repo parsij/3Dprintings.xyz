@@ -2,6 +2,46 @@ module.exports = function productRoutes(deps) {
   const { app, pool } = deps;
   const IMAGE_BASE_URL = 'https://3dprintings.xyz/api/imgUploads';
 
+  const normalizeProductRow = (p, includeImages = false) => {
+    const images = Array.isArray(p.img_path) && p.img_path.length > 0
+      ? p.img_path.map(img => `${IMAGE_BASE_URL}/${img}`)
+      : [];
+    const firstImage = images.length > 0 ? images[0] : null;
+
+    let parsedTags = [];
+    if (p.tags) {
+      if (Array.isArray(p.tags)) parsedTags = p.tags;
+      else if (typeof p.tags === 'string') {
+        try { parsedTags = JSON.parse(p.tags); }
+        catch { parsedTags = p.tags.split(',').map(t => t.trim()).filter(Boolean); }
+      }
+    }
+
+    const category = typeof p.category === 'string' && p.category.trim().length > 0 ? p.category.trim() : null;
+
+    return {
+      ...p,
+      image_url: firstImage,
+      ...(includeImages ? { images } : {}),
+      tags: parsedTags,
+      category,
+      seller_id: p.user_id,
+      shop_name: p.shop_name || p.creator_name || '',
+      shop_logo_url: p.shop_logo_url || null,
+    };
+  };
+
+  const mapShopRow = (row) => ({
+    sellerId: Number(row.seller_user_id || row.id),
+    username: row.username || '',
+    shopName: row.shop_name || row.username || 'Shop',
+    shopBio: row.shop_bio || '',
+    shopLogoUrl: row.shop_logo_url || '',
+    primaryPrinterSpecialization: row.primary_printer_specialization || '',
+    designSoftware: Array.isArray(row.design_software) ? row.design_software : [],
+    externalPortfolioLink: row.external_portfolio_link || '',
+  });
+
   app.get('/api/products', async (req, res) => {
     try {
       const page = parseInt(req.query.page) || 1;
@@ -20,9 +60,12 @@ module.exports = function productRoutes(deps) {
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
+                sp.shop_name,
+                sp.shop_logo_url,
                 COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id
          LEFT JOIN LATERAL (
             SELECT COUNT(*)::int AS review_count
             FROM reviews
@@ -33,33 +76,7 @@ module.exports = function productRoutes(deps) {
         [limit, offset]
       );
 
-      const products = result.rows.map(p => {
-        // img_path is the array you saved in create.cjs
-        // We take the first image if it exists
-        const firstImage = Array.isArray(p.img_path) && p.img_path.length > 0
-          ? p.img_path[0]
-          : null;
-
-        // Normalize tags: DB may store tags as JSON text or as array
-        let parsedTags = [];
-        if (p.tags) {
-          if (Array.isArray(p.tags)) parsedTags = p.tags;
-          else if (typeof p.tags === 'string') {
-            try { parsedTags = JSON.parse(p.tags); }
-            catch { parsedTags = p.tags.split(',').map(t => t.trim()).filter(Boolean); }
-          }
-        }
-
-        // Normalize category
-        const category = typeof p.category === 'string' && p.category.trim().length > 0 ? p.category.trim() : null;
-
-        return {
-          ...p,
-          image_url: firstImage ? `${IMAGE_BASE_URL}/${firstImage}` : null,
-          tags: parsedTags,
-          category
-        };
-      });
+      const products = result.rows.map((p) => normalizeProductRow(p));
 
       res.json({
         products,
@@ -90,9 +107,12 @@ module.exports = function productRoutes(deps) {
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
+                sp.shop_name,
+                sp.shop_logo_url,
                 COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id
          LEFT JOIN LATERAL (
             SELECT COUNT(*)::int AS review_count
             FROM reviews
@@ -104,29 +124,7 @@ module.exports = function productRoutes(deps) {
         [`%${q}%`, limit, offset]
       );
 
-      const products = result.rows.map(p => {
-        const firstImage = Array.isArray(p.img_path) && p.img_path.length > 0
-          ? p.img_path[0]
-          : null;
-
-        let parsedTags = [];
-        if (p.tags) {
-          if (Array.isArray(p.tags)) parsedTags = p.tags;
-          else if (typeof p.tags === 'string') {
-            try { parsedTags = JSON.parse(p.tags); }
-            catch { parsedTags = p.tags.split(',').map(t => t.trim()).filter(Boolean); }
-          }
-        }
-
-        const category = typeof p.category === 'string' && p.category.trim().length > 0 ? p.category.trim() : null;
-
-        return {
-          ...p,
-          image_url: firstImage ? `${IMAGE_BASE_URL}/${firstImage}` : null,
-          tags: parsedTags,
-          category
-        };
-      });
+      const products = result.rows.map((p) => normalizeProductRow(p));
 
       res.json({
         products,
@@ -147,9 +145,16 @@ module.exports = function productRoutes(deps) {
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
+                sp.shop_name,
+                sp.shop_bio,
+                sp.shop_logo_url,
+                sp.primary_printer_specialization,
+                sp.design_software,
+                sp.external_portfolio_link,
                 COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id
          LEFT JOIN LATERAL (
             SELECT COUNT(*)::int AS review_count
             FROM reviews
@@ -163,34 +168,67 @@ module.exports = function productRoutes(deps) {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      const p = result.rows[0];
-      const images = Array.isArray(p.img_path) && p.img_path.length > 0
-        ? p.img_path.map(img => `${IMAGE_BASE_URL}/${img}`)
-        : [];
-      const firstImage = images.length > 0 ? images[0] : null;
-
-      let parsedTags = [];
-      if (p.tags) {
-        if (Array.isArray(p.tags)) parsedTags = p.tags;
-        else if (typeof p.tags === 'string') {
-          try { parsedTags = JSON.parse(p.tags); }
-          catch { parsedTags = p.tags.split(',').map(t => t.trim()).filter(Boolean); }
-        }
-      }
-
-      const category = typeof p.category === 'string' && p.category.trim().length > 0 ? p.category.trim() : null;
-
-      const product = {
-        ...p,
-        image_url: firstImage,
-        images: images,
-        tags: parsedTags,
-        category
-      };
+      const product = normalizeProductRow(result.rows[0], true);
 
       res.json(product);
     } catch (err) {
       console.error('Error fetching product:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  app.get('/api/shops/:sellerId', async (req, res) => {
+    try {
+      const sellerId = parseInt(req.params.sellerId, 10);
+      if (!Number.isInteger(sellerId) || sellerId <= 0) {
+        return res.status(400).json({ message: 'Invalid shop ID' });
+      }
+
+      const shopResult = await pool.query(
+        `SELECT u.id,
+                u.username,
+                sp.seller_user_id,
+                sp.shop_name,
+                sp.shop_bio,
+                sp.shop_logo_url,
+                sp.primary_printer_specialization,
+                sp.design_software,
+                sp.external_portfolio_link
+         FROM users u
+         LEFT JOIN seller_profiles sp ON sp.seller_user_id = u.id
+         WHERE u.id = $1
+         LIMIT 1`,
+        [sellerId]
+      );
+
+      if (shopResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Shop not found' });
+      }
+
+      const productsResult = await pool.query(
+        `SELECT p.*, u.username as creator_name,
+                sp.shop_name,
+                sp.shop_logo_url,
+                COALESCE(r.review_count, 0)::int AS reviews_count
+         FROM products p
+         LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id
+         LEFT JOIN LATERAL (
+            SELECT COUNT(*)::int AS review_count
+            FROM reviews
+            WHERE reviews.product_id = p.id
+         ) r ON true
+         WHERE p.user_id = $1
+         ORDER BY p.id DESC`,
+        [sellerId]
+      );
+
+      res.json({
+        shop: mapShopRow(shopResult.rows[0]),
+        products: productsResult.rows.map((p) => normalizeProductRow(p)),
+      });
+    } catch (err) {
+      console.error('Error fetching shop:', err);
       res.status(500).json({ message: 'Server error' });
     }
   });

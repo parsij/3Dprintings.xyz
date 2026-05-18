@@ -160,6 +160,8 @@ const ProductPage = ({ user }) => {
     return num % 1 === 0 ? num.toString() : num.toFixed(2);
   };
 
+  const getShopDisplayName = () => product?.shop_name || product?.creator_name || "Unknown Shop";
+
   const formatReviewTimestamp = (timestamp) => {
     const parsed = new Date(timestamp);
     if (Number.isNaN(parsed.getTime())) {
@@ -567,9 +569,25 @@ const ProductPage = ({ user }) => {
 
             {/* Creator & Rating */}
             <div className="flex items-center gap-4 mb-6">
-              <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                By {product.creator_name || 'Unknown User'}
-              </span>
+              <Link
+                to={`/shop/${product.seller_id || product.user_id}`}
+                className="flex min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-orange-50 hover:text-orange-700"
+              >
+                <span className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-orange-100">
+                  {product.shop_logo_url ? (
+                    <img
+                      src={product.shop_logo_url}
+                      alt={getShopDisplayName()}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-xs font-bold text-orange-700">
+                      {getShopDisplayName().slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0 truncate">By {getShopDisplayName()}</span>
+              </Link>
               <div className="flex items-center gap-2">
                 <StarRating
                   value={Math.max(0, Math.min(5, Number(product.rating) || 0))}

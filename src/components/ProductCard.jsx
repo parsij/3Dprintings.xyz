@@ -12,6 +12,9 @@ const ProductCard = ({
   currentPrice,
   originalPrice,
   imageUrl,
+  sellerId,
+  shopName,
+  shopLogoUrl,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -56,6 +59,15 @@ const ProductCard = ({
     }
   };
 
+  const handleShopClick = (event) => {
+    event.stopPropagation();
+    if (sellerId) {
+      navigate(`/shop/${sellerId}`);
+    }
+  };
+
+  const displayShopName = shopName || creatorName || "Unknown";
+
   return (
     <div
       onClick={handleCardClick}
@@ -82,9 +94,31 @@ const ProductCard = ({
         <span className="font-bold text-gray-800">
           {rating ? Number(rating).toFixed(1) : "0.0"} ⭐
         </span>
-        <span className="truncate text-gray-500">
-          ({reviewNumber || 0}) By {creatorName || 'Unknown'}
-        </span>
+        <div className="flex items-center gap-2 text-gray-500">
+          <span className="shrink-0">({reviewNumber || 0})</span>
+          <button
+            type="button"
+            onClick={handleShopClick}
+            disabled={!sellerId}
+            className="flex min-w-0 items-center gap-2 rounded-lg text-left transition hover:text-orange-600 disabled:cursor-default disabled:hover:text-gray-500"
+          >
+            <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+              {shopLogoUrl ? (
+                <img
+                  src={shopLogoUrl}
+                  alt={displayShopName}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center bg-orange-100 text-xs font-bold text-orange-700">
+                  {displayShopName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+            </span>
+            <span className="min-w-0 truncate">By {displayShopName}</span>
+          </button>
+        </div>
 
         <div className="mt-1">
           <span className="font-bold text-lg text-black">${formatPrice(currentPrice)}</span>

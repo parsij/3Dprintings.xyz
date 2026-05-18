@@ -112,7 +112,9 @@ export default function SellerPreferences() {
         <form className="mt-4 space-y-4" onSubmit={handleSavePreferences}>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Shop Name</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Shop Name <span className="text-red-600">*</span>
+              </label>
               <input
                 required
                 value={preferencesForm.shopName}
@@ -125,7 +127,9 @@ export default function SellerPreferences() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Primary Printer Specialization</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Primary Printer Specialization <span className="text-red-600">*</span>
+              </label>
               <select
                 required
                 value={preferencesForm.primaryPrinterSpecialization}
@@ -235,7 +239,7 @@ export default function SellerPreferences() {
                 onChange={(event) => updateField("intellectualPropertyCertified", event.target.checked)}
                 className="mt-1"
               />
-              <span>I certify that I own or have commercial rights to all files I upload.</span>
+              <span>I certify that I own or have commercial rights to all files I upload. <span className="text-red-600">*</span></span>
             </label>
             <label className="flex items-start gap-2 text-sm text-gray-700">
               <input
@@ -245,7 +249,7 @@ export default function SellerPreferences() {
                 onChange={(event) => updateField("termsOfServiceAccepted", event.target.checked)}
                 className="mt-1"
               />
-              <span>I accept the platform creator terms of service.</span>
+              <span>I accept the platform creator terms of service. <span className="text-red-600">*</span></span>
             </label>
           </div>
 
