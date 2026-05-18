@@ -3,7 +3,7 @@ import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
 
 // Your complete, community-specific 3D printing taxonomy
-const CATEGORY_DATA = [
+export const CATEGORY_DATA = [
   {
     title: "3D Printer Parts & Upgrades",
     slug: "3d-printer-parts",

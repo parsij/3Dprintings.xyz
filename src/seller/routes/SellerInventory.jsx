@@ -4,7 +4,8 @@ import {
   getSellerProducts,
   updateSellerProduct,
 } from "../services/sellerPortalService.js";
-import SubmitModel from "./SubmitModel.jsx";
+// Imported CATEGORY_DATA directly from SubmitModel to eliminate duplicate lines
+import SubmitModel, { CATEGORY_DATA } from "./SubmitModel.jsx";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
 import { PenLine as EditIcon } from "lucide-react";
@@ -17,7 +18,6 @@ export default function SellerInventory() {
   const [editForms, setEditForms] = useState({});
   const [savingProductId, setSavingProductId] = useState(null);
 
-  // States to manage the independent popup windows
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
@@ -71,7 +71,6 @@ export default function SellerInventory() {
       setSellerProducts((prev) =>
           prev.map((product) => (Number(product.id) === Number(productId) ? { ...product, ...response.product } : product))
       );
-      // Automatically dismiss the edit window popup when saving successfully finishes
       setEditingProduct(null);
     } catch (error) {
       setProductsError(error?.response?.data?.message || "Failed to update product.");
@@ -85,10 +84,7 @@ export default function SellerInventory() {
         <SellerNavBar pageName={"Products"} />
         <SideMenu role={"seller"} title={"Seller Options"} />
 
-        {/* Normalized page container with consistent fluid margins and padding */}
         <main className="max-w-7xl mx-auto px-4 lg:px-[5vw] pt-24 pb-12">
-
-          {/* Dynamic Dashboard Top Header Section */}
           <div className="flex justify-between items-center mb-6 gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Product Inventory</h1>
@@ -104,19 +100,16 @@ export default function SellerInventory() {
             </button>
           </div>
 
-          {/* Global Alert Notification Flags */}
           {productMessage && <p className="mb-4 text-sm font-medium text-green-700 bg-green-50 p-3 rounded-xl border border-green-200">{productMessage}</p>}
           {productsError && <p className="mb-4 text-sm font-medium text-red-600 bg-red-50 p-3 rounded-xl border border-red-200">{productsError}</p>}
           {productsLoading && <p className="text-sm text-gray-600 animate-pulse">Loading items from your inventory...</p>}
 
-          {/* Fallback Empty State Display */}
           {!productsLoading && sellerProducts.length === 0 && (
               <div className="text-center bg-white border border-gray-200 rounded-xl p-12 text-gray-500">
                 No active product listings found on your account. Click "+ New Product" above to create one.
               </div>
           )}
 
-          {/* Clean Dynamic Product Item Display List */}
           <div className="space-y-3">
             {sellerProducts.map((product) => {
               const form = editForms[product.id];
@@ -158,11 +151,10 @@ export default function SellerInventory() {
           </div>
         </main>
 
-        {/* POPUP MODAL COMPONENT WINDOW (NEW PRODUCT CREATION) */}
+        {/* POPUP MODAL (NEW PRODUCT CREATION) */}
         {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
               <div className="relative bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-100 max-h-[90vh] overflow-y-auto pt-14">
-
                 <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
@@ -184,12 +176,10 @@ export default function SellerInventory() {
             </div>
         )}
 
-        {/* POPUP MODAL COMPONENT WINDOW (EDIT EXISTING PRODUCT DETAIL) */}
+        {/* POPUP MODAL (EDIT EXISTING PRODUCT DETAIL) */}
         {editingProduct && editForms[editingProduct.id] && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
               <div className="relative bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-100 max-h-[90vh] overflow-y-auto pt-14">
-
-                {/* Standardized Close Button ("X") positioned at the TOP LEFT */}
                 <button
                     type="button"
                     onClick={() => setEditingProduct(null)}
@@ -201,15 +191,13 @@ export default function SellerInventory() {
                   </svg>
                 </button>
 
-                {/* Inline Product Modal Content Block */}
                 <div>
-                  <div className="mb-4 flex items-center gap-3">
+                  <div className="mb-6 flex items-center gap-3">
                     {editingProduct.image_url && (
                         <img src={editingProduct.image_url} alt="" className="h-12 w-12 rounded-lg object-cover border" />
                     )}
                     <div>
-                      <h2 className="text-lg font-bold text-gray-900">Modify Listing Information</h2>
-                      <p className="text-xs text-gray-400">Updating adjustments for item reference #{editingProduct.id}</p>
+                      <h2 className="text-xl font-bold text-gray-900">Edit Product Details</h2>
                     </div>
                   </div>
 
@@ -248,8 +236,7 @@ export default function SellerInventory() {
 
                     <div className="flex flex-col gap-1 md:col-span-2">
                       <label className="text-xs font-bold text-gray-500 pl-1">Category Placement</label>
-                      <input
-                          type="text"
+                      <select
                           value={editForms[editingProduct.id].category}
                           onChange={(event) =>
                               setEditForms((prev) => ({
@@ -257,9 +244,19 @@ export default function SellerInventory() {
                                 [editingProduct.id]: { ...prev[editingProduct.id], category: event.target.value },
                               }))
                           }
-                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800"
-                          placeholder="Category"
-                      />
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800 cursor-pointer"
+                      >
+                        <option value="">Select a category...</option>
+                        {CATEGORY_DATA.map((group) => (
+                            <optgroup key={group.slug} label={group.title} className="font-bold text-gray-900 bg-gray-50">
+                              {group.subcategories.map((sub) => (
+                                  <option key={sub.slug} value={sub.label} className="font-normal text-gray-700 bg-white">
+                                    {sub.label}
+                                  </option>
+                              ))}
+                            </optgroup>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="flex flex-col gap-1 md:col-span-2">
@@ -293,25 +290,26 @@ export default function SellerInventory() {
                     />
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-gray-100 flex justify-end gap-3">
+                  <div className="mt-5 flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
                     <button
                         type="button"
                         onClick={() => setEditingProduct(null)}
-                        className="rounded-lg border border-gray-300 font-bold px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                        className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                         type="button"
+                        disabled={savingProductId === editingProduct.id}
                         onClick={() => handleSaveProduct(editingProduct.id)}
-                        disabled={Number(savingProductId) === Number(editingProduct.id)}
-                        className="rounded-lg bg-gray-950 font-bold px-5 py-2 text-white hover:bg-orange-600 transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
+                        className={`rounded-xl bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-xs transition-all hover:bg-orange-400 cursor-pointer ${
+                            savingProductId === editingProduct.id ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
                     >
-                      {Number(savingProductId) === Number(editingProduct.id) ? "Saving Updates..." : "Save Changes"}
+                      {savingProductId === editingProduct.id ? "Saving changes..." : "Save Changes"}
                     </button>
                   </div>
                 </div>
-
               </div>
             </div>
         )}
