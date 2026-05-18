@@ -5,8 +5,9 @@ import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+const SELLER_SITE_ORIGIN = "https://seller.3dprintings.xyz";
 
-export default function BecomeSeller() {
+export default function BecomeSeller({ setUser }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -22,9 +23,17 @@ export default function BecomeSeller() {
         withCredentials: true,
       });
 
+      if (response.data?.user) {
+        setUser(response.data.user);
+      }
+
       setMessage(response.data?.message || "seller access granted.");
       setTimeout(() => {
-        navigate("/seller");
+        if (window.location.hostname.endsWith("3dprintings.xyz")) {
+          window.location.assign(`${SELLER_SITE_ORIGIN}/dashboard`);
+          return;
+        }
+        navigate("/home", { replace: true });
       }, 500);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to become a seller.");

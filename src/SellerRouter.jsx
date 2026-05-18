@@ -10,10 +10,14 @@ import SellerInventory from "./seller/routes/SellerInventory.jsx";
 import SellerPreferences from "./seller/routes/SellerPreferences.jsx";
 import SellerReviews from "./seller/routes/SellerReviews.jsx";
 // Safety Wrapper: Ensures the user is logged in AND is actually a seller
+function hasSellerRole(user) {
+    return String(user?.role || "").trim().toLowerCase() === "seller";
+}
+
 function ProtectedSellerRoute({ user, children }) {
 
     useEffect(() => {
-        if (user && user.role !== "seller") {
+        if (user && !hasSellerRole(user)) {
             // FIXED: Safe side effect executed comfortably outside the rendering timeline
             window.location.href = "https://3dprintings.xyz/become-seller";
         }
@@ -23,7 +27,7 @@ function ProtectedSellerRoute({ user, children }) {
         return <Navigate to="/signin" replace />;
     }
 
-    if (user.role !== "seller") {
+    if (!hasSellerRole(user)) {
         // Show a temporary transition screen while the useEffect runs the redirect
         return (
             <div className={"flex bg-gray-100 h-screen items-center justify-center "}>
