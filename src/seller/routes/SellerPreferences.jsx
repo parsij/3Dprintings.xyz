@@ -16,7 +16,7 @@ const PRINTER_OPTIONS = [
   { value: "sla", label: "SLA (Resin)" },
   { value: "both", label: "Both" },
 ];
-const DESIGN_SOFTWARE_OPTIONS = ["Blender", "Fusion", "ZBrush", "SolidWorks", "Onshape", "Other"];
+const DESIGN_SOFTWARE_OPTIONS = ["Blender", "Fusion360", "ZBrush", "SolidWorks", "Onshape", "Other"];
 const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 function loadImage(imageUrl) {
@@ -293,7 +293,7 @@ export default function SellerPreferences() {
                   disabled={imageUploading}
                   className="rounded-lg border border-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-60"
                 >
-                  {imageUploading ? "Uploading..." : "Upload Cropped Image"}
+                  {imageUploading ? "Saving..." : "Save"}
                 </button>
               </div>
             ) : null}

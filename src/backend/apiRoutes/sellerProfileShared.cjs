@@ -14,6 +14,9 @@ const PORTFOLIO_HOSTS = [
   "thingiverse.com",
   "instagram.com",
 ];
+const DESIGN_SOFTWARE_ALIASES = {
+  Fusion: "Fusion360",
+};
 
 async function ensureSellerProfilesTable(pool) {
   await pool.query(`
@@ -48,7 +51,13 @@ async function ensureSellerProfilesTable(pool) {
 function normalizeSellerProfile(input = {}) {
   const payload = input && typeof input === "object" ? input : {};
   const designSoftware = Array.isArray(payload.designSoftware)
-    ? [...new Set(payload.designSoftware.map((item) => String(item || "").trim()).filter(Boolean))]
+    ? [
+        ...new Set(
+          payload.designSoftware
+            .map((item) => DESIGN_SOFTWARE_ALIASES[String(item || "").trim()] || String(item || "").trim())
+            .filter(Boolean)
+        ),
+      ]
     : [];
 
   return {
