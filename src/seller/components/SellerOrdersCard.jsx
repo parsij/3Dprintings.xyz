@@ -40,8 +40,10 @@ export default function SellerOrdersCard({ order }) {
     if (shippingAddress.country) addressLines.push(shippingAddress.country);
   }
 
+  const items = Array.isArray(order.items) ? order.items : [];
+
   return (
-    <article className="rounded-lg border border-gray-200 bg-white p-4 shadow-2xs">
+    <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
       <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs text-gray-500">Order ID</p>
@@ -71,36 +73,56 @@ export default function SellerOrdersCard({ order }) {
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-155 text-left text-sm">
-          <thead className="text-xs uppercase text-gray-500">
-            <tr>
-              <th className="py-2 pr-3 font-semibold">Product</th>
-              <th className="px-3 py-2 font-semibold">Quantity</th>
-              <th className="px-3 py-2 font-semibold">Unit Price</th>
-              <th className="py-2 pl-3 text-right font-semibold">Line Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {(Array.isArray(order.items) ? order.items : []).map((item) => (
-              <tr key={`${order.id}-${item.productId}`}>
-                <td className="py-3 pr-3 font-medium text-gray-900">{item.productName}</td>
-                <td className="px-3 py-3 text-gray-700">{Number(item.quantity) || 0}</td>
-                <td className="px-3 py-3 text-gray-700">{formatCurrency(item.unitPrice)}</td>
-                <td className="py-3 pl-3 text-right font-semibold text-gray-900">{formatCurrency(item.lineTotal)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-gray-900">Items</p>
+        {items.length === 0 ? (
+          <p className="text-sm text-gray-600">No items in this order.</p>
+        ) : (
+          <div className="space-y-2">
+            {items.map((item) => {
+              const quantity = Number(item.quantity) || 0;
+              const unitPrice = Number(item.unitPrice) || 0;
+              const lineTotal = Number(item.lineTotal) || 0;
+
+              return (
+                <div key={`${order.id}-${item.productId}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.productName}
+                          className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-105 transition-transform transform-gpu"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-md bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200 text-xs text-gray-400">
+                          No Img
+                        </div>
+                      )}
+
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900">{item.productName}</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Qty {quantity} x {formatCurrency(unitPrice)}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(lineTotal)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <div className="mt-4 flex justify-end">
-        <div className="rounded-lg bg-gray-50 px-4 py-3 text-right">
-          <p className="text-xs font-semibold uppercase text-gray-500">Total Order Amount</p>
-          <p className="text-lg font-bold text-gray-900">{formatCurrency(order.totalAmount)}</p>
+      <div className="mt-4 flex justify-end border-t border-gray-100 pt-4">
+        <div className="text-right">
+          <p className="text-xs font-semibold uppercase text-gray-500">Order Revenue</p>
+          <p className="text-lg font-bold text-gray-900">{formatCurrency(order.sellerSubtotal)}</p>
         </div>
       </div>
     </article>
   );
 }
-

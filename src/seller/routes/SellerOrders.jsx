@@ -11,38 +11,8 @@ const STATUS_FILTERS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-const currencyFormatter = new Intl.NumberFormat(undefined, {
-  style: "currency",
-  currency: "USD",
-});
-
-function formatCurrency(value) {
-  const amount = Number(value);
-  return currencyFormatter.format(Number.isFinite(amount) ? amount : 0);
-}
-
-function formatDate(value) {
-  const date = value ? new Date(value) : null;
-  if (!date || Number.isNaN(date.valueOf())) return "Unknown date";
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function getStatusStyles(status) {
-  const normalized = String(status || "").toLowerCase();
-  if (normalized === "completed") return "bg-green-50 text-green-700";
-  if (normalized === "cancelled") return "bg-red-50 text-red-700";
-  if (normalized === "pending") return "bg-amber-50 text-amber-700";
-  return "bg-gray-100 text-gray-700";
-}
-
-function getStatusLabel(status) {
-  const normalized = String(status || "").toLowerCase();
-  if (!normalized) return "Unknown";
-  return normalized[0].toUpperCase() + normalized.slice(1);
-}
-
 export default function SellerOrders() {
-  const [orders, setOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
@@ -51,31 +21,35 @@ export default function SellerOrders() {
     setOrdersLoading(true);
     setOrdersError("");
     try {
-      const response = await getSellerOrders(statusFilter);
-      setOrders(Array.isArray(response.orders) ? response.orders : []);
+      const response = await getSellerOrders("");
+      setAllOrders(Array.isArray(response.orders) ? response.orders : []);
     } catch (error) {
       setOrdersError(error?.response?.data?.message || "Failed to load seller orders.");
     } finally {
       setOrdersLoading(false);
     }
-  }, [statusFilter]);
+  }, []);
 
   useEffect(() => {
     reloadOrders();
   }, [reloadOrders]);
 
   const totals = useMemo(() => {
-    return orders.reduce(
+    return allOrders.reduce(
       (acc, order) => {
         const items = Array.isArray(order.items) ? order.items : [];
         acc.orders += 1;
         acc.items += items.reduce((count, item) => count + (Number(item.quantity) || 0), 0);
-        acc.subtotal += Number(order.sellerSubtotal) || 0;
         return acc;
       },
-      { orders: 0, items: 0, subtotal: 0 }
+      { orders: 0, items: 0 }
     );
-  }, [orders]);
+  }, [allOrders]);
+
+  const filteredOrders = useMemo(() => {
+    if (!statusFilter) return allOrders;
+    return allOrders.filter(order => order.status === statusFilter);
+  }, [allOrders, statusFilter]);
 
   return (
     <div className="min-h-screen bg-[#f2f2f2]">
@@ -127,11 +101,11 @@ export default function SellerOrders() {
 
         {ordersLoading ? (
           <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">Loading seller orders...</p>
-        ) : orders.length === 0 ? (
+        ) : filteredOrders.length === 0 ? (
           <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">No seller orders found.</p>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => (
+            {filteredOrders.map((order) => (
               <SellerOrdersCard key={order.id} order={order} />
             ))}
           </div>
