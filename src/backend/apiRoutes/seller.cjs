@@ -36,6 +36,7 @@ function normalizeSellerPreferences(input) {
     storeName,
     supportEmail,
     storeDescription,
+    shopLogoUrl: String(payload.shopLogoUrl || "").trim(),
     notifyNewOrders: Boolean(payload.notifyNewOrders),
     notifyNewReviews: Boolean(payload.notifyNewReviews),
     notifyPayouts: Boolean(payload.notifyPayouts),
@@ -462,10 +463,31 @@ module.exports = function sellerRoutes(deps) {
         await fs.promises.rename(uploadedFile.path, nextPath);
         uploadedFile.filename = fileName;
         uploadedFile.path = nextPath;
+        const imageUrl = buildImageUrl(req, fileName);
+
+        await pool.query(
+          `UPDATE seller_profiles
+           SET shop_logo_url = $1,
+               updated_at = NOW()
+           WHERE seller_user_id = $2`,
+          [imageUrl, req.user.id]
+        );
+
+        await pool.query(
+          `UPDATE users
+           SET seller_preferences = jsonb_set(
+             COALESCE(seller_preferences, '{}'::jsonb),
+             '{shopLogoUrl}',
+             to_jsonb($1::text),
+             true
+           )
+           WHERE id = $2`,
+          [imageUrl, req.user.id]
+        );
 
         return res.status(201).json({
-          message: "Profile image uploaded.",
-          imageUrl: buildImageUrl(req, fileName),
+          message: "Profile image saved.",
+          imageUrl,
           fileName,
         });
       } catch (error) {

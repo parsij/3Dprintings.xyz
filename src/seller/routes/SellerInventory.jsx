@@ -8,7 +8,7 @@ import {
 import SubmitModel, { CATEGORY_DATA } from "./SubmitModel.jsx";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
-import { PenLine as EditIcon, Save as SaveIcon, Check as CheckIcon } from "lucide-react";
+import { PenLine as EditIcon, Save as SaveIcon } from "lucide-react";
 
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
@@ -141,7 +141,7 @@ export default function SellerInventory() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                        <span className="text-xs font-semibold text-gray-600">Qty:</span>
+                        <span className="text-xs font-semibold text-gray-600">Quantity:</span>
                         <input
                             type="number"
                             min="0"
@@ -166,17 +166,15 @@ export default function SellerInventory() {
                                    type="button"
                                    onClick={() => handleSaveProduct(product.id)}
                                    disabled={isDisabled}
-                                   title={isDisabled ? "No changes to save" : "Save changes"}
-                                   className={`p-1.5 rounded-md flex items-center justify-center transition-all ${
+                                   title={isDisabled ? "No changes to save" : "Save quantity"}
+                                   className={`p-1.5 rounded-md border flex items-center justify-center transition-all ${
                                        isDisabled
-                                           ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                           : "bg-green-500 text-white hover:bg-green-600 cursor-pointer shadow-sm"
+                                           ? "border-gray-200 bg-gray-200 text-gray-400 cursor-not-allowed"
+                                           : "border-gray-300 bg-white text-gray-950 hover:bg-gray-50 cursor-pointer shadow-sm"
                                    }`}
                                >
                                    {savingProductId === product.id ? (
                                        <span className="h-4 w-4 border-2 border-t-transparent border-gray-400 rounded-full animate-spin"></span>
-                                   ) : isChanged ? (
-                                       <CheckIcon className="h-4 w-4" />
                                    ) : (
                                        <SaveIcon className="h-4 w-4" />
                                    )}

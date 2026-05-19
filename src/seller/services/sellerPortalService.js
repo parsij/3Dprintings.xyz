@@ -23,6 +23,14 @@ export async function uploadSellerProfileImage(formData) {
   return response.data;
 }
 
+export async function getSellerOrders(status = "") {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const response = await axios.get(`${API_BASE}/api/seller/orders${query}`, {
+    withCredentials: true,
+  });
+  return response.data;
+}
+
 export async function getSellerProducts() {
   const response = await axios.get(`${API_BASE}/api/seller/products`, {
     withCredentials: true,

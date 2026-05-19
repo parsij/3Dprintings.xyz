@@ -7,6 +7,7 @@ import ForgotPassword from "./routes/ForgotPassword.jsx";
 // FIXED: Corrected path imports from absolute "/" to relative "./routes/"
 import SellerDashboard from "./seller/routes/SellerDashboard.jsx";
 import SellerInventory from "./seller/routes/SellerInventory.jsx";
+import SellerOrders from "./seller/routes/SellerOrders.jsx";
 import SellerPreferences from "./seller/routes/SellerPreferences.jsx";
 import SellerReviews from "./seller/routes/SellerReviews.jsx";
 // Safety Wrapper: Ensures the user is logged in AND is actually a seller
@@ -98,8 +99,7 @@ const SellerRouter = ({ user, setUser }) => {
                     path="/orders"
                     element={
                         <ProtectedSellerRoute user={user}>
-                            {/* <Orders user={user} /> */}
-                            <div className="p-8"><h1>Seller Orders & Analytics</h1></div>
+                            <SellerOrders user={user} />
                         </ProtectedSellerRoute>
                     }
                 />

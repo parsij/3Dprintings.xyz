@@ -188,7 +188,7 @@ export default function SellerPreferences() {
 
       const response = await uploadSellerProfileImage(formData);
       updateField("shopLogoUrl", response.imageUrl || "");
-      setPreferencesMessage("Profile image uploaded. Save preferences to publish it.");
+      setPreferencesMessage(response?.message || "Profile image saved.");
       setSelectedImageUrl("");
       setSelectedImageName("");
       setCroppedAreaPixels(null);
@@ -218,9 +218,10 @@ export default function SellerPreferences() {
   };
 
   return (
-    <section className="max-w-4xl m-20">
+    <section className="min-h-screen bg-[#f2f2f2]">
       <SellerNavBar pageName={"Preferences"}/>
       <SideMenu role={"seller"} title={"Seller Options"}/>
+      <div className="mx-auto max-w-4xl px-4 pb-12 pt-24">
       <div className="rounded-lg border border-gray-200 bg-white p-5">
         <h2 className="text-lg font-bold text-gray-900">Seller Preferences</h2>
         <p className="mt-1 text-sm text-gray-600">Control storefront details and seller notifications.</p>
@@ -235,7 +236,7 @@ export default function SellerPreferences() {
             <button
               type="button"
               onClick={openImagePicker}
-              className="group relative h-36 w-36 overflow-hidden rounded-full border border-gray-200 bg-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+              className="group relative h-36 w-36 overflow-hidden rounded-full border border-gray-200 bg-gray-100 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2"
               aria-label="Change avatar"
             >
               {preferencesForm.shopLogoUrl ? (
@@ -267,6 +268,9 @@ export default function SellerPreferences() {
                     image={selectedImageUrl}
                     crop={crop}
                     zoom={zoom}
+                    minZoom={1}
+                    maxZoom={3}
+                    zoomSpeed={0.08}
                     aspect={1}
                     cropShape="round"
                     showGrid={false}
@@ -281,10 +285,10 @@ export default function SellerPreferences() {
                     type="range"
                     min={1}
                     max={3}
-                    step={0.1}
+                    step="any"
                     value={zoom}
                     onChange={(event) => setZoom(Number(event.target.value))}
-                    className="mt-2 w-full cursor-pointer"
+                    className="mt-2 w-full cursor-pointer accent-gray-900"
                   />
                 </label>
                 <button
@@ -439,6 +443,7 @@ export default function SellerPreferences() {
             {preferencesSaving ? "Saving..." : "Save Preferences"}
           </button>
         </form>
+      </div>
       </div>
     </section>
   );

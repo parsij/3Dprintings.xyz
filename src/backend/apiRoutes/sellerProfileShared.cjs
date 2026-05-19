@@ -77,7 +77,7 @@ function sellerProfileFromRow(row, fallbackPreferences = {}) {
     return {
       shopName: fallbackPreferences.storeName || "",
       shopBio: fallbackPreferences.storeDescription || "",
-      shopLogoUrl: "",
+      shopLogoUrl: fallbackPreferences.shopLogoUrl || "",
       primaryPrinterSpecialization: "",
       designSoftware: [],
       externalPortfolioLink: "",
