@@ -217,6 +217,9 @@ module.exports = function sellerRoutes(deps) {
 
   app.get("/api/seller/orders", attachAuthenticatedUser, isSeller, async (req, res) => {
     try {
+      const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+      if (!auth?.userId) return;
+
       const sellerId = req.user.id;
       const requestedStatus = typeof req.query.status === "string" ? req.query.status.trim().toLowerCase() : "";
       const allowedStatuses = new Set(["pending", "completed", "cancelled"]);
@@ -263,7 +266,12 @@ module.exports = function sellerRoutes(deps) {
             COALESCE(e.unit_price, p.current_price, 0)::numeric(12,2) AS unit_price,
             (COALESCE(e.quantity, 0) * COALESCE(e.unit_price, p.current_price, 0))::numeric(12,2) AS line_total,
             u.username AS customer_username,
-            u.email AS customer_email
+            u.email AS customer_email,
+            u.street_address,
+            u.city,
+            u.state_province,
+            u.postal_code,
+            u.country_code
           FROM expanded_items e
           JOIN products p ON p.id = e.product_id
           LEFT JOIN users u ON u.id = e.customer_id
@@ -283,6 +291,13 @@ module.exports = function sellerRoutes(deps) {
             customerId: Number(row.customer_id),
             customerUsername: row.customer_username || null,
             customerEmail: row.customer_email || null,
+            shippingAddress: {
+              street: row.street_address || null,
+              city: row.city || null,
+              state: row.state_province || null,
+              postalCode: row.postal_code || null,
+              country: row.country_code || null,
+            },
             status: row.status,
             totalAmount: Number(row.total_amount || 0),
             createdAt: row.created_at,
