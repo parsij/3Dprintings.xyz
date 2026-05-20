@@ -86,16 +86,16 @@ export default function SellerOrdersCard({ order }) {
               const productId = item.productId;
               const hasProductLink = Number.isFinite(Number(productId)) && Number(productId) > 0;
               const productPath = hasProductLink ? `/product/${encodeURIComponent(String(productId))}` : null;
-              
+
               return (
                 <div key={`${order.id}-${item.productId}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
-                      {item.image_url || item.imageUrl ? (
+                      {item.imageUrl ? (
                         hasProductLink ? (
                           <Link to={productPath} className="block shrink-0">
                             <img
-                              src={item.image_url || item.imageUrl}
+                              src={item.imageUrl}
                               alt={item.productName}
                               className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
                               loading="lazy"
@@ -103,7 +103,7 @@ export default function SellerOrdersCard({ order }) {
                           </Link>
                         ) : (
                           <img
-                            src={item.image_url || item.imageUrl}
+                            src={item.imageUrl}
                             alt={item.productName}
                             className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
                             loading="lazy"

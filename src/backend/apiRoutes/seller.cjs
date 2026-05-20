@@ -262,6 +262,7 @@ module.exports = function sellerRoutes(deps) {
             e.updated_at,
             p.id AS product_id,
             p.name AS product_name,
+            p.img_path,
             e.quantity,
             COALESCE(e.unit_price, p.current_price, 0)::numeric(12,2) AS unit_price,
             (COALESCE(e.quantity, 0) * COALESCE(e.unit_price, p.current_price, 0))::numeric(12,2) AS line_total,
@@ -309,12 +310,15 @@ module.exports = function sellerRoutes(deps) {
 
         const lineTotal = Number(row.line_total || 0);
         const order = ordersMap.get(key);
+        const firstImage = Array.isArray(row.img_path) && row.img_path.length > 0 ? row.img_path[0] : null;
+        const imageUrl = firstImage ? buildImageUrl(req, firstImage) : null;
         order.items.push({
           productId: Number(row.product_id),
           productName: row.product_name,
           quantity: Number(row.quantity || 0),
           unitPrice: Number(row.unit_price || 0),
           lineTotal,
+          imageUrl,
         });
         order.sellerSubtotal += lineTotal;
       }

@@ -72,7 +72,7 @@ const OrderCard = ({
         </div>
       </div>
 
-      <div className="px-4 md:px-5 py-3 bg-gray-50/40 border-t border-gray-100 flex flex-col sm:flex-row gap-2 justify-end">
+      <div className="px-4 md:px-5 py-3 bg-gray-50/40 border-t border-gray-100 flex flex-row gap-2 items-center justify-start md:justify-end">
         {isPending && onPay && (
           <button
             type="button"
@@ -87,7 +87,7 @@ const OrderCard = ({
           type="button"
           onClick={onViewDetails}
           disabled={isDetailsLoading}
-          className="bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-zinc-800 hover:scale-105 active:scale-95 transition duration-100 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          className="bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-zinc-800 hover:scale-105 active:scale-95 transition duration-100 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed md:ml-auto"
         >
           {isDetailsLoading ? "Loading..." : "Details"}
         </button>
