@@ -86,7 +86,7 @@ export default function SellerOrdersCard({ order }) {
               const productId = item.productId;
               const hasProductLink = Number.isFinite(Number(productId)) && Number(productId) > 0;
               const productPath = hasProductLink ? `/product/${encodeURIComponent(String(productId))}` : null;
-
+              
               return (
                 <div key={`${order.id}-${item.productId}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                   <div className="flex items-start justify-between gap-3">
