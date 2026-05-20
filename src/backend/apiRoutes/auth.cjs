@@ -90,7 +90,7 @@ module.exports = function authRoutes(deps) {
       const query = `
       INSERT INTO users (username, email, password)
       VALUES ($1, $2, $3)
-      RETURNING id, username, email, COALESCE(role, 'customer') AS role
+      RETURNING id, username, email, phone_number, COALESCE(role, 'customer') AS role
     `;
 
       const values = [normalizedUsername, normalizedEmail, hashedPassword];
@@ -102,7 +102,13 @@ module.exports = function authRoutes(deps) {
 
       return res.status(201).json({
         message: 'User created',
-        user,
+        user: {
+          id: Number(user.id),
+          username: user.username,
+          email: user.email,
+          phone_number: user.phone_number,
+          role: user.role,
+        },
       });
     } catch (err) {
       console.error('Signup error:', err.message);
@@ -125,7 +131,7 @@ module.exports = function authRoutes(deps) {
         return res.status(400).json({ message: 'Invalid email format' });
       }
 
-      const result = await pool.query('SELECT id, username, email, password, COALESCE(role, \'customer\') AS role FROM users WHERE email = $1', [
+      const result = await pool.query('SELECT id, username, email, phone_number, password, COALESCE(role, \'customer\') AS role FROM users WHERE email = $1', [
         normalizedEmail,
       ]);
 
@@ -147,6 +153,7 @@ module.exports = function authRoutes(deps) {
           id: Number(user.id),
           username: user.username,
           email: user.email,
+          phone_number: user.phone_number,
           role: user.role,
         },
       });
@@ -223,7 +230,7 @@ module.exports = function authRoutes(deps) {
 
       const usernameCandidate = buildUsernameFromGoogleProfile(payload.name, email);
       const existingBySub = await pool.query(
-        `SELECT id, username, email, google_sub, COALESCE(role, 'customer') AS role
+        `SELECT id, username, email, phone_number, COALESCE(role, 'customer') AS role
          FROM users
          WHERE google_sub = $1
          LIMIT 1`,
@@ -252,7 +259,7 @@ module.exports = function authRoutes(deps) {
             `UPDATE users
              SET email = $1
              WHERE id = $2
-             RETURNING id, username, email, google_sub, COALESCE(role, 'customer') AS role`,
+             RETURNING id, username, email, phone_number, google_sub, COALESCE(role, 'customer') AS role`,
             [email, matchedBySub.id]
           );
           user = updatedEmailUser.rows[0];
@@ -261,7 +268,7 @@ module.exports = function authRoutes(deps) {
         }
       } else {
         const existingByEmail = await pool.query(
-        `SELECT id, username, email, google_sub, COALESCE(role, 'customer') AS role
+        `SELECT id, username, email, phone_number, google_sub, COALESCE(role, 'customer') AS role
          FROM users
          WHERE email = $1
          LIMIT 1`,
@@ -282,7 +289,7 @@ module.exports = function authRoutes(deps) {
               `UPDATE users
                SET google_sub = $1
                WHERE id = $2
-               RETURNING id, username, email, google_sub, COALESCE(role, 'customer') AS role`,
+               RETURNING id, username, email, phone_number, google_sub, COALESCE(role, 'customer') AS role`,
               [googleSub, matchedUser.id]
             );
             user = updated.rows[0];
@@ -295,7 +302,7 @@ module.exports = function authRoutes(deps) {
           const inserted = await pool.query(
             `INSERT INTO users (username, email, password, google_sub)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, username, email, google_sub, COALESCE(role, 'customer') AS role`,
+             RETURNING id, username, email, phone_number, google_sub, COALESCE(role, 'customer') AS role`,
             [usernameCandidate, email, hashedPassword, googleSub]
           );
           user = inserted.rows[0];
@@ -311,6 +318,7 @@ module.exports = function authRoutes(deps) {
           id: Number(user.id),
           username: user.username,
           email: user.email,
+          phone_number: user.phone_number,
           role: user.role,
           profile: {
             name: payload.name || null,
@@ -344,7 +352,7 @@ module.exports = function authRoutes(deps) {
       }
 
       const userResult = await pool.query(
-        `SELECT id, username, email, COALESCE(role, 'customer') AS role
+        `SELECT id, username, email, phone_number, COALESCE(role, 'customer') AS role
          FROM users
          WHERE id = $1
          LIMIT 1`,
@@ -361,6 +369,7 @@ module.exports = function authRoutes(deps) {
           id: Number(user.id),
           username: user.username,
           email: user.email,
+          phone_number: user.phone_number,
           role: user.role,
         },
         message: 'Authentication successfully',

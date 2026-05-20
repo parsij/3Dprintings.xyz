@@ -17,7 +17,7 @@ export default function Account({
         Account <span className="text-orange-500">settings</span>
       </h1>
       <p className="mt-2 text-sm text-gray-600">
-        Update your username and email used for your marketplace account.
+        Update your info for your marketplace account.
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onProfileSubmit} noValidate>
