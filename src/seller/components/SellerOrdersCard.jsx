@@ -1,10 +1,11 @@
 import React from "react";
-import { Link } from "react-router-dom";
 
 const currencyFormatter = new Intl.NumberFormat(undefined, {
   style: "currency",
   currency: "USD",
 });
+
+const MARKETPLACE_ORIGIN = "https://3dprintings.xyz";
 
 function formatCurrency(value) {
   const amount = Number(value);
@@ -29,6 +30,11 @@ function getStatusLabel(status) {
   const normalized = String(status || "").toLowerCase();
   if (!normalized) return "Unknown";
   return normalized[0].toUpperCase() + normalized.slice(1);
+}
+
+function getMarketplaceProductUrl(productId) {
+  if (!Number.isFinite(Number(productId)) || Number(productId) <= 0) return null;
+  return `${MARKETPLACE_ORIGIN}/product/${encodeURIComponent(String(productId))}`;
 }
 
 export default function SellerOrdersCard({ order }) {
@@ -80,59 +86,59 @@ export default function SellerOrdersCard({ order }) {
         ) : (
           <div className="space-y-2">
             {items.map((item) => {
-              const quantity = Number(item.quantity) || 0;
-              const unitPrice = Number(item.unitPrice) || 0;
-              const lineTotal = Number(item.lineTotal) || 0;
-              const productId = item.productId;
-              const hasProductLink = Number.isFinite(Number(productId)) && Number(productId) > 0;
-              const productPath = hasProductLink ? `/product/${encodeURIComponent(String(productId))}` : null;
-              
-              return (
-                <div key={`${order.id}-${item.productId}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      {item.imageUrl ? (
-                        hasProductLink ? (
-                          <Link to={productPath} className="block shrink-0">
-                            <img
-                              src={item.imageUrl}
-                              alt={item.productName}
-                              className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
-                              loading="lazy"
-                            />
-                          </Link>
-                        ) : (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.productName}
-                            className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
-                            loading="lazy"
-                          />
-                        )
-                      ) : (
-                        <div className="h-14 w-14 rounded-md bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200 text-xs text-gray-400">
-                          No Img
-                        </div>
-                      )}
+               const quantity = Number(item.quantity) || 0;
+               const unitPrice = Number(item.unitPrice) || 0;
+               const lineTotal = Number(item.lineTotal) || 0;
+               const productId = item.productId;
+               const productUrl = getMarketplaceProductUrl(productId);
+               const hasProductLink = Boolean(productUrl);
 
-                      <div className="min-w-0">
-                        {hasProductLink ? (
-                          <Link to={productPath} className="font-medium text-gray-900 hover:text-orange-600 transition-colors duration-250">
-                            {item.productName}
-                          </Link>
-                        ) : (
-                          <p className="font-medium text-gray-900">{item.productName}</p>
-                        )}
-                        <p className="text-xs text-gray-600 mt-1">
-                          Quantity: {quantity} x {formatCurrency(unitPrice)}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(lineTotal)}</p>
-                  </div>
-                </div>
-              );
-            })}
+               return (
+                 <div key={`${order.id}-${item.productId}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                   <div className="flex items-start justify-between gap-3">
+                     <div className="flex items-start gap-3 min-w-0">
+                       {item.imageUrl ? (
+                         hasProductLink ? (
+                           <a href={productUrl} target="_self" className="block shrink-0">
+                             <img
+                               src={item.imageUrl}
+                               alt={item.productName}
+                               className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
+                               loading="lazy"
+                             />
+                           </a>
+                         ) : (
+                           <img
+                             src={item.imageUrl}
+                             alt={item.productName}
+                             className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
+                             loading="lazy"
+                           />
+                         )
+                       ) : (
+                         <div className="h-14 w-14 rounded-md bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200 text-xs text-gray-400">
+                           No Img
+                         </div>
+                       )}
+
+                       <div className="min-w-0">
+                         {hasProductLink ? (
+                           <a href={productUrl} target="_self" className="font-medium text-gray-900 hover:text-orange-600 transition-colors duration-250">
+                             {item.productName}
+                           </a>
+                         ) : (
+                           <p className="font-medium text-gray-900">{item.productName}</p>
+                         )}
+                         <p className="text-xs text-gray-600 mt-1">
+                           Quantity: {quantity} x {formatCurrency(unitPrice)}
+                         </p>
+                       </div>
+                     </div>
+                     <p className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(lineTotal)}</p>
+                   </div>
+                 </div>
+               );
+             })}
           </div>
         )}
       </div>
