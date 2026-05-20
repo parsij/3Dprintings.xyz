@@ -31,6 +31,8 @@ export default function OrderDetails({ user }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     if (!user || !orderId) return;
@@ -82,10 +84,54 @@ export default function OrderDetails({ user }) {
     return () => controller.abort();
   }, [navigate, orderId, user]);
 
+  const handlePayment = async () => {
+    if (!order || !order.id) return;
+    setPaymentLoading(true);
+    setPaymentError("");
+
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(order.id)}/pay`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+      });
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (response.status === 401) {
+        navigate("/signin", { replace: true });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload?.error || payload?.message || "Failed to process payment.");
+      }
+
+      // Redirect to Stripe checkout URL if provided
+      if (payload.checkout_url) {
+        window.location.href = payload.checkout_url;
+      } else {
+        // Reload order to reflect status change
+        window.location.reload();
+      }
+    } catch (err) {
+      setPaymentError(err.message || "Failed to process payment.");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const items = useMemo(() => getOrderItemsArray(order?.items), [order?.items]);
   const orderTotals = order?.items && typeof order.items === "object" && !Array.isArray(order.items)
     ? order.items
     : null;
+
+  const isPending = order && String(order.status || "").toLowerCase() === "pending";
 
   if (!user) return <Navigate to="/signin" replace />;
 
@@ -135,6 +181,21 @@ export default function OrderDetails({ user }) {
                 </p>
               </div>
             </div>
+
+            {isPending && paymentError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</p>
+            )}
+
+            {isPending && (
+              <button
+                type="button"
+                onClick={handlePayment}
+                disabled={paymentLoading}
+                className="w-full bg-orange-500 text-white px-4 py-3 rounded-lg text-sm font-semibold hover:bg-orange-600 hover:scale-105 active:scale-95 transition duration-100 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {paymentLoading ? "Processing Payment..." : "Pay Now"}
+              </button>
+            )}
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
@@ -186,7 +247,7 @@ export default function OrderDetails({ user }) {
                               <p className="font-medium text-gray-900">{productName}</p>
                             )}
                             <p className="text-xs text-gray-600 mt-1">
-                              Qty {safeQuantity} x {toMoney(safePrice)}
+                              Quantity: {safeQuantity} x {toMoney(safePrice)}
                             </p>
                           </div>
                         </div>

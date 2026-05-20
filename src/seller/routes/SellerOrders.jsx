@@ -102,7 +102,12 @@ export default function SellerOrders() {
         {ordersLoading ? (
           <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">Loading seller orders...</p>
         ) : filteredOrders.length === 0 ? (
-          <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">No seller orders found.</p>
+          <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+            {statusFilter === "pending" && "No pending orders found."}
+            {statusFilter === "completed" && "No completed orders found."}
+            {statusFilter === "cancelled" && "No cancelled orders found."}
+            {!statusFilter && "No seller orders found."}
+          </p>
         ) : (
           <div className="space-y-4">
             {filteredOrders.map((order) => (

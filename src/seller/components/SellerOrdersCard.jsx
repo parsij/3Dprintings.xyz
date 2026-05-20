@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 const currencyFormatter = new Intl.NumberFormat(undefined, {
   style: "currency",
@@ -50,7 +51,6 @@ export default function SellerOrdersCard({ order }) {
           <h2 className="break-all font-mono text-sm font-semibold text-gray-900">{order.id}</h2>
           <p className="mt-2 text-sm text-gray-600">
             {order.customerUsername || "Customer"}
-            {order.customerEmail ? <span className="text-gray-400"> &middot; {order.customerEmail}</span> : null}
           </p>
           <div className="mt-2">
             <p className="text-xs font-semibold uppercase text-gray-500">Shipping Address</p>
@@ -83,18 +83,32 @@ export default function SellerOrdersCard({ order }) {
               const quantity = Number(item.quantity) || 0;
               const unitPrice = Number(item.unitPrice) || 0;
               const lineTotal = Number(item.lineTotal) || 0;
-
+              const productId = item.productId;
+              const hasProductLink = Number.isFinite(Number(productId)) && Number(productId) > 0;
+              const productPath = hasProductLink ? `/product/${encodeURIComponent(String(productId))}` : null;
+              
               return (
                 <div key={`${order.id}-${item.productId}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.productName}
-                          className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-105 transition-transform transform-gpu"
-                          loading="lazy"
-                        />
+                      {item.image_url || item.imageUrl ? (
+                        hasProductLink ? (
+                          <Link to={productPath} className="block shrink-0">
+                            <img
+                              src={item.image_url || item.imageUrl}
+                              alt={item.productName}
+                              className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
+                              loading="lazy"
+                            />
+                          </Link>
+                        ) : (
+                          <img
+                            src={item.image_url || item.imageUrl}
+                            alt={item.productName}
+                            className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
+                            loading="lazy"
+                          />
+                        )
                       ) : (
                         <div className="h-14 w-14 rounded-md bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200 text-xs text-gray-400">
                           No Img
@@ -102,9 +116,15 @@ export default function SellerOrdersCard({ order }) {
                       )}
 
                       <div className="min-w-0">
-                        <p className="font-medium text-gray-900">{item.productName}</p>
+                        {hasProductLink ? (
+                          <Link to={productPath} className="font-medium text-gray-900 hover:text-orange-600 transition-colors duration-250">
+                            {item.productName}
+                          </Link>
+                        ) : (
+                          <p className="font-medium text-gray-900">{item.productName}</p>
+                        )}
                         <p className="text-xs text-gray-600 mt-1">
-                          Qty {quantity} x {formatCurrency(unitPrice)}
+                          Quantity: {quantity} x {formatCurrency(unitPrice)}
                         </p>
                       </div>
                     </div>
@@ -119,8 +139,8 @@ export default function SellerOrdersCard({ order }) {
 
       <div className="mt-4 flex justify-end border-t border-gray-100 pt-4">
         <div className="text-right">
-          <p className="text-xs font-semibold uppercase text-gray-500">Order Revenue</p>
-          <p className="text-lg font-bold text-gray-900">{formatCurrency(order.sellerSubtotal)}</p>
+          <p className="text-xs font-semibold uppercase text-gray-500">Total Amount</p>
+          <p className="text-lg font-bold text-gray-900">{formatCurrency(order.totalAmount)}</p>
         </div>
       </div>
     </article>

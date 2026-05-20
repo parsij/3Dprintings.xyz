@@ -7,6 +7,8 @@ const OrderCard = ({
   totalItemsCount = 0,
   onViewDetails,
   isDetailsLoading = false,
+  onPay,
+  isPayLoading = false,
 }) => {
   const statusMap = {
     completed: { label: "Completed", styles: "bg-green-50 text-green-600" },
@@ -32,6 +34,8 @@ const OrderCard = ({
     style: "currency",
     currency: "USD",
   }).format(safeTotal);
+
+  const isPending = normalizedStatus === "pending";
 
   return (
     <article className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full">
@@ -68,7 +72,17 @@ const OrderCard = ({
         </div>
       </div>
 
-      <div className="px-4 md:px-5 py-3 bg-gray-50/40 border-t border-gray-100 flex justify-end">
+      <div className="px-4 md:px-5 py-3 bg-gray-50/40 border-t border-gray-100 flex flex-col sm:flex-row gap-2 justify-end">
+        {isPending && onPay && (
+          <button
+            type="button"
+            onClick={onPay}
+            disabled={isPayLoading}
+            className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 hover:scale-105 active:scale-95 transition duration-100 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isPayLoading ? "Processing..." : "Pay Now"}
+          </button>
+        )}
         <button
           type="button"
           onClick={onViewDetails}
