@@ -8,7 +8,7 @@ import {
 import SubmitModel, { CATEGORY_DATA } from "./SubmitModel.jsx";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
-import { PenLine as EditIcon, Save as SaveIcon } from "lucide-react";
+import { PenLine as EditIcon, Save as SaveIcon, Check as CheckIcon } from "lucide-react";
 
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
@@ -17,6 +17,7 @@ export default function SellerInventory() {
   const [sellerProducts, setSellerProducts] = useState([]);
   const [editForms, setEditForms] = useState({});
   const [savingProductId, setSavingProductId] = useState(null);
+  const [successProductId, setSuccessProductId] = useState(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -74,9 +75,17 @@ export default function SellerInventory() {
           prev.map((product) => (Number(product.id) === Number(productId) ? { ...product, ...response.product } : product))
       );
       setEditingProduct(null);
+
+      // Show success checkmark
+      setSavingProductId(null);
+      setSuccessProductId(productId);
+
+      // Auto-clear success state after 2 seconds
+      setTimeout(() => {
+        setSuccessProductId(null);
+      }, 2000);
     } catch (error) {
       setProductsError(error?.response?.data?.message || "Failed to update product.");
-    } finally {
       setSavingProductId(null);
     }
   };
@@ -160,21 +169,26 @@ export default function SellerInventory() {
                            const currentQty = String(editForms[product.id]?.quantity ?? "");
                            const isChanged = originalQty !== currentQty;
                            const isDisabled = !isChanged || savingProductId === product.id;
+                           const isSuccess = successProductId === product.id;
 
                            return (
                                <button
                                    type="button"
                                    onClick={() => handleSaveProduct(product.id)}
-                                   disabled={isDisabled}
-                                   title={isDisabled ? "No changes to save" : "Save quantity"}
-                                   className={`p-1.5 rounded-md border flex items-center justify-center transition-all ${
-                                       isDisabled
+                                   disabled={isDisabled || isSuccess}
+                                   title={isDisabled ? "No changes to save" : isSuccess ? "Saved!" : "Save quantity"}
+                                   className={`p-1.5 rounded-md border flex items-center justify-center transition-all duration-300 ${
+                                       isSuccess
+                                           ? "border-green-500 bg-green-500 text-white cursor-default"
+                                           : isDisabled
                                            ? "border-gray-200 bg-gray-200 text-gray-400 cursor-not-allowed"
                                            : "border-gray-300 bg-white text-gray-950 hover:bg-gray-50 cursor-pointer shadow-sm"
                                    }`}
                                >
                                    {savingProductId === product.id ? (
                                        <span className="h-4 w-4 border-2 border-t-transparent border-gray-400 rounded-full animate-spin"></span>
+                                   ) : isSuccess ? (
+                                       <CheckIcon className="h-4 w-4 animate-pulse" />
                                    ) : (
                                        <SaveIcon className="h-4 w-4" />
                                    )}
@@ -364,11 +378,27 @@ export default function SellerInventory() {
                         type="button"
                         disabled={savingProductId === editingProduct.id}
                         onClick={() => handleSaveProduct(editingProduct.id)}
-                        className={`rounded-xl bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-xs transition-all hover:bg-orange-400 cursor-pointer ${
-                            savingProductId === editingProduct.id ? "opacity-50 cursor-not-allowed" : ""
+                        className={`rounded-xl px-5 py-2 text-sm font-semibold shadow-xs transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+                            successProductId === editingProduct.id
+                                ? "bg-green-500 text-white border border-green-600 hover:bg-green-600"
+                                : savingProductId === editingProduct.id
+                                ? "bg-orange-500 text-white opacity-50 cursor-not-allowed"
+                                : "bg-orange-500 text-white hover:bg-orange-400"
                         }`}
                     >
-                      {savingProductId === editingProduct.id ? "Saving changes..." : "Save Changes"}
+                        {savingProductId === editingProduct.id ? (
+                            <>
+                                <span className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
+                                Saving changes...
+                            </>
+                        ) : successProductId === editingProduct.id ? (
+                            <>
+                                <CheckIcon className="h-4 w-4 animate-pulse" />
+                                Saved!
+                            </>
+                        ) : (
+                            "Save Changes"
+                        )}
                     </button>
                   </div>
                 </div>
