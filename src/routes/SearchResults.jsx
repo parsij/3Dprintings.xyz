@@ -151,19 +151,20 @@ const SearchResults = ({ user }) => {
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map((product, index) => {
               const isLastElement = products.length === index + 1;
-              const cardProps = {
-                productId: product.id,
-                creatorName: product.creator_name,
-                productName: product.name,
-                rating: product.rating,
-                currentPrice: product.current_price,
-                originalPrice: product.original_price,
-                reviewNumber: product.reviews_count || 0,
-                imageUrl: product.image_url,
-                sellerId: product.seller_id || product.user_id,
-                shopName: product.shop_name,
-                shopLogoUrl: product.shop_logo_url,
-              };
+               const cardProps = {
+                 productId: product.id,
+                 creatorName: product.creator_name,
+                 productName: product.name,
+                 rating: product.rating,
+                 currentPrice: product.current_price,
+                 originalPrice: product.original_price,
+                 reviewNumber: product.reviews_count || 0,
+                 imageUrl: product.image_url,
+                 sellerId: product.seller_id || product.user_id,
+                 shopName: product.shop_name,
+                 shopLogoUrl: product.shop_logo_url,
+                 quantity: product.quantity,
+               };
 
               return isLastElement ? (
                 <div ref={lastProductElementRef} key={product.id}>

@@ -168,7 +168,9 @@ export default function SellerInventory() {
                         {(() => {
                            const originalQty = String(product.quantity ?? "1");
                            const currentQty = String(editForms[product.id]?.quantity ?? "");
-                           const isChanged = originalQty !== currentQty;
+                           const qtyNumber = Number(currentQty);
+                           const isValidWholeNumber = currentQty !== "" && !Number.isNaN(qtyNumber) && Number.isInteger(qtyNumber) && qtyNumber >= 0;
+                           const isChanged = originalQty !== currentQty && isValidWholeNumber;
                            const isDisabled = !isChanged || savingProductId === product.id;
                            const isSuccess = successProductId === product.id;
 
@@ -339,6 +341,9 @@ export default function SellerInventory() {
                             </optgroup>
                         ))}
                       </select>
+                      {editForms[editingProduct.id].category === "Other" && (
+                        <p className="mt-2 text-xs text-red-600 font-semibold">Setting your product category as "Other" makes your products have less sales compared to others.</p>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1 md:col-span-2">
@@ -382,7 +387,10 @@ export default function SellerInventory() {
                     </button>
                     <button
                         type="button"
-                        disabled={savingProductId === editingProduct.id}
+                        disabled={savingProductId === editingProduct.id || (() => {
+                          const qtyNumber = Number(editForms[editingProduct.id]?.quantity ?? "");
+                          return !Number.isNaN(qtyNumber) && !Number.isInteger(qtyNumber);
+                        })()}
                         onClick={() => handleSaveProduct(editingProduct.id)}
                         className={`rounded-xl px-5 py-2 text-sm font-semibold shadow-xs transition-all duration-300 cursor-pointer flex items-center gap-2 ${
                             successProductId === editingProduct.id

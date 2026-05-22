@@ -132,6 +132,7 @@ export default function ShopInfo({ user }) {
                       sellerId={product.seller_id || product.user_id}
                       shopName={product.shop_name}
                       shopLogoUrl={product.shop_logo_url}
+                      quantity={product.quantity}
                     />
                   ))}
                 </div>

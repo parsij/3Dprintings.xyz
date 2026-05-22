@@ -106,6 +106,13 @@ export const CATEGORY_DATA = [
       { label: "Costume Jewelry & Wearables", slug: "wearables" },
       { label: "Other Props & Cosplay", slug: "other-cosplay" }
     ]
+  },
+  {
+    title: "Miscellaneous",
+    slug: "miscellaneous",
+    subcategories: [
+      { label: "Other", slug: "other" }
+    ]
   }
 ];
 
@@ -390,6 +397,9 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 ))}
               </select>
               {submitted && errors.category && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.category}</p>}
+              {form.category === "Other" && (
+                <p className="mt-2 text-xs text-red-600 font-semibold">Setting your product category as "Other" makes your products have less sales compared to others.</p>
+              )}
             </div>
 
             <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">

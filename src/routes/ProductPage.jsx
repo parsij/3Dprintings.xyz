@@ -612,11 +612,17 @@ const ProductPage = ({ user }) => {
                   </>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Includes digital files & standard commercial license
-              </p>
-            </div>
+               <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                 Includes digital files & standard commercial license
+               </p>
+
+               {product.quantity !== undefined && product.quantity !== null && Number(product.quantity) <= 2 && (
+                 <div className="mt-3 text-sm font-semibold text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                   Only {Number(product.quantity)} available in stock
+                 </div>
+               )}
+             </div>
 
             {/* Description */}
             <div className="mb-auto">

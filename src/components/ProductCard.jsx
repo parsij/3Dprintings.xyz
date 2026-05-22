@@ -15,6 +15,7 @@ const ProductCard = ({
   sellerId,
   shopName,
   shopLogoUrl,
+  quantity,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -87,9 +88,14 @@ const ProductCard = ({
       </div>
 
       <section className="p-3 flex flex-col gap-1 text-left flex-1">
-        <div className="line-clamp-2 min-h-12 font-medium" title={productName}>
+        <button
+          type="button"
+          onClick={handleCardClick}
+          className="line-clamp-2 min-h-12 font-medium text-left hover:text-orange-600 transition-colors cursor-pointer"
+          title={productName}
+        >
           {productName}
-        </div>
+        </button>
 
         <span className="font-bold text-gray-800">
           {rating ? Number(rating).toFixed(1) : "0.0"} ⭐
@@ -131,6 +137,12 @@ const ProductCard = ({
             </>
           )}
         </div>
+
+        {quantity !== undefined && quantity !== null && Number(quantity) <= 2 && (
+          <div className="mt-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">
+            Only {Number(quantity)} available in stock
+          </div>
+        )}
 
         {error && (
           <div className="mt-2 text-xs text-red-600 bg-red-50 p-1 rounded">
