@@ -158,6 +158,11 @@ export default function SellerInventory() {
                                   [product.id]: { ...prev[product.id], quantity: event.target.value },
                                 }))
                             }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                handleSaveProduct(product.id);
+                              }
+                            }}
                             className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm outline-none focus:border-orange-500 transition-colors text-gray-800 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         {(() => {
@@ -302,6 +307,11 @@ export default function SellerInventory() {
                                 [editingProduct.id]: { ...prev[editingProduct.id], quantity: event.target.value },
                               }))
                           }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              handleSaveProduct(editingProduct.id);
+                            }
+                          }}
                           className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
