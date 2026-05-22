@@ -68,7 +68,7 @@ export default function SellerInventory() {
         price: Number(form.price),
         category: form.category,
         tags: form.tags,
-        quantity: Number(form.quantity),
+        quantity: form.quantity,
       });
       setSellerProducts((prev) =>
           prev.map((product) => (Number(product.id) === Number(productId) ? { ...product, ...response.product } : product))

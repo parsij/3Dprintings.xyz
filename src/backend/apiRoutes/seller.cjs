@@ -578,7 +578,8 @@ module.exports = function sellerRoutes(deps) {
         const description = String(req.body?.description || "").trim();
         const category = String(req.body?.category || "").trim();
         const parsedPrice = Number(req.body?.price);
-        const parsedQuantity = Number(req.body?.quantity);
+        const rawQuantity = req.body?.quantity;
+        const parsedQuantity = Number(rawQuantity);
         const nextTags = normalizeTagList(req.body?.tags);
 
        if (modelName.length < 3 || !/^[a-zA-Z0-9 ]+$/.test(modelName)) {
@@ -590,7 +591,7 @@ module.exports = function sellerRoutes(deps) {
        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
          return res.status(400).json({ message: "Price must be a positive number." });
        }
-       if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
+       if (rawQuantity === "" || rawQuantity === null || rawQuantity === undefined || String(rawQuantity).trim() === "" || !Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
          return res.status(400).json({ message: "Quantity must be a whole number." });
        }
        if (isProfane(modelName) || isProfane(description) || nextTags.some((tag) => isProfane(tag))) {
