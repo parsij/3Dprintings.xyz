@@ -13,7 +13,6 @@ import { PenLine as EditIcon, Save as SaveIcon, Check as CheckIcon } from "lucid
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState("");
-  const [productMessage, setProductMessage] = useState("");
   const [sellerProducts, setSellerProducts] = useState([]);
   const [editForms, setEditForms] = useState({});
   const [savingProductId, setSavingProductId] = useState(null);
@@ -58,7 +57,6 @@ export default function SellerInventory() {
   const handleSaveProduct = async (productId) => {
     const form = editForms[productId];
     if (!form) return;
-    setProductMessage("");
     setProductsError("");
     try {
       setSavingProductId(productId);
@@ -70,7 +68,6 @@ export default function SellerInventory() {
         tags: form.tags,
         quantity: Number(form.quantity),
       });
-      setProductMessage(response?.message || "Product updated.");
       setSellerProducts((prev) =>
           prev.map((product) => (Number(product.id) === Number(productId) ? { ...product, ...response.product } : product))
       );
@@ -111,7 +108,6 @@ export default function SellerInventory() {
             </button>
           </div>
 
-          {productMessage && <p className="mb-4 text-sm font-medium text-green-700 bg-green-50 p-3 rounded-xl border border-green-200">{productMessage}</p>}
           {productsError && <p className="mb-4 text-sm font-medium text-red-600 bg-red-50 p-3 rounded-xl border border-red-200">{productsError}</p>}
           {productsLoading && <p className="text-sm text-gray-600 animate-pulse">Loading items from your inventory...</p>}
 

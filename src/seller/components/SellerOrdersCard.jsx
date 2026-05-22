@@ -85,7 +85,7 @@ export default function SellerOrdersCard({ order }) {
           <p className="text-sm text-gray-600">No items in this order.</p>
         ) : (
           <div className="space-y-2">
-            {items.map((item) => {
+            {items.map((item, index) => {
                const quantity = Number(item.quantity) || 0;
                const unitPrice = Number(item.unitPrice) || 0;
                const lineTotal = Number(item.lineTotal) || 0;
@@ -94,7 +94,7 @@ export default function SellerOrdersCard({ order }) {
                const hasProductLink = Boolean(productUrl);
 
                return (
-                 <div key={`${order.id}-${item.productId}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                 <div key={`${order.id}-${item.productId}-${index}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                    <div className="flex items-start justify-between gap-3">
                      <div className="flex items-start gap-3 min-w-0">
                        {item.imageUrl ? (

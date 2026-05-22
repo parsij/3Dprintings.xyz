@@ -178,7 +178,8 @@ module.exports = function paymentController(deps) {
             );
 
             const hasMore = result.rows.length > limit;
-            const orders = hasMore ? result.rows.slice(0, limit) : result.rows;
+            let orders = hasMore ? result.rows.slice(0, limit) : result.rows;
+            orders = orders.map(sanitizeOrderItems);
 
             res.json({
                 page,
@@ -213,7 +214,7 @@ module.exports = function paymentController(deps) {
                 return res.status(404).json({ error: "Order not found" });
             }
 
-            res.json(result.rows[0]);
+            res.json(sanitizeOrderItems(result.rows[0]));
         } catch (error) {
             console.error('Error fetching order:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -603,4 +604,21 @@ module.exports = function paymentController(deps) {
 
     // The Stripe webhook handler has been moved to server.cjs BEFORE express.json()
     bootstrapPendingOrderPolling();
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2023-10-16', // Ensure standard API version
+});
+
+function sanitizeOrderItems(order) {
+    if (order && order.items && Array.isArray(order.items.items)) {
+        order.items.items = order.items.items.map(item => {
+            const newItem = { ...item };
+            delete newItem.id;
+            delete newItem.product_id;
+            delete newItem.productId;
+            return newItem;
+        });
+    }
+    return order;
 }

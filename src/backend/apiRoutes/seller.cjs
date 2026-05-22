@@ -313,7 +313,6 @@ module.exports = function sellerRoutes(deps) {
         const firstImage = Array.isArray(row.img_path) && row.img_path.length > 0 ? row.img_path[0] : null;
         const imageUrl = firstImage ? buildImageUrl(req, firstImage) : null;
         order.items.push({
-          productId: Number(row.product_id),
           productName: row.product_name,
           quantity: Number(row.quantity || 0),
           unitPrice: Number(row.unit_price || 0),
