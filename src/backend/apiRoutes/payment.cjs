@@ -606,10 +606,6 @@ module.exports = function paymentController(deps) {
     bootstrapPendingOrderPolling();
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2023-10-16', // Ensure standard API version
-});
-
 function sanitizeOrderItems(order) {
     if (order && order.items && Array.isArray(order.items.items)) {
         order.items.items = order.items.items.map(item => {
