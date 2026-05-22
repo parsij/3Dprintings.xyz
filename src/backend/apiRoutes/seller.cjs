@@ -573,26 +573,29 @@ module.exports = function sellerRoutes(deps) {
         return res.status(403).json({ message: "You can only edit your own products." });
       }
 
-       const { isProfane } = await import("../../services/profanityFilter.js");
-       const modelName = String(req.body?.modelName || "").trim();
-       const description = String(req.body?.description || "").trim();
-       const category = String(req.body?.category || "").trim();
-       const parsedPrice = Number(req.body?.price);
-       const parsedQuantity = Math.max(0, Number(req.body?.quantity) || 0);
-       const nextTags = normalizeTagList(req.body?.tags);
+        const { isProfane } = await import("../../services/profanityFilter.js");
+        const modelName = String(req.body?.modelName || "").trim();
+        const description = String(req.body?.description || "").trim();
+        const category = String(req.body?.category || "").trim();
+        const parsedPrice = Number(req.body?.price);
+        const parsedQuantity = Number(req.body?.quantity);
+        const nextTags = normalizeTagList(req.body?.tags);
 
-      if (modelName.length < 3 || !/^[a-zA-Z0-9 ]+$/.test(modelName)) {
-        return res.status(400).json({ message: "Model name must be at least 3 characters and contain letters/numbers/spaces only." });
-      }
-      if (description.length < 20) {
-        return res.status(400).json({ message: "Description must be at least 20 characters." });
-      }
-      if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
-        return res.status(400).json({ message: "Price must be a positive number." });
-      }
-      if (isProfane(modelName) || isProfane(description) || nextTags.some((tag) => isProfane(tag))) {
-        return res.status(400).json({ message: "Explicit content is not allowed in title, description, or tags." });
-      }
+       if (modelName.length < 3 || !/^[a-zA-Z0-9 ]+$/.test(modelName)) {
+         return res.status(400).json({ message: "Model name must be at least 3 characters and contain letters/numbers/spaces only." });
+       }
+       if (description.length < 20) {
+         return res.status(400).json({ message: "Description must be at least 20 characters." });
+       }
+       if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+         return res.status(400).json({ message: "Price must be a positive number." });
+       }
+       if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
+         return res.status(400).json({ message: "Quantity must be a whole number." });
+       }
+       if (isProfane(modelName) || isProfane(description) || nextTags.some((tag) => isProfane(tag))) {
+         return res.status(400).json({ message: "Explicit content is not allowed in title, description, or tags." });
+       }
 
       const currentTags = parseProductTags(existingProduct.tags);
       await adjustTagUsageCounts(currentTags, nextTags);

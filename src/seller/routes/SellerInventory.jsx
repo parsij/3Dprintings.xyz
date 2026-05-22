@@ -8,7 +8,7 @@ import {
 import SubmitModel, { CATEGORY_DATA } from "./SubmitModel.jsx";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
-import { PenLine as EditIcon, Save as SaveIcon, Check as CheckIcon } from "lucide-react";
+import { PenLine as EditIcon, Save as SaveIcon, Check as CheckIcon, X as XIcon } from "lucide-react";
 
 export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
@@ -17,6 +17,7 @@ export default function SellerInventory() {
   const [editForms, setEditForms] = useState({});
   const [savingProductId, setSavingProductId] = useState(null);
   const [successProductId, setSuccessProductId] = useState(null);
+  const [errorProductId, setErrorProductId] = useState(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -60,6 +61,7 @@ export default function SellerInventory() {
     setProductsError("");
     try {
       setSavingProductId(productId);
+      setErrorProductId(null);
       const response = await updateSellerProduct(productId, {
         modelName: form.modelName,
         description: form.description,
@@ -82,8 +84,14 @@ export default function SellerInventory() {
         setSuccessProductId(null);
       }, 2000);
     } catch (error) {
-      setProductsError(error?.response?.data?.message || "Failed to update product.");
       setSavingProductId(null);
+      setErrorProductId(productId);
+      setProductsError(error?.response?.data?.message || "Failed to update product.");
+
+      // Auto-clear error state after 3 seconds
+      setTimeout(() => {
+        setErrorProductId(null);
+      }, 3000);
     }
   };
 
@@ -152,15 +160,19 @@ export default function SellerInventory() {
                             min="0"
                             step="1"
                             value={editForms[product.id]?.quantity ?? ""}
-                            onChange={(event) =>
+                            onChange={(event) => {
                                 setEditForms((prev) => ({
                                   ...prev,
                                   [product.id]: { ...prev[product.id], quantity: event.target.value },
-                                }))
-                            }
+                                }));
+                                setErrorProductId(null);
+                            }}
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
+                                event.preventDefault();
+                                event.stopPropagation();
                                 handleSaveProduct(product.id);
+                                event.currentTarget.blur();
                               }
                             }}
                             className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm outline-none focus:border-orange-500 transition-colors text-gray-800 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -173,16 +185,19 @@ export default function SellerInventory() {
                            const isChanged = originalQty !== currentQty && isValidWholeNumber;
                            const isDisabled = !isChanged || savingProductId === product.id;
                            const isSuccess = successProductId === product.id;
+                           const isError = errorProductId === product.id;
 
                            return (
                                <button
                                    type="button"
                                    onClick={() => handleSaveProduct(product.id)}
-                                   disabled={isDisabled || isSuccess}
-                                   title={isDisabled ? "No changes to save" : isSuccess ? "Saved!" : "Save quantity"}
+                                   disabled={isDisabled || isSuccess || isError}
+                                   title={isDisabled ? "No changes to save" : isSuccess ? "Saved!" : isError ? "Failed to update!" : "Save quantity"}
                                    className={`p-1.5 rounded-md border flex items-center justify-center transition-all duration-300 ${
                                        isSuccess
                                            ? "border-green-500 bg-green-500 text-white cursor-default"
+                                           : isError
+                                           ? "border-red-500 bg-red-500 text-white cursor-default"
                                            : isDisabled
                                            ? "border-gray-200 bg-gray-200 text-gray-400 cursor-not-allowed"
                                            : "border-gray-300 bg-white text-gray-950 hover:bg-gray-50 cursor-pointer shadow-sm"
@@ -192,6 +207,8 @@ export default function SellerInventory() {
                                        <span className="h-4 w-4 border-2 border-t-transparent border-gray-400 rounded-full animate-spin"></span>
                                    ) : isSuccess ? (
                                        <CheckIcon className="h-4 w-4 animate-pulse" />
+                                   ) : isError ? (
+                                       <XIcon className="h-4 w-4 animate-pulse" />
                                    ) : (
                                        <SaveIcon className="h-4 w-4" />
                                    )}
@@ -303,15 +320,19 @@ export default function SellerInventory() {
                           min="0"
                           step="1"
                           value={editForms[editingProduct.id].quantity}
-                          onChange={(event) =>
+                          onChange={(event) => {
                               setEditForms((prev) => ({
                                 ...prev,
                                 [editingProduct.id]: { ...prev[editingProduct.id], quantity: event.target.value },
-                              }))
-                          }
+                              }));
+                              setErrorProductId(null);
+                          }}
                           onKeyDown={(event) => {
                             if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.stopPropagation();
                               handleSaveProduct(editingProduct.id);
+                              event.currentTarget.blur();
                             }
                           }}
                           className="rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-orange-500 transition-colors text-gray-800 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -395,6 +416,8 @@ export default function SellerInventory() {
                         className={`rounded-xl px-5 py-2 text-sm font-semibold shadow-xs transition-all duration-300 cursor-pointer flex items-center gap-2 ${
                             successProductId === editingProduct.id
                                 ? "bg-green-500 text-white border border-green-600 hover:bg-green-600"
+                                : errorProductId === editingProduct.id
+                                ? "bg-red-500 text-white border border-red-600 hover:bg-red-600"
                                 : savingProductId === editingProduct.id
                                 ? "bg-orange-500 text-white opacity-50 cursor-not-allowed"
                                 : "bg-orange-500 text-white hover:bg-orange-400"
@@ -409,6 +432,11 @@ export default function SellerInventory() {
                             <>
                                 <CheckIcon className="h-4 w-4 animate-pulse" />
                                 Saved!
+                            </>
+                        ) : errorProductId === editingProduct.id ? (
+                            <>
+                                <XIcon className="h-4 w-4 animate-pulse" />
+                                Failed to save
                             </>
                         ) : (
                             "Save Changes"
