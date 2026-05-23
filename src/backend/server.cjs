@@ -155,6 +155,84 @@ async function calculateTaxAndAuthentication(req, res) {
   }
 }
 
+async function ensureDatabaseIndexes() {
+  const indexStatements = [
+    {
+      name: "products seller lookup index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_products_user_id_id_desc
+        ON products (user_id, id DESC)
+      `,
+    },
+    {
+      name: "products price sort index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_products_current_price
+        ON products (current_price)
+      `,
+    },
+    {
+      name: "products sales sort index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_products_sales_count_desc_id_desc
+        ON products (sales_count DESC, id DESC)
+      `,
+    },
+    {
+      name: "reviews product timeline index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_reviews_product_id_created_at_id_desc
+        ON reviews (product_id, created_at DESC, id DESC)
+      `,
+    },
+    {
+      name: "reviews product/user index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_reviews_product_id_user_id
+        ON reviews (product_id, user_id)
+      `,
+    },
+    {
+      name: "reviews user timeline index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_reviews_user_id_created_at_id_desc
+        ON reviews (user_id, created_at DESC, id DESC)
+      `,
+    },
+    {
+      name: "orders customer timeline index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_orders_customer_id_created_at_id_desc
+        ON orders (customer_id, created_at DESC, id DESC)
+      `,
+    },
+    {
+      name: "orders pending payment index",
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_orders_pending_created_at
+        ON orders (created_at)
+        WHERE status = 'pending'
+      `,
+    },
+  ];
+
+  for (const { name, sql } of indexStatements) {
+    await pool.query(sql);
+    console.log(`${name} ensured`);
+  }
+
+  try {
+    await pool.query("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public");
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_products_name_trgm
+      ON products USING gin (name public.gin_trgm_ops)
+    `);
+    console.log("products name trigram search index ensured");
+  } catch (error) {
+    console.warn("Could not ensure products name trigram search index:", error.message);
+  }
+}
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
@@ -616,6 +694,9 @@ async function initializeDatabase() {
 
      await ensureSellerDashboardTable(pool);
      console.log("seller dashboard metrics table ensured.");
+
+     await ensureDatabaseIndexes();
+     console.log("database indexes ensured.");
    } catch (error) {
      console.error('⚠️ Error initializing database:', error.message);
    }
