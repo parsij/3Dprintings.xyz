@@ -1,18 +1,17 @@
 module.exports = function paymentController(deps) {
     const { app, pool, isAuthenticatedAnIisValid, stripe } = deps;
     const { fulfillPaidOrder } = require("./orderFulfillment.cjs");
+    const {
+        calculateEasyPostShippingQuote,
+        createInitialTrackingPayload,
+        normalizeAddressPayload,
+        normalizeSellerAddressFromRow,
+    } = require("./shippingShared.cjs");
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const ORDER_PAYMENT_POLL_INTERVAL_MS = 10_000;
     const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
     const orderPaymentPollers = new Map();
-    const normalizeAddress = (address = {}) => ({
-        line1: String(address.line1 || '').trim(),
-        line2: String(address.line2 || '').trim(),
-        city: String(address.city || '').trim(),
-        state: String(address.state || '').trim().toUpperCase(),
-        zip: String(address.zip || '').trim(),
-        country: String(address.country || '').trim().toUpperCase(),
-    });
+    const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
     const parseIntInRange = (value, field, min, max) => {
         const parsed = Number.parseInt(value, 10);
         if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
@@ -41,6 +40,173 @@ module.exports = function paymentController(deps) {
              [customerId]
          );
      };
+
+    const getProductImageUrl = (imgPath) => {
+        if (!Array.isArray(imgPath) || imgPath.length === 0 || !imgPath[0]) return "";
+        return `${IMAGE_BASE_URL}/${imgPath[0]}`;
+    };
+
+    const normalizeCheckoutItemsFromDatabase = async (items = []) => {
+        const quantitiesByProductId = new Map();
+        for (const item of items) {
+            const productId = Number(item?.id || item?.productId || item?.product_id);
+            const quantity = Number(item?.quantity);
+            if (!Number.isInteger(productId) || productId <= 0) {
+                const error = new Error("Invalid checkout item.");
+                error.statusCode = 400;
+                throw error;
+            }
+            if (!Number.isInteger(quantity) || quantity <= 0) {
+                const error = new Error("Invalid checkout quantity.");
+                error.statusCode = 400;
+                throw error;
+            }
+            quantitiesByProductId.set(productId, (quantitiesByProductId.get(productId) || 0) + quantity);
+        }
+
+        const productIds = [...quantitiesByProductId.keys()];
+        if (productIds.length === 0) return [];
+
+        const productsResult = await pool.query(
+            `
+              SELECT
+                p.id,
+                p.name,
+                p.description,
+                p.current_price,
+                p.quantity,
+                p.user_id AS seller_id,
+                p.img_path,
+                u.username AS seller_username,
+                u.email AS seller_email,
+                u.phone_number AS seller_phone_number,
+                u.street_address AS seller_street_address,
+                u.city AS seller_city,
+                u.state_province AS seller_state_province,
+                u.postal_code AS seller_postal_code,
+                u.country_code AS seller_country_code,
+                sp.shop_name,
+                COALESCE(sp.sellersaddres, '{}'::jsonb) AS sellersaddres
+              FROM products p
+              LEFT JOIN users u ON u.id = p.user_id
+              LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id
+              WHERE p.id = ANY($1::int[])
+            `,
+            [productIds]
+        );
+
+        const productsById = new Map(productsResult.rows.map((row) => [Number(row.id), row]));
+        const normalizedItems = [];
+        for (const productId of productIds) {
+            const product = productsById.get(productId);
+            if (!product) {
+                const error = new Error(`Product ${productId} was not found.`);
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const requestedQuantity = quantitiesByProductId.get(productId);
+            const availableQuantity = Number(product.quantity || 0);
+            if (requestedQuantity > availableQuantity) {
+                const error = new Error(`Not enough stock for item: ${product.name || productId}`);
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const sellerAddress = normalizeSellerAddressFromRow(product);
+            normalizedItems.push({
+                id: Number(product.id),
+                productId: Number(product.id),
+                name: product.name,
+                description: product.description || "",
+                current_price: Number(product.current_price || 0),
+                quantity: requestedQuantity,
+                image_url: getProductImageUrl(product.img_path),
+                sellerId: Number(product.seller_id),
+                seller_id: Number(product.seller_id),
+                sellerName: product.shop_name || product.seller_username || `Seller ${product.seller_id}`,
+                sellerAddress,
+            });
+        }
+
+        return normalizedItems;
+    };
+
+    const calculateCheckoutAmounts = async ({ items, address }) => {
+        const normalizedItems = await normalizeCheckoutItemsFromDatabase(items);
+        if (normalizedItems.length === 0) {
+            const error = new Error("No items provided");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const subtotalCents = normalizedItems.reduce((sum, item) => {
+            return sum + Math.round(Number(item.current_price || 0) * 100) * Number(item.quantity || 1);
+        }, 0);
+
+        const totalItemsCount = normalizedItems.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
+        if (totalItemsCount > 30) {
+            const error = new Error("Order limit of 30 items exceeded.");
+            error.statusCode = 400;
+            throw error;
+        }
+        if (subtotalCents > 200000) {
+            const error = new Error("Spend limit of $2,000 exceeded.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const safeAddress = normalizeAddressPayload(address);
+        if (!safeAddress.line1 || !safeAddress.city || !safeAddress.zip || !safeAddress.state || !safeAddress.country) {
+            const error = new Error("Invalid shipping address");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        let taxCents = 0;
+        try {
+            const calculation = await stripe.tax.calculations.create({
+                currency: 'usd',
+                line_items: normalizedItems.map((item, idx) => ({
+                    amount: Math.round(item.current_price * 100) * item.quantity,
+                    reference: `item_${idx}`,
+                    tax_code: 'txcd_99999999',
+                })),
+                customer_details: {
+                    address: {
+                        line1: safeAddress.line1,
+                        line2: safeAddress.line2,
+                        city: safeAddress.city,
+                        state: safeAddress.state,
+                        postal_code: safeAddress.zip,
+                        country: safeAddress.country,
+                    },
+                    address_source: 'shipping',
+                },
+            });
+            taxCents = calculation.tax_amount_exclusive || 0;
+        } catch (taxError) {
+            console.warn('Tax calculation warning:', taxError.message);
+            taxCents = Math.round(subtotalCents * 0.08);
+        }
+
+        const shippingQuote = await calculateEasyPostShippingQuote({
+            items: normalizedItems,
+            toAddress: safeAddress,
+        });
+        const shippingCents = shippingQuote.shippingCents;
+        const totalCents = subtotalCents + taxCents + shippingCents;
+
+        return {
+            normalizedItems,
+            safeAddress,
+            subtotalCents,
+            taxCents,
+            shippingCents,
+            totalCents,
+            shippingQuote,
+        };
+    };
 
     const stopOrderPaymentPolling = (orderId) => {
         const existingInterval = orderPaymentPollers.get(orderId);
@@ -169,7 +335,7 @@ module.exports = function paymentController(deps) {
             const offset = (page - 1) * limit;
 
             const result = await pool.query(
-                `SELECT id, status, total_amount, items, payment_type, created_at, updated_at
+                `SELECT id, status, total_amount, items, payment_type, tracking, created_at, updated_at
                  FROM orders
                  WHERE customer_id = $1
                  ORDER BY created_at DESC, id DESC
@@ -205,7 +371,7 @@ module.exports = function paymentController(deps) {
             }
 
             const result = await pool.query(
-                `SELECT id, customer_id, status, total_amount, items, shipping_address_id, payment_type, created_at, updated_at 
+                `SELECT id, customer_id, status, total_amount, items, shipping_address_id, payment_type, tracking, created_at, updated_at 
                  FROM orders WHERE id = $1 AND customer_id = $2`,
                 [orderId, auth.userId]
             );
@@ -255,103 +421,31 @@ module.exports = function paymentController(deps) {
             if (!auth?.userId) return;
 
             const { items, address } = req.body;
-            const safeAddress = normalizeAddress(address);
             if (!items || !items.length) {
                 return res.status(400).json({ error: "No items provided" });
             }
 
-            if (!safeAddress.zip || !safeAddress.state || !safeAddress.country) {
-                return res.status(400).json({ error: "Invalid shipping address" });
-            }
-
-            // Calculate subtotal in cents
-            const subtotalCents = Math.round(
-                items.reduce((sum, item) => sum + (item.current_price * item.quantity), 0) * 100
-            );
-
-            // Server-side limits validation
-            const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
-            if (totalItemsCount > 30) {
-                return res.status(400).json({ error: "Order limit of 30 items exceeded." });
-            }
-            if (subtotalCents > 200000) {
-                return res.status(400).json({ error: "Spend limit of $2,000 exceeded." });
-            }
-
-            // Validate inventory against DB
-            const productIds = items.map(i => i.id || i.productId);
-            const dbProductsResult = await pool.query(
-                `SELECT id, quantity FROM products WHERE id = ANY($1::int[])`,
-                [productIds]
-            );
-            const dbProductsMap = {};
-            dbProductsResult.rows.forEach(row => dbProductsMap[row.id] = row.quantity);
-
-            for (const item of items) {
-                const dbQty = dbProductsMap[item.id || item.productId] || 0;
-                if (item.quantity > dbQty) {
-                    return res.status(400).json({ error: `Not enough stock for item: ${item.name || item.id}` });
-                }
-            }
-
-            try {
-                // Use Stripe Tax API to calculate tax
-                const calculation = await stripe.tax.calculations.create({
-                    currency: 'usd',
-                    line_items: items.map((item, idx) => ({
-                        amount: Math.round(item.current_price * 100) * item.quantity,
-                        reference: `item_${idx}`,
-                        tax_code: 'txcd_99999999', // Physical goods
-                    })),
-                    customer_details: {
-                        address: {
-                            line1: safeAddress.line1,
-                            line2: safeAddress.line2,
-                            city: safeAddress.city,
-                            state: safeAddress.state,
-                            postal_code: safeAddress.zip,
-                            country: safeAddress.country,
-                        },
-                        address_source: 'shipping',
-                    },
-                });
-
-                const taxCents = calculation.tax_amount_exclusive || 0;
-                // Fixed shipping for now (in cents, i.e., $5.00 = 500)
-                const shippingCents = 500;
-                const totalCents = subtotalCents + taxCents + shippingCents;
-
-                res.json({
-                    subtotal: subtotalCents / 100,
-                    tax: taxCents / 100,
-                    shipping: shippingCents / 100,
-                    total: totalCents / 100,
-                    subtotalCents,
-                    taxCents,
-                    shippingCents,
-                    totalCents,
-                });
-            } catch (taxError) {
-                console.warn('Tax calculation failed, using default:', taxError.message);
-                // Fallback: simple tax calculation (8% tax)
-                const taxCents = Math.round(subtotalCents * 0.08);
-                const shippingCents = 500; // $5 shipping
-                const totalCents = subtotalCents + taxCents + shippingCents;
-
-                res.json({
-                    subtotal: subtotalCents / 100,
-                    tax: taxCents / 100,
-                    shipping: shippingCents / 100,
-                    total: totalCents / 100,
-                    subtotalCents,
-                    taxCents,
-                    shippingCents,
-                    totalCents,
-                });
-            }
+            const totals = await calculateCheckoutAmounts({ items, address });
+            res.json({
+                subtotal: totals.subtotalCents / 100,
+                tax: totals.taxCents / 100,
+                shipping: totals.shippingCents / 100,
+                shippingAndHandling: totals.shippingCents / 100,
+                total: totals.totalCents / 100,
+                subtotalCents: totals.subtotalCents,
+                taxCents: totals.taxCents,
+                shippingCents: totals.shippingCents,
+                totalCents: totals.totalCents,
+                shippingQuote: {
+                    originalShipping: totals.shippingQuote.originalShipping,
+                    originalShippingCents: totals.shippingQuote.originalShippingCents,
+                    markupRate: totals.shippingQuote.markupRate,
+                    shipments: totals.shippingQuote.shipments,
+                },
+            });
         } catch (error) {
             console.error('Error calculating totals:', error);
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
         }
     });
 
@@ -365,80 +459,23 @@ module.exports = function paymentController(deps) {
             const userEmail = userResult.rows[0]?.email;
 
             const { items, address } = req.body;
-            const safeAddress = normalizeAddress(address);
             if (!items || !items.length) {
                 return res.status(400).json({ error: "No items to checkout" });
             }
 
-            if (!safeAddress.zip || !safeAddress.state || !safeAddress.country) {
-                return res.status(400).json({ error: "Invalid shipping address" });
-            }
-
-            // Recalculate totals on backend for security
-            const subtotalCents = Math.round(
-                items.reduce((sum, item) => sum + (item.current_price * item.quantity), 0) * 100
-            );
-
-            // Server-side limits validation
-            const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
-            if (totalItemsCount > 30) {
-                return res.status(400).json({ error: "Order limit of 30 items exceeded." });
-            }
-            if (subtotalCents > 200000) {
-                return res.status(400).json({ error: "Spend limit of $2,000 exceeded." });
-            }
-
-            // Validate inventory against DB
-            const productIds = items.map(i => i.id || i.productId);
-            const dbProductsResult = await pool.query(
-                `SELECT id, quantity FROM products WHERE id = ANY($1::int[])`,
-                [productIds]
-            );
-            const dbProductsMap = {};
-            dbProductsResult.rows.forEach(row => dbProductsMap[row.id] = row.quantity);
-
-            for (const item of items) {
-                const dbQty = dbProductsMap[item.id || item.productId] || 0;
-                if (item.quantity > dbQty) {
-                    return res.status(400).json({ error: `Not enough stock for item: ${item.name || item.id}` });
-                }
-            }
-
-            let taxCents = 0;
-            let shippingCents = 500; // $5 fixed shipping
-
-            try {
-                // Use Stripe Tax API
-                const calculation = await stripe.tax.calculations.create({
-                    currency: 'usd',
-                    line_items: items.map((item, idx) => ({
-                        amount: Math.round(item.current_price * 100) * item.quantity,
-                        reference: `item_${idx}`,
-                        tax_code: 'txcd_99999999',
-                    })),
-                    customer_details: {
-                        address: {
-                            line1: safeAddress.line1,
-                            line2: safeAddress.line2,
-                            city: safeAddress.city,
-                            state: safeAddress.state,
-                            postal_code: safeAddress.zip,
-                            country: safeAddress.country,
-                        },
-                        address_source: 'shipping',
-                    },
-                });
-                taxCents = calculation.tax_amount_exclusive || 0;
-            } catch (taxError) {
-                console.warn('Tax calculation warning:', taxError.message);
-                // Fallback to 8% tax
-                taxCents = Math.round(subtotalCents * 0.08);
-            }
-
-            const totalCents = subtotalCents + taxCents + shippingCents;
+            const totals = await calculateCheckoutAmounts({ items, address });
+            const {
+                normalizedItems,
+                safeAddress,
+                subtotalCents,
+                taxCents,
+                shippingCents,
+                totalCents,
+                shippingQuote,
+            } = totals;
 
             // Create line items for Stripe
-            const line_items = items.map(item => {
+            const line_items = normalizedItems.map(item => {
                 const product_data = {
                     name: item.name,
                     images: item.image_url ? [item.image_url] : [],
@@ -466,7 +503,7 @@ module.exports = function paymentController(deps) {
                         product_data: {
                             name: 'Sales Tax',
                         },
-                        unit_amount: Math.round(taxCents / 100) * 100, // This gets the tax amount; Stripe will show it separately
+                        unit_amount: taxCents,
                     },
                     quantity: 1,
                 });
@@ -477,7 +514,7 @@ module.exports = function paymentController(deps) {
                 price_data: {
                     currency: 'usd',
                     product_data: {
-                        name: 'Shipping',
+                        name: 'Shipping and handling',
                     },
                     unit_amount: shippingCents,
                 },
@@ -485,20 +522,26 @@ module.exports = function paymentController(deps) {
             });
 
             // Create order in database with pending status
+            const trackingPayload = createInitialTrackingPayload(shippingQuote);
+            const orderItems = normalizedItems.map(({ sellerAddress, ...item }) => item);
             const orderInsert = await pool.query(
-                `INSERT INTO orders (customer_id, items, status, total_amount, shipping_address_id) 
-                 VALUES ($1, $2, 'pending', $3, $4) RETURNING id`,
+                `INSERT INTO orders (customer_id, items, status, total_amount, shipping_address_id, tracking) 
+                 VALUES ($1, $2, 'pending', $3, $4, $5::jsonb) RETURNING id`,
                 [
                     authUser.id,
                     JSON.stringify({
-                        items,
+                        items: orderItems,
+                        shippingAddress: safeAddress,
                         subtotal: subtotalCents / 100,
                         tax: taxCents / 100,
                         shipping: shippingCents / 100,
+                        shippingAndHandling: shippingCents / 100,
+                        shippingQuote,
                         total: totalCents / 100,
                     }),
                     totalCents / 100,
                     null, // Will store address data if needed
+                    JSON.stringify(trackingPayload),
                 ]
             );
 
@@ -527,7 +570,7 @@ module.exports = function paymentController(deps) {
             res.json({ url: session.url, orderId });
         } catch (error) {
             console.error('Error creating checkout session:', error);
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
         }
     });
 
@@ -613,6 +656,9 @@ function sanitizeOrderItems(order) {
             delete newItem.id;
             delete newItem.product_id;
             delete newItem.productId;
+            delete newItem.sellerId;
+            delete newItem.seller_id;
+            delete newItem.sellerAddress;
             return newItem;
         });
     }

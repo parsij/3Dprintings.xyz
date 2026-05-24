@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import OrderCard from "./OrderCard.jsx";
-import {PencilLine as EditIcon} from "lucide-react"
 
 const PAGE_SIZE = 10;
 
@@ -184,6 +183,7 @@ export default function Orders({ user }) {
               paymentMethod={normalizePaymentType(order.payment_type)}
               totalAmount={order.total_amount}
               totalItemsCount={getOrderItemsCount(order.items)}
+              tracking={order.tracking}
               onViewDetails={() => navigate(`/account/orders/${encodeURIComponent(order.id)}`)}
               isDetailsLoading={false}
             />

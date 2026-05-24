@@ -16,6 +16,12 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
 const { ensureSellerProfilesTable } = require("./apiRoutes/sellerProfileShared.cjs");
 const { ensureInventoryDeductedColumn, fulfillPaidOrder } = require("./apiRoutes/orderFulfillment.cjs");
+const {
+  ensureOrderTrackingColumn,
+  ensureSellerAddressColumn,
+  mergeTrackerWebhookIntoOrders,
+  validateEasyPostWebhookSignature,
+} = require("./apiRoutes/shippingShared.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
@@ -383,6 +389,50 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
   }
 });
 
+app.post('/api/webhooks/easypost', express.raw({ type: 'application/json' }), async (request, response) => {
+  const rawBody = Buffer.isBuffer(request.body) ? request.body.toString("utf8") : String(request.body || "");
+  const signature = validateEasyPostWebhookSignature({
+    headers: request.headers,
+    method: request.method,
+    rawBody,
+  });
+
+  if (!signature.ok) {
+    console.warn("EasyPost webhook signature rejected:", signature.reason);
+    return response.status(signature.statusCode || 401).send(signature.reason || "Invalid signature");
+  }
+  if (signature.skipped && IS_PRODUCTION) {
+    console.error("EasyPost webhook rejected: EASYPOST_WEBHOOK_SECRET is required in production.");
+    return response.status(500).send("Missing EASYPOST_WEBHOOK_SECRET");
+  }
+  if (signature.skipped) {
+    console.warn("EasyPost webhook signature validation skipped:", signature.reason);
+  }
+
+  let event;
+  try {
+    event = JSON.parse(rawBody);
+  } catch (error) {
+    return response.status(400).send("Invalid JSON payload");
+  }
+
+  try {
+    const eventType = String(event?.description || event?.type || "").toLowerCase();
+    const tracker = event?.result && typeof event.result === "object" ? event.result : null;
+    const isTrackerEvent = tracker?.object === "Tracker" || eventType.includes("tracker");
+
+    if (tracker && isTrackerEvent) {
+      const updatedOrders = await mergeTrackerWebhookIntoOrders(pool, tracker);
+      console.log(`EasyPost webhook ${eventType || "tracker"} updated ${updatedOrders} order(s).`);
+    }
+
+    return response.status(200).json({ received: true });
+  } catch (error) {
+    console.error("Error processing EasyPost webhook:", error);
+    return response.status(500).json({ error: "EasyPost webhook processing failed" });
+  }
+});
+
 app.use(express.json());
 app.use(cookieParser());
 app.use("/imgUploads", express.static(uploadDir));
@@ -623,6 +673,7 @@ async function initializeDatabase() {
      console.log("seller preferences column ensured in users table");
 
      await ensureSellerProfilesTable(pool);
+     await ensureSellerAddressColumn(pool);
      console.log("seller profiles table ensured.");
 
      // Ensure Google identity cannot be linked to multiple users
@@ -632,6 +683,24 @@ async function initializeDatabase() {
        WHERE google_sub IS NOT NULL
      `);
      console.log(' Google identity unique index ensured');
+
+     await pool.query(`
+       CREATE TABLE IF NOT EXISTS orders (
+         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+         customer_id BIGINT NOT NULL,
+         status VARCHAR(50) DEFAULT 'pending',
+         total_amount NUMERIC(12, 2) NOT NULL CHECK (total_amount >= 0),
+         items JSONB NOT NULL,
+         shipping_address_id INT,
+         payment_type VARCHAR(100),
+         stripe_session_id VARCHAR(255),
+         inventory_deducted BOOLEAN NOT NULL DEFAULT FALSE,
+         tracking JSONB NOT NULL DEFAULT '{"shipments":[]}'::jsonb,
+         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       );
+      `);
+     console.log('✅ Orders table initialized');
 
      // Add payment_type column to orders if it doesn't exist
      await pool.query(`
@@ -649,6 +718,8 @@ async function initializeDatabase() {
 
      await ensureInventoryDeductedColumn(pool);
      console.log('Inventory deducted column ensured in orders table');
+     await ensureOrderTrackingColumn(pool);
+     console.log('tracking column ensured in orders table');
 
      await pool.query(`
        ALTER TABLE reviews
@@ -672,6 +743,7 @@ async function initializeDatabase() {
          payment_type VARCHAR(100),
          stripe_session_id VARCHAR(255),
          inventory_deducted BOOLEAN NOT NULL DEFAULT FALSE,
+         tracking JSONB NOT NULL DEFAULT '{"shipments":[]}'::jsonb,
          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
        );

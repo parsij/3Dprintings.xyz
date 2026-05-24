@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const Checkout = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const cartItems = location.state?.items || [];
+    const passedItems = location.state?.items;
+    const cartItems = useMemo(() => (Array.isArray(passedItems) ? passedItems : []), [passedItems]);
     const passedAddress = location.state?.address || null;
 
     const [totals, setTotals] = useState({ subtotal: 0, tax: 0, shipping: 0, total: 0 });
@@ -48,7 +49,7 @@ const Checkout = () => {
                     });
                     setAddressLine([addr.street_address, addr.city, addr.state_province, addr.postal_code].filter(Boolean).join(', '));
                 }
-            } catch (err) {
+            } catch {
                 console.log('No saved address found');
             } finally {
                 setLoadingAddress(false);
@@ -75,7 +76,7 @@ const Checkout = () => {
                 });
                 setAddressSuggestions(Array.isArray(response.data?.suggestions) ? response.data.suggestions : []);
                 setShowSuggestions(true);
-            } catch (err) {
+            } catch {
                 setAddressSuggestions([]);
                 setShowSuggestions(false);
             } finally {
@@ -443,7 +444,7 @@ const Checkout = () => {
                                     <span className="font-semibold text-gray-800">${totals.subtotal.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Shipping:</span>
+                                    <span className="text-gray-600">Shipping and handling:</span>
                                     <span className="font-semibold text-gray-800">${totals.shipping.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
