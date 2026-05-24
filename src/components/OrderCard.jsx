@@ -1,3 +1,5 @@
+import TrackingSection from "./TrackingSection.jsx";
+
 const OrderCard = ({
   orderId,
   status = "pending",
@@ -9,6 +11,7 @@ const OrderCard = ({
   isDetailsLoading = false,
   onPay,
   isPayLoading = false,
+  tracking,
 }) => {
   const statusMap = {
     completed: { label: "Completed", styles: "bg-green-50 text-green-600" },
@@ -69,6 +72,10 @@ const OrderCard = ({
             <p className="text-xs text-gray-500">Total</p>
             <p className="font-semibold text-gray-900">{formattedTotal}</p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <TrackingSection tracking={tracking} compact />
         </div>
       </div>
 

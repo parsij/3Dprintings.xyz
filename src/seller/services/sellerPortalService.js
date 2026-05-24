@@ -31,6 +31,13 @@ export async function getSellerOrders(status = "") {
   return response.data;
 }
 
+export async function addSellerOrderTracking(orderId, payload) {
+  const response = await axios.post(`${API_BASE}/api/seller/orders/${encodeURIComponent(orderId)}/tracking`, payload, {
+    withCredentials: true,
+  });
+  return response.data;
+}
+
 export async function getSellerProducts() {
   const response = await axios.get(`${API_BASE}/api/seller/products`, {
     withCredentials: true,

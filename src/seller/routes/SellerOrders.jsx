@@ -111,7 +111,7 @@ export default function SellerOrders() {
         ) : (
           <div className="space-y-4">
             {filteredOrders.map((order) => (
-              <SellerOrdersCard key={order.id} order={order} />
+              <SellerOrdersCard key={order.id} order={order} onTrackingSaved={reloadOrders} />
             ))}
           </div>
         )}

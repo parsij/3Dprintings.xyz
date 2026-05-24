@@ -17,6 +17,7 @@ const PORTFOLIO_HOSTS = [
 const DESIGN_SOFTWARE_ALIASES = {
   Fusion: "Fusion360",
 };
+const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared.cjs");
 
 async function ensureSellerProfilesTable(pool) {
   await pool.query(`
@@ -30,6 +31,7 @@ async function ensureSellerProfilesTable(pool) {
       external_portfolio_link TEXT,
       intellectual_property_certified BOOLEAN NOT NULL DEFAULT FALSE,
       terms_of_service_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+      sellersaddres JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       CONSTRAINT seller_profiles_shop_name_length_check CHECK (char_length(shop_name) BETWEEN 3 AND 30),
@@ -45,6 +47,11 @@ async function ensureSellerProfilesTable(pool) {
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS seller_profiles_shop_name_unique_idx
     ON seller_profiles (lower(shop_name))
+  `);
+
+  await pool.query(`
+    ALTER TABLE seller_profiles
+    ADD COLUMN IF NOT EXISTS sellersaddres JSONB NOT NULL DEFAULT '{}'::jsonb
   `);
 }
 
@@ -69,6 +76,7 @@ function normalizeSellerProfile(input = {}) {
     externalPortfolioLink: String(payload.externalPortfolioLink || "").trim(),
     intellectualPropertyCertified: Boolean(payload.intellectualPropertyCertified),
     termsOfServiceAccepted: Boolean(payload.termsOfServiceAccepted),
+    sellerAddress: normalizeAddressPayload(payload.sellerAddress || payload.sellersaddres || {}),
   };
 }
 
@@ -80,10 +88,11 @@ function sellerProfileFromRow(row, fallbackPreferences = {}) {
       shopLogoUrl: fallbackPreferences.shopLogoUrl || "",
       primaryPrinterSpecialization: "",
       designSoftware: [],
-      externalPortfolioLink: "",
-      intellectualPropertyCertified: false,
-      termsOfServiceAccepted: false,
-    };
+    externalPortfolioLink: "",
+    intellectualPropertyCertified: false,
+    termsOfServiceAccepted: false,
+    sellerAddress: {},
+  };
   }
 
   return {
@@ -95,6 +104,7 @@ function sellerProfileFromRow(row, fallbackPreferences = {}) {
     externalPortfolioLink: row.external_portfolio_link || "",
     intellectualPropertyCertified: Boolean(row.intellectual_property_certified),
     termsOfServiceAccepted: Boolean(row.terms_of_service_accepted),
+    sellerAddress: normalizeAddressPayload(row.sellersaddres || {}),
   };
 }
 
@@ -138,6 +148,13 @@ function validateSellerProfile(profile) {
   }
   if (!profile.termsOfServiceAccepted) {
     return "You must accept the creator terms of service.";
+  }
+  const hasSellerAddress = ["line1", "city", "state", "zip"].some((key) => String(profile.sellerAddress?.[key] || "").trim());
+  if (hasSellerAddress) {
+    const sellerAddressError = validateUsAddress(profile.sellerAddress, "Seller fulfillment address", {
+      requireStreetNumber: true,
+    });
+    if (sellerAddressError) return sellerAddressError;
   }
 
   return "";

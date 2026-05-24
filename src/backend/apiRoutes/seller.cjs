@@ -7,6 +7,13 @@ const {
   sellerProfileFromRow,
   validateSellerProfile,
 } = require("./sellerProfileShared.cjs");
+const {
+  addOrUpdateSellerTracker,
+  createEasyPostTracker,
+  filterTrackingForSeller,
+} = require("./shippingShared.cjs");
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
 
 function normalizeTagList(tags) {
   if (!Array.isArray(tags)) return [];
@@ -233,6 +240,8 @@ module.exports = function sellerRoutes(deps) {
               o.customer_id,
               o.status,
               o.total_amount,
+              COALESCE(o.tracking, '{"shipments":[]}'::jsonb) AS tracking,
+              o.items->'shippingAddress' AS order_shipping_address,
               o.created_at,
               o.updated_at,
               item,
@@ -258,6 +267,8 @@ module.exports = function sellerRoutes(deps) {
             e.customer_id,
             e.status,
             e.total_amount,
+            e.tracking,
+            e.order_shipping_address,
             e.created_at,
             e.updated_at,
             p.id AS product_id,
@@ -287,23 +298,28 @@ module.exports = function sellerRoutes(deps) {
       for (const row of ordersResult.rows) {
         const key = String(row.order_id);
         if (!ordersMap.has(key)) {
+          const orderShippingAddress = row.order_shipping_address && typeof row.order_shipping_address === "object"
+            ? row.order_shipping_address
+            : {};
           ordersMap.set(key, {
             id: row.order_id,
             customerId: Number(row.customer_id),
             customerUsername: row.customer_username || null,
             customerEmail: row.customer_email || null,
             shippingAddress: {
-              street: row.street_address || null,
-              city: row.city || null,
-              state: row.state_province || null,
-              postalCode: row.postal_code || null,
-              country: row.country_code || null,
+              street: orderShippingAddress.line1 || row.street_address || null,
+              street2: orderShippingAddress.line2 || null,
+              city: orderShippingAddress.city || row.city || null,
+              state: orderShippingAddress.state || row.state_province || null,
+              postalCode: orderShippingAddress.zip || row.postal_code || null,
+              country: orderShippingAddress.country || row.country_code || null,
             },
             status: row.status,
             totalAmount: Number(row.total_amount || 0),
             createdAt: row.created_at,
             updatedAt: row.updated_at,
             sellerSubtotal: 0,
+            tracking: filterTrackingForSeller(row.tracking, sellerId),
             items: [],
           });
         }
@@ -313,6 +329,7 @@ module.exports = function sellerRoutes(deps) {
         const firstImage = Array.isArray(row.img_path) && row.img_path.length > 0 ? row.img_path[0] : null;
         const imageUrl = firstImage ? buildImageUrl(req, firstImage) : null;
         order.items.push({
+          productId: Number(row.product_id),
           productName: row.product_name,
           quantity: Number(row.quantity || 0),
           unitPrice: Number(row.unit_price || 0),
@@ -331,6 +348,91 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
+  app.post("/api/seller/orders/:orderId/tracking", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      if (!UUID_REGEX.test(orderId)) {
+        return res.status(400).json({ message: "Invalid order ID." });
+      }
+
+      const trackingCode = String(req.body?.trackingCode || "").trim();
+      const carrier = String(req.body?.carrier || "").trim();
+      if (!trackingCode || trackingCode.length > 80 || !/^[A-Za-z0-9 -]+$/.test(trackingCode)) {
+        return res.status(400).json({ message: "Enter a valid tracking number." });
+      }
+      if (carrier && (carrier.length > 40 || !/^[A-Za-z0-9 _-]+$/.test(carrier))) {
+        return res.status(400).json({ message: "Enter a valid carrier name." });
+      }
+
+      const sellerId = req.user.id;
+      const orderResult = await pool.query(
+        `
+          WITH expanded_items AS (
+            SELECT
+              o.id,
+              o.status,
+              COALESCE(o.tracking, '{"shipments":[]}'::jsonb) AS tracking,
+              item,
+              CASE
+                WHEN COALESCE(item->>'id', '') ~ '^\\d+$' THEN (item->>'id')::int
+                WHEN COALESCE(item->>'productId', '') ~ '^\\d+$' THEN (item->>'productId')::int
+                ELSE NULL
+              END AS product_id
+            FROM orders o
+            JOIN LATERAL jsonb_array_elements(COALESCE(o.items->'items', '[]'::jsonb)) AS item ON TRUE
+            WHERE o.id = $1
+          )
+          SELECT
+            e.id,
+            e.status,
+            e.tracking,
+            p.id AS product_id,
+            p.name AS product_name,
+            sp.shop_name
+          FROM expanded_items e
+          JOIN products p ON p.id = e.product_id
+          LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id
+          WHERE p.user_id = $2
+        `,
+        [orderId, sellerId]
+      );
+
+      if (orderResult.rows.length === 0) {
+        return res.status(404).json({ message: "Order not found for this seller." });
+      }
+      if (String(orderResult.rows[0].status || "").toLowerCase() === "cancelled") {
+        return res.status(400).json({ message: "Cannot add tracking to a cancelled order." });
+      }
+
+      const tracker = await createEasyPostTracker({ trackingCode, carrier });
+      const productIds = orderResult.rows.map((row) => Number(row.product_id)).filter(Number.isFinite);
+      const productNames = orderResult.rows.map((row) => row.product_name).filter(Boolean);
+      const sellerName = orderResult.rows[0].shop_name || req.user.username || `Seller ${sellerId}`;
+      const nextTracking = addOrUpdateSellerTracker(orderResult.rows[0].tracking, {
+        sellerId,
+        sellerName,
+        productIds,
+        productNames,
+        tracker,
+      });
+
+      await pool.query(
+        `UPDATE orders SET tracking = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+        [JSON.stringify(nextTracking), orderId]
+      );
+
+      return res.status(200).json({
+        message: "Tracking saved.",
+        tracking: filterTrackingForSeller(nextTracking, sellerId),
+      });
+    } catch (error) {
+      console.error("Error saving seller tracking:", error);
+      return res.status(error.statusCode && error.statusCode < 500 ? error.statusCode : 500).json({
+        message: error.message || "Failed to save tracking.",
+      });
+    }
+  });
+
   app.get("/api/seller/preferences", attachAuthenticatedUser, isSeller, async (req, res) => {
     try {
       const result = await pool.query(
@@ -346,7 +448,8 @@ module.exports = function sellerRoutes(deps) {
                 sp.design_software,
                 sp.external_portfolio_link,
                 sp.intellectual_property_certified,
-                sp.terms_of_service_accepted
+                sp.terms_of_service_accepted,
+                COALESCE(sp.sellersaddres, '{}'::jsonb) AS sellersaddres
          FROM users u
          LEFT JOIN seller_profiles sp ON sp.seller_user_id = u.id
          WHERE u.id = $1
@@ -411,9 +514,10 @@ module.exports = function sellerRoutes(deps) {
            design_software,
            external_portfolio_link,
            intellectual_property_certified,
-           terms_of_service_accepted
+           terms_of_service_accepted,
+           sellersaddres
          )
-         VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6::text[], NULLIF($7, ''), $8, $9)
+         VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6::text[], NULLIF($7, ''), $8, $9, $10::jsonb)
          ON CONFLICT (seller_user_id) DO UPDATE SET
            shop_name = EXCLUDED.shop_name,
            shop_bio = EXCLUDED.shop_bio,
@@ -423,6 +527,7 @@ module.exports = function sellerRoutes(deps) {
            external_portfolio_link = EXCLUDED.external_portfolio_link,
            intellectual_property_certified = EXCLUDED.intellectual_property_certified,
            terms_of_service_accepted = EXCLUDED.terms_of_service_accepted,
+           sellersaddres = EXCLUDED.sellersaddres,
            updated_at = NOW()`,
         [
           req.user.id,
@@ -434,6 +539,7 @@ module.exports = function sellerRoutes(deps) {
           sellerProfile.externalPortfolioLink,
           sellerProfile.intellectualPropertyCertified,
           sellerProfile.termsOfServiceAccepted,
+          JSON.stringify(sellerProfile.sellerAddress || {}),
         ]
       );
 

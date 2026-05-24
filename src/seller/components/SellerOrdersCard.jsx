@@ -1,4 +1,6 @@
-import React from "react";
+import { useEffect, useState } from "react";
+import TrackingSection from "../../components/TrackingSection.jsx";
+import { addSellerOrderTracking } from "../services/sellerPortalService.js";
 
 const currencyFormatter = new Intl.NumberFormat(undefined, {
   style: "currency",
@@ -37,17 +39,54 @@ function getMarketplaceProductUrl(productId) {
   return `${MARKETPLACE_ORIGIN}/product/${encodeURIComponent(String(productId))}`;
 }
 
-export default function SellerOrdersCard({ order }) {
+export default function SellerOrdersCard({ order, onTrackingSaved }) {
+  const existingShipment = Array.isArray(order.tracking?.shipments) ? order.tracking.shipments[0] : null;
+  const [trackingCode, setTrackingCode] = useState(existingShipment?.trackingCode || "");
+  const [carrier, setCarrier] = useState(existingShipment?.carrier || "");
+  const [trackingSaving, setTrackingSaving] = useState(false);
+  const [trackingMessage, setTrackingMessage] = useState("");
+  const [trackingError, setTrackingError] = useState("");
   const { shippingAddress } = order;
   const addressLines = [];
   if (shippingAddress) {
     if (shippingAddress.street) addressLines.push(shippingAddress.street);
+    if (shippingAddress.street2) addressLines.push(shippingAddress.street2);
     const line2 = [shippingAddress.city, shippingAddress.state, shippingAddress.postalCode].filter(Boolean).join(", ");
     if (line2) addressLines.push(line2);
     if (shippingAddress.country) addressLines.push(shippingAddress.country);
   }
 
   const items = Array.isArray(order.items) ? order.items : [];
+
+  useEffect(() => {
+    setTrackingCode(existingShipment?.trackingCode || "");
+    setCarrier(existingShipment?.carrier || "");
+  }, [existingShipment?.trackingCode, existingShipment?.carrier]);
+
+  async function handleTrackingSubmit(event) {
+    event.preventDefault();
+    setTrackingMessage("");
+    setTrackingError("");
+
+    if (!trackingCode.trim()) {
+      setTrackingError("Enter a tracking number.");
+      return;
+    }
+
+    try {
+      setTrackingSaving(true);
+      const response = await addSellerOrderTracking(order.id, {
+        trackingCode: trackingCode.trim(),
+        carrier: carrier.trim(),
+      });
+      setTrackingMessage(response?.message || "Tracking saved.");
+      await onTrackingSaved?.();
+    } catch (error) {
+      setTrackingError(error?.response?.data?.message || "Failed to save tracking.");
+    } finally {
+      setTrackingSaving(false);
+    }
+  }
 
   return (
     <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
@@ -141,6 +180,45 @@ export default function SellerOrdersCard({ order }) {
              })}
           </div>
         )}
+      </div>
+
+      <div className="border-t border-gray-100 pt-4">
+        <TrackingSection tracking={order.tracking} title="Tracking" />
+
+        <form className="mt-3 grid gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={handleTrackingSubmit}>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Carrier</label>
+            <input
+              type="text"
+              value={carrier}
+              onChange={(event) => setCarrier(event.target.value)}
+              placeholder="USPS, UPS, FedEx"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Tracking Number</label>
+            <input
+              type="text"
+              value={trackingCode}
+              onChange={(event) => setTrackingCode(event.target.value)}
+              placeholder="Tracking number"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={trackingSaving}
+              className="w-full rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60 md:w-auto"
+            >
+              {trackingSaving ? "Saving..." : "Save Tracking"}
+            </button>
+          </div>
+          {trackingMessage ? <p className="text-sm text-green-700 md:col-span-3">{trackingMessage}</p> : null}
+          {trackingError ? <p className="text-sm text-red-600 md:col-span-3">{trackingError}</p> : null}
+        </form>
       </div>
 
       <div className="mt-4 flex justify-end border-t border-gray-100 pt-4">

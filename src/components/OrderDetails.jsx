@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import TrackingSection from "./TrackingSection.jsx";
 
 function getOrderItemsArray(itemsPayload) {
   if (Array.isArray(itemsPayload)) return itemsPayload;
@@ -259,6 +260,8 @@ export default function OrderDetails({ user }) {
               </div>
             )}
           </div>
+
+          <TrackingSection tracking={order.tracking} />
 
           {orderTotals && (
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 text-sm">

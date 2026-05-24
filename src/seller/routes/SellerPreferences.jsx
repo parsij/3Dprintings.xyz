@@ -83,6 +83,15 @@ export default function SellerPreferences() {
     externalPortfolioLink: "",
     intellectualPropertyCertified: false,
     termsOfServiceAccepted: false,
+    sellerAddress: {
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      zip: "",
+      country: "US",
+      residential: true,
+    },
     notifyNewOrders: true,
     notifyNewReviews: true,
     notifyPayouts: false,
@@ -201,6 +210,16 @@ export default function SellerPreferences() {
 
   const updateField = (field, value) => {
     setPreferencesForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateSellerAddressField = (field, value) => {
+    setPreferencesForm((prev) => ({
+      ...prev,
+      sellerAddress: {
+        ...(prev.sellerAddress || {}),
+        [field]: field === "state" || field === "country" ? value.toUpperCase() : value,
+      },
+    }));
   };
 
   const openImagePicker = () => {
@@ -383,6 +402,65 @@ export default function SellerPreferences() {
               onChange={(event) => updateField("supportEmail", event.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-900">Fulfillment Address</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Street Address</label>
+                <input
+                  value={preferencesForm.sellerAddress?.line1 || ""}
+                  onChange={(event) => updateSellerAddressField("line1", event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                  placeholder="123 Main St"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Apt, suite, etc.</label>
+                <input
+                  value={preferencesForm.sellerAddress?.line2 || ""}
+                  onChange={(event) => updateSellerAddressField("line2", event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">City</label>
+                <input
+                  value={preferencesForm.sellerAddress?.city || ""}
+                  onChange={(event) => updateSellerAddressField("city", event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">State</label>
+                <input
+                  value={preferencesForm.sellerAddress?.state || ""}
+                  onChange={(event) => updateSellerAddressField("state", event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                  maxLength={2}
+                  placeholder="CA"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">ZIP Code</label>
+                <input
+                  value={preferencesForm.sellerAddress?.zip || ""}
+                  onChange={(event) => updateSellerAddressField("zip", event.target.value.trimStart())}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                  placeholder="94107"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">Country</label>
+                <input
+                  value={preferencesForm.sellerAddress?.country || "US"}
+                  onChange={(event) => updateSellerAddressField("country", event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                  maxLength={2}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">
