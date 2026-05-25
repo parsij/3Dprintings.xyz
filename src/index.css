@@ -26,6 +26,11 @@
     animation: fadeInUp 0.5s ease-out forwards;
   }
 
+  .no-bounce {
+    animation: none;
+    transition: none;
+  }
+
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
