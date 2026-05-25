@@ -145,6 +145,7 @@ async function createEasyPostTracker({ trackingCode, carrier }) {
 }
 
 function chooseCheapestRate(rates = []) {
+  console.log("rates" + rates)
   return rates
     .map((rate) => ({
       ...rate,
@@ -292,7 +293,7 @@ async function calculateEasyPostShippingQuote({ items, toAddress }) {
   };
 }
 
-function createInitialTrackingPayload(quote, nowIso = new Date().toISOString()) {
+function createInitialTrackingPayload(quote, nowIsoTime = new Date().toISOString()) {
   return {
     shipments: (quote?.shipments || []).map((shipment) => ({
       sellerId: shipment.sellerId,
@@ -310,20 +311,20 @@ function createInitialTrackingPayload(quote, nowIso = new Date().toISOString()) 
       publicUrl: null,
       estDeliveryDate: shipment.deliveryDate || null,
       submittedAt: null,
-      updatedAt: nowIso,
+      updatedAt: nowIsoTime,
       events: [
         {
-          id: `pending-${shipment.sellerId}-${nowIso}`,
-          message: "Tracking number pending from seller",
-          status: "pending_tracking",
+          id: `pending-${shipment.sellerId}-${nowIsoTime}`,
+          message: "Pending Shipping from seller",
+          status: "pending_Shipping",
           statusDetail: "awaiting_seller_tracking",
-          datetime: nowIso,
+          datetime: nowIsoTime,
           source: "3dprintings.xyz",
           location: null,
         },
       ],
     })),
-    lastUpdatedAt: nowIso,
+    lastUpdatedAt: nowIsoTime,
   };
 }
 
@@ -454,7 +455,7 @@ function addOrUpdateSellerTracker(tracking, { sellerId, sellerName, productIds, 
 }
 
 function mergeTrackerWebhookPayload(tracking, tracker) {
-  const nowIso = new Date().toISOString();
+  const nowIsoTime = new Date().toISOString();
   const normalized = normalizeTrackingPayload(tracking);
   const trackerId = normalizeText(tracker?.id);
   const trackingCode = normalizeText(tracker?.tracking_code).toLowerCase();
@@ -467,17 +468,18 @@ function mergeTrackerWebhookPayload(tracking, tracker) {
     const idMatches = trackerId && shipmentTrackerId === trackerId;
     const codeMatches = trackingCode && shipmentTrackingCode === trackingCode && (!carrier || !shipmentCarrier || carrier === shipmentCarrier);
     if (!idMatches && !codeMatches) return shipment;
-    return mergeTrackerIntoShipment(shipment, tracker, nowIso);
+    return mergeTrackerIntoShipment(shipment, tracker, nowIsoTime);
   });
 
   return {
     ...normalized,
     shipments,
-    lastUpdatedAt: nowIso,
+    lastUpdatedAt: nowIsoTime,
   };
 }
 
 async function mergeTrackerWebhookIntoOrders(pool, tracker) {
+   console.log("tracker", tracker);
   const trackerId = normalizeText(tracker?.id);
   const trackingCode = normalizeText(tracker?.tracking_code);
   const carrier = normalizeText(tracker?.carrier);
