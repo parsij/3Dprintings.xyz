@@ -1,6 +1,13 @@
 const bcrypt = require('bcrypt');
-const { randomBytes } = require('crypto');
+const { createHash, randomBytes } = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
+const nodemailer = require('nodemailer');
+
+const RESET_TOKEN_TTL_MINUTES = 60;
+const RESET_REQUEST_WINDOW_MS = 15 * 60 * 1000;
+const RESET_REQUEST_LIMIT = 5;
+const passwordResetRequests = new Map();
+let mailTransporter = null;
 
 function buildUsernameFromGoogleProfile(name, email) {
   const rawName = String(name || '').trim().toLowerCase();
@@ -44,6 +51,75 @@ function isAllowedFrontendOrigin(origin, configuredFrontendOrigin) {
   }
 }
 
+function hashResetToken(token) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getMailTransporter() {
+  const user = String(process.env.PERSONAL_GMAIL_ADDRESS || '').trim();
+  const pass = String(process.env.GMAIL_APP_PASSWORD || '').trim();
+
+  if (!user || !pass) {
+    throw new Error('Missing PERSONAL_GMAIL_ADDRESS or GMAIL_APP_PASSWORD');
+  }
+
+  if (!mailTransporter) {
+    mailTransporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass },
+    });
+  }
+
+  return mailTransporter;
+}
+
+function buildResetUrl(req, frontendOrigin, token) {
+  const requestOrigin = normalizeOrigin(req.headers.origin);
+  let origin = frontendOrigin || 'https://3dprintings.xyz';
+
+  if (requestOrigin && isAllowedFrontendOrigin(requestOrigin, frontendOrigin)) {
+    origin = requestOrigin;
+  }
+
+  return `${origin}/reset-password/${encodeURIComponent(token)}`;
+}
+
+function isPasswordResetRateLimited(req, normalizedEmail) {
+  const key = `${req.ip || req.socket?.remoteAddress || 'unknown'}:${normalizedEmail}`;
+  const now = Date.now();
+  const existing = passwordResetRequests.get(key) || [];
+  const recent = existing.filter((timestamp) => now - timestamp < RESET_REQUEST_WINDOW_MS);
+  recent.push(now);
+  passwordResetRequests.set(key, recent);
+  return recent.length > RESET_REQUEST_LIMIT;
+}
+
+async function sendPasswordResetEmail(userEmail, resetUrl) {
+  const transporter = getMailTransporter();
+  const safeResetUrl = escapeHtml(resetUrl);
+
+  await transporter.sendMail({
+    from: '"3D Printings Management" <management@3dprintings.xyz>',
+    to: userEmail,
+    subject: 'Reset your 3D Printings password',
+    html: `
+      <p>You requested a password reset for 3D Printings.</p>
+      <p>This link expires in ${RESET_TOKEN_TTL_MINUTES} minutes and can only be used once.</p>
+      <p><a href="${safeResetUrl}">Click here to reset your password</a></p>
+      <p>If you did not request this, you can ignore this email.</p>
+    `,
+  });
+}
+
 module.exports = function authRoutes(deps) {
   const {
     app,
@@ -58,6 +134,131 @@ module.exports = function authRoutes(deps) {
   const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
   const googleOAuthClient = googleClientId ? new OAuth2Client(googleClientId) : null;
   const frontendOrigin = normalizeOrigin(process.env.FRONTEND_URL);
+
+  app.post('/api/password-reset/request', async (req, res) => {
+    try {
+      const normalizedEmail = String(req.body?.email || '').toLowerCase().trim();
+
+      if (!EMAIL_REGEX.test(normalizedEmail)) {
+        return res.status(400).json({ message: 'Enter a valid email address' });
+      }
+
+      if (isPasswordResetRateLimited(req, normalizedEmail)) {
+        return res.status(429).json({
+          message: 'Too many reset requests. Please wait a few minutes and try again.',
+        });
+      }
+
+      const genericMessage = 'If an account exists for that email, a reset link has been sent.';
+      const userResult = await pool.query(
+        'SELECT id, email FROM users WHERE email = $1 LIMIT 1',
+        [normalizedEmail]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.json({ message: genericMessage });
+      }
+
+      const user = userResult.rows[0];
+      const rawToken = randomBytes(32).toString('base64url');
+      const tokenHash = hashResetToken(rawToken);
+      const resetUrl = buildResetUrl(req, frontendOrigin, rawToken);
+
+      await pool.query(
+        `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, NOW() + ($3::text || ' minutes')::interval)`,
+        [user.id, tokenHash, RESET_TOKEN_TTL_MINUTES]
+      );
+
+      await sendPasswordResetEmail(user.email, resetUrl);
+      return res.json({ message: genericMessage });
+    } catch (err) {
+      console.error('Password reset request error:', err.message || err);
+      return res.status(500).json({ message: 'Could not send a reset link right now. Please try again later.' });
+    }
+  });
+
+  app.post('/api/password-reset/confirm', async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const token = String(req.body?.token || '').trim();
+      const password = String(req.body?.password || '');
+
+      if (!token || token.length > 200) {
+        return res.status(400).json({ message: 'Invalid or expired reset link' });
+      }
+
+      if (!PASSWORD_REGEX.test(password)) {
+        return res.status(400).json({
+          message: 'Password must include uppercase, lowercase, number, and be at least 8 characters',
+        });
+      }
+
+      const tokenHash = hashResetToken(token);
+      await client.query('BEGIN');
+
+      const tokenResult = await client.query(
+        `SELECT prt.id, prt.user_id, users.username, users.email, users.phone_number, users.password, COALESCE(users.role, 'customer') AS role
+         FROM password_reset_tokens prt
+         JOIN users ON users.id = prt.user_id
+         WHERE prt.token_hash = $1
+           AND prt.used_at IS NULL
+           AND prt.expires_at > NOW()
+         FOR UPDATE`,
+        [tokenHash]
+      );
+
+      if (tokenResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Invalid or expired reset link' });
+      }
+
+      const user = tokenResult.rows[0];
+      const samePassword = await bcrypt.compare(password, user.password);
+      if (samePassword) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'New password must be different from the current password' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+      await client.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, user.user_id]);
+      await client.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1', [user.id]);
+      await client.query(
+        `UPDATE password_reset_tokens
+         SET used_at = COALESCE(used_at, NOW())
+         WHERE user_id = $1 AND id <> $2 AND used_at IS NULL`,
+        [user.user_id, user.id]
+      );
+      await client.query('COMMIT');
+
+      const authUser = {
+        id: user.user_id,
+        username: user.username,
+        email: user.email,
+        phone_number: user.phone_number,
+        role: user.role,
+      };
+      setAuthCookie(res, createAuthToken(authUser));
+
+      return res.json({
+        message: 'Password reset successfully',
+        user: {
+          id: Number(authUser.id),
+          username: authUser.username,
+          email: authUser.email,
+          phone_number: authUser.phone_number,
+          role: authUser.role,
+        },
+      });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => null);
+      console.error('Password reset confirm error:', err.message || err);
+      return res.status(500).json({ message: 'Could not reset password right now. Please try again later.' });
+    } finally {
+      client.release();
+    }
+  });
 
   app.post('/api/signup', async (req, res) => {
     try {

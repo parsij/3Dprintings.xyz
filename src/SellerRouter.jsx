@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import SignIn from "./routes/SignIn.jsx";
 import SignUp from "./routes/SignUp.jsx";
 import ForgotPassword from "./routes/ForgotPassword.jsx";
+import ResetPassword from "./routes/ResetPassword.jsx";
 
 // FIXED: Corrected path imports from absolute "/" to relative "./routes/"
 import SellerDashboard from "./seller/routes/SellerDashboard.jsx";
@@ -59,6 +60,7 @@ const SellerRouter = ({ user, setUser }) => {
                 <Route path="/signin" element={<SignInRoute user={user} setUser={setUser} />} />
                 <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <SignUp setUser={setUser} />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword setUser={setUser} />} />
 
                 {/* Protected Seller Workflows */}
                 <Route

@@ -2,24 +2,46 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
+import axios from "axios";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [activeField, setActiveField] = useState(null);
   const [touched, setTouched] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [submitError, setSubmitError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setTouched(true);
+    setSubmitMessage("");
+    setSubmitError(false);
 
     if (!isEmailValid) return;
 
-    // TODO: call your forgot-password API
-    // await api.forgotPassword({ email });
-    setSubmitted(true);
+    try {
+      setIsSubmitting(true);
+      const response = await axios.post(
+        `${API_BASE}/api/password-reset/request`,
+        { email },
+        { withCredentials: true }
+      );
+      setSubmitMessage(response.data?.message || "If an account exists for that email, a reset link has been sent.");
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(true);
+      setSubmitMessage(
+        error.response?.data?.message || "Could not send a reset link right now. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -79,15 +101,21 @@ export default function ForgotPassword() {
 
             <button
               type="submit"
-              disabled={!isEmailValid}
+              disabled={!isEmailValid || isSubmitting}
               className={`w-full rounded-xl py-3 font-semibold text-white transition-all duration-300 ${
-                isEmailValid
+                isEmailValid && !isSubmitting
                   ? "cursor-pointer bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
                   : "bg-gray-300 cursor-not-allowed opacity-70"
               }`}
             >
-              Send reset link
+              {isSubmitting ? "Sending..." : "Send reset link"}
             </button>
+
+            {submitMessage && (
+              <p className={`text-sm ${submitError ? "text-red-600" : "text-gray-700"}`}>
+                {submitMessage}
+              </p>
+            )}
           </form>
         ) : (
           <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-gray-700 animate-fade-in-up shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
