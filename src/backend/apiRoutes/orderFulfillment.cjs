@@ -1,4 +1,5 @@
 let inventoryDeductedColumnReady = false;
+const { scheduleTestTrackingTimeline } = require("./shippingShared.cjs");
 
 async function ensureInventoryDeductedColumn(pool) {
   if (inventoryDeductedColumnReady) return;
@@ -88,6 +89,8 @@ async function fulfillPaidOrder(pool, orderId, paymentType = "card") {
     );
 
     await client.query("COMMIT");
+
+    scheduleTestTrackingTimeline(pool, orderId);
 
     return {
       order: updatedOrderResult.rows[0] || order,

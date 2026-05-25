@@ -12,6 +12,7 @@ function formatDateTime(value) {
 function formatStatus(value) {
   const normalized = String(value || "").replaceAll("_", " ").trim();
   if (!normalized) return "Pending";
+  if (normalized.toLowerCase() === "pending tracking") return "Pending Shipping";
   return normalized
     .split(" ")
     .filter(Boolean)
@@ -22,6 +23,14 @@ function formatStatus(value) {
 function formatLocation(location) {
   if (!location || typeof location !== "object") return "";
   return [location.city, location.state, location.zip, location.country].filter(Boolean).join(", ");
+}
+
+function formatEventMessage(event) {
+  const message = String(event?.message || "").trim();
+  if (message === "Tracking number pending from seller" || message === "Pending Shipping from seller") {
+    return "Pending shipping";
+  }
+  return message || formatStatus(event?.status);
 }
 
 export default function TrackingSection({ tracking, compact = false, title = "Tracking" }) {
@@ -79,7 +88,7 @@ export default function TrackingSection({ tracking, compact = false, title = "Tr
                       const location = formatLocation(event.location);
                       return (
                         <li key={`${event.id || event.datetime || eventIndex}-${eventIndex}`} className="border-l-2 border-orange-200 pl-3">
-                          <p className="text-sm font-medium text-gray-900">{event.message || formatStatus(event.status)}</p>
+                          <p className="text-sm font-medium text-gray-900">{formatEventMessage(event)}</p>
                           <p className="text-xs text-gray-500">{formatDateTime(event.datetime)}</p>
                           {location ? <p className="text-xs text-gray-500">{location}</p> : null}
                         </li>

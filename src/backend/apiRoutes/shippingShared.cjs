@@ -8,6 +8,59 @@ const DEFAULT_PARCEL = {
 };
 const US_STATE_CODE_REGEX = /^[A-Z]{2}$/;
 const US_POSTAL_CODE_REGEX = /^\d{5}(?:-\d{4})?$/;
+const TEST_TRACKING_TIMELINE_MS = 3 * 60 * 1000;
+const scheduledTestTrackingOrders = new Set();
+const TEST_TRACKING_STEPS = [
+  {
+    delayRatio: 0,
+    status: "pending_shipping",
+    statusDetail: "order_preparing",
+    message: "Pending shipping",
+    location: null,
+  },
+  {
+    delayRatio: 0.18,
+    status: "pre_transit",
+    statusDetail: "label_created",
+    message: "Shipping label created",
+    location: { city: "San Francisco", state: "CA", country: "US", zip: "94104" },
+  },
+  {
+    delayRatio: 0.36,
+    status: "in_transit",
+    statusDetail: "accepted_at_origin_facility",
+    message: "Package accepted at origin facility",
+    location: { city: "San Francisco", state: "CA", country: "US", zip: "94104" },
+  },
+  {
+    delayRatio: 0.54,
+    status: "in_transit",
+    statusDetail: "departed_distribution_center",
+    message: "Departed distribution center",
+    location: { city: "Oakland", state: "CA", country: "US", zip: "94621" },
+  },
+  {
+    delayRatio: 0.72,
+    status: "in_transit",
+    statusDetail: "arrived_at_regional_facility",
+    message: "Arrived at regional distribution center",
+    location: { city: "Los Angeles", state: "CA", country: "US", zip: "90040" },
+  },
+  {
+    delayRatio: 0.88,
+    status: "out_for_delivery",
+    statusDetail: "out_for_delivery",
+    message: "Out for delivery",
+    location: { city: "Los Angeles", state: "CA", country: "US", zip: "90012" },
+  },
+  {
+    delayRatio: 1,
+    status: "delivered",
+    statusDetail: "delivered",
+    message: "Delivered",
+    location: { city: "Los Angeles", state: "CA", country: "US", zip: "90012" },
+  },
+];
 
 function centsFromDollars(value) {
   const numeric = Number(value);
@@ -133,7 +186,6 @@ async function createEasyPostTracker({ trackingCode, carrier }) {
 }
 
 function chooseCheapestRate(rates = []) {
-  console.log("rates", rates)
   return rates
     .map((rate) => ({
       ...rate,
@@ -292,8 +344,8 @@ function createInitialTrackingPayload(quote, nowIsoTime = new Date().toISOString
       rateId: shipment.rateId || null,
       carrier: shipment.carrier || null,
       service: shipment.service || null,
-      status: "pending_tracking",
-      statusDetail: "awaiting_seller_tracking",
+      status: "pending_shipping",
+      statusDetail: "awaiting_label",
       trackingCode: null,
       trackerId: null,
       publicUrl: null,
@@ -303,9 +355,9 @@ function createInitialTrackingPayload(quote, nowIsoTime = new Date().toISOString
       events: [
         {
           id: `pending-${shipment.sellerId}-${nowIsoTime}`,
-          message: "Pending Shipping from seller",
-          status: "pending_Shipping",
-          statusDetail: "awaiting_seller_tracking",
+          message: "Pending shipping",
+          status: "pending_shipping",
+          statusDetail: "awaiting_label",
           datetime: nowIsoTime,
           source: "3dprintings.xyz",
           location: null,
@@ -375,6 +427,117 @@ function mergeEvents(existingEvents = [], incomingEvents = []) {
     return leftTime - rightTime;
   });
   return merged;
+}
+
+function buildTrackingEvent({ shipment, step, orderId, stepIndex, nowIso }) {
+  const sellerKey = shipment.sellerId || shipment.sellerName || "shipment";
+  return {
+    id: `test-${orderId}-${sellerKey}-${stepIndex}`,
+    message: step.message,
+    status: step.status,
+    statusDetail: step.statusDetail,
+    datetime: nowIso,
+    source: "test_mode",
+    location: step.location || null,
+  };
+}
+
+function appendTrackingEventToPayload(tracking, { orderId, step, stepIndex, nowIso = new Date().toISOString() }) {
+  const normalized = normalizeTrackingPayload(tracking);
+  const shipments = normalized.shipments.map((shipment) => {
+    const event = buildTrackingEvent({ shipment, step, orderId, stepIndex, nowIso });
+    return {
+      ...shipment,
+      status: step.status,
+      statusDetail: step.statusDetail,
+      updatedAt: nowIso,
+      events: mergeEvents(shipment.events || [], [event]),
+    };
+  });
+
+  return {
+    ...normalized,
+    shipments,
+    lastUpdatedAt: nowIso,
+  };
+}
+
+function getDestinationLocationFromOrderItems(itemsPayload) {
+  const shippingAddress = itemsPayload && typeof itemsPayload === "object" ? itemsPayload.shippingAddress : null;
+  if (!shippingAddress || typeof shippingAddress !== "object") return null;
+
+  const city = normalizeText(shippingAddress.city);
+  const state = normalizeText(shippingAddress.state);
+  const zip = normalizeText(shippingAddress.zip);
+  const country = normalizeText(shippingAddress.country || "US");
+  if (!city && !state && !zip && !country) return null;
+
+  return {
+    city: city || null,
+    state: state || null,
+    zip: zip || null,
+    country: country || null,
+  };
+}
+
+function resolveTestTrackingStepLocation(step, destinationLocation) {
+  if (!destinationLocation) return step;
+  if (!["arrived_at_regional_facility", "out_for_delivery", "delivered"].includes(step.statusDetail)) {
+    return step;
+  }
+  return {
+    ...step,
+    location: destinationLocation,
+  };
+}
+
+async function appendTestTrackingStep(pool, orderId, step, stepIndex) {
+  const result = await pool.query(
+    `SELECT id, items, COALESCE(tracking, '{"shipments":[]}'::jsonb) AS tracking
+     FROM orders
+     WHERE id = $1`,
+    [orderId]
+  );
+  const order = result.rows[0];
+  if (!order) return;
+
+  const destinationLocation = getDestinationLocationFromOrderItems(order.items);
+  const resolvedStep = resolveTestTrackingStepLocation(step, destinationLocation);
+  const nextTracking = appendTrackingEventToPayload(order.tracking, {
+    orderId,
+    step: resolvedStep,
+    stepIndex,
+  });
+  await pool.query(
+    `UPDATE orders
+     SET tracking = $1::jsonb,
+         updated_at = NOW()
+     WHERE id = $2`,
+    [JSON.stringify(nextTracking), orderId]
+  );
+}
+
+function isTestModeEnabled() {
+  return ["1", "true", "yes", "on"].includes(normalizeText(process.env.TEST_MODE).toLowerCase());
+}
+
+function scheduleTestTrackingTimeline(pool, orderId) {
+  if (!isTestModeEnabled() || !orderId || scheduledTestTrackingOrders.has(orderId)) return false;
+
+  scheduledTestTrackingOrders.add(orderId);
+  TEST_TRACKING_STEPS.forEach((step, stepIndex) => {
+    const delayMs = Math.round(TEST_TRACKING_TIMELINE_MS * step.delayRatio);
+    setTimeout(() => {
+      appendTestTrackingStep(pool, orderId, step, stepIndex).catch((error) => {
+        console.error(`Failed to append test tracking step ${stepIndex} for order ${orderId}:`, error);
+      });
+      if (stepIndex === TEST_TRACKING_STEPS.length - 1) {
+        scheduledTestTrackingOrders.delete(orderId);
+      }
+    }, delayMs);
+  });
+
+  return true;
 }
 
 function mergeTrackerIntoShipment(shipment = {}, tracker = {}, nowIso = new Date().toISOString()) {
@@ -467,7 +630,6 @@ function mergeTrackerWebhookPayload(tracking, tracker) {
 }
 
 async function mergeTrackerWebhookIntoOrders(pool, tracker) {
-   console.log("tracker", tracker);
   const trackerId = normalizeText(tracker?.id);
   const trackingCode = normalizeText(tracker?.tracking_code);
   const carrier = normalizeText(tracker?.carrier);
@@ -566,6 +728,7 @@ module.exports = {
   mergeTrackerWebhookIntoOrders,
   normalizeAddressPayload,
   normalizeSellerAddressFromRow,
+  scheduleTestTrackingTimeline,
   validateEasyPostWebhookSignature,
   validateUsAddress,
 };
