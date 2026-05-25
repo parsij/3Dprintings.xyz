@@ -14,6 +14,7 @@
     "seller:address-column": "node src/backend/scripts/ensureSellerAddressColumn.cjs"
   },
   "dependencies": {
+    "@easypost/api": "^8.8.0",
     "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",

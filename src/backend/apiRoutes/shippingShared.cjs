@@ -1,7 +1,4 @@
-const crypto = require("crypto");
-const axios = require("axios");
-
-const EASYPOST_API_BASE = "https://api.easypost.com/v2";
+const EasyPostClient = require("@easypost/api");
 const SHIPPING_MARKUP_RATE = 0.165;
 const DEFAULT_PARCEL = {
   length: Number(process.env.EASYPOST_DEFAULT_PARCEL_LENGTH_IN || 8),
@@ -96,52 +93,43 @@ function buildEasyPostAddress(address, fallback = {}) {
   };
 }
 
-function getEasyPostApiKey() {
-  return normalizeText(process.env.EASYPOST_API_KEY);
-}
-
-async function easyPostRequest(method, path, data) {
-  const apiKey = getEasyPostApiKey();
+function getEasyPostClient() {
+  const apiKey = normalizeText(process.env.EASYPOST_API_KEY);
   if (!apiKey) {
     const error = new Error("Missing EASYPOST_API_KEY on server.");
     error.statusCode = 500;
     throw error;
   }
+  return new EasyPostClient(apiKey, {
+    timeout: 15000,
+  });
+}
 
+async function createEasyPostShipment(shipment) {
+  const client = getEasyPostClient();
   try {
-    const response = await axios({
-      method,
-      url: `${EASYPOST_API_BASE}${path}`,
-      data,
-      auth: { username: apiKey, password: "" },
-      timeout: 15000,
-      headers: { "Content-Type": "application/json" },
-    });
-    return response.data;
+    return await client.Shipment.create(shipment);
   } catch (error) {
-    const message =
-      error?.response?.data?.error?.message ||
-      error?.response?.data?.message ||
-      error?.message ||
-      "EasyPost request failed.";
-    const nextError = new Error(message);
-    nextError.statusCode = error?.response?.status || 502;
-    nextError.responseData = error?.response?.data;
+    const nextError = new Error(error?.message || "EasyPost shipment creation failed.");
+    nextError.statusCode = Number(error?.statusCode) || Number(error?.status) || 502;
     throw nextError;
   }
 }
 
-async function createEasyPostShipment(shipment) {
-  return easyPostRequest("post", "/shipments", { shipment });
-}
-
 async function createEasyPostTracker({ trackingCode, carrier }) {
+  const client = getEasyPostClient();
   const tracker = {
     tracking_code: normalizeText(trackingCode),
   };
   const normalizedCarrier = normalizeText(carrier);
   if (normalizedCarrier) tracker.carrier = normalizedCarrier;
-  return easyPostRequest("post", "/trackers", { tracker });
+  try {
+    return await client.Tracker.create(tracker);
+  } catch (error) {
+    const nextError = new Error(error?.message || "EasyPost tracker creation failed.");
+    nextError.statusCode = Number(error?.statusCode) || Number(error?.status) || 502;
+    throw nextError;
+  }
 }
 
 function chooseCheapestRate(rates = []) {
@@ -528,59 +516,26 @@ function filterTrackingForSeller(tracking, sellerId) {
   };
 }
 
-function parseEasyPostTimestamp(timestampHeader) {
-  const parsedMs = Date.parse(timestampHeader);
-  if (!Number.isFinite(parsedMs)) return null;
-  return Math.floor(parsedMs / 1000);
-}
-
-function timingSafeHexEqual(left, right) {
-  const normalizedLeft = normalizeText(left).toLowerCase();
-  const normalizedRight = normalizeText(right).toLowerCase();
-  if (!/^[a-f0-9]+$/.test(normalizedLeft) || !/^[a-f0-9]+$/.test(normalizedRight)) return false;
-  const leftBuffer = Buffer.from(normalizedLeft, "hex");
-  const rightBuffer = Buffer.from(normalizedRight, "hex");
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
-
 function validateEasyPostWebhookSignature({ headers, method, rawBody }) {
   const secret = normalizeText(process.env.EASYPOST_WEBHOOK_SECRET);
   if (!secret) {
     return { ok: true, skipped: true, reason: "missing EASYPOST_WEBHOOK_SECRET" };
   }
-
-  const timestamp = normalizeText(headers["x-timestamp"]);
-  const requestPath = normalizeText(headers["x-path"]);
-  const signatureHeader = normalizeText(headers["x-hmac-signature-v2"] || headers["x-hmac-signature"]);
-  if (!timestamp || !requestPath || !signatureHeader) {
-    return { ok: false, statusCode: 401, reason: "Missing EasyPost HMAC headers" };
+  try {
+    const client = getEasyPostClient();
+    const normalizedHeaders = Object.fromEntries(
+      Object.entries(headers || {}).map(([key, value]) => [String(key), String(value)])
+    );
+    const eventBody = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody || ""), "utf8");
+    client.Utils.validateWebhook(eventBody, normalizedHeaders, secret);
+    return { ok: true, skipped: false };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 401,
+      reason: error?.message || `Invalid EasyPost signature for ${String(method || "POST").toUpperCase()} webhook`,
+    };
   }
-
-  const timestampSeconds = parseEasyPostTimestamp(timestamp);
-  if (!timestampSeconds) {
-    return { ok: false, statusCode: 401, reason: "Invalid EasyPost HMAC timestamp" };
-  }
-
-  const toleranceMinutes = Math.min(60, Math.max(0, Number(process.env.EASYPOST_WEBHOOK_TOLERANCE_MINUTES || 1)));
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (nowSeconds - timestampSeconds > toleranceMinutes * 60) {
-    return { ok: false, statusCode: 401, reason: "EasyPost HMAC timestamp is too old" };
-  }
-  if (timestampSeconds - nowSeconds > 30) {
-    return { ok: false, statusCode: 401, reason: "EasyPost HMAC timestamp is in the future" };
-  }
-
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(`${timestamp}${String(method || "POST").toUpperCase()}${requestPath}${rawBody}`, "utf8")
-    .digest("hex");
-  const received = signatureHeader.replace(/^hmac-sha256-hex=/i, "");
-  if (!timingSafeHexEqual(expected, received)) {
-    return { ok: false, statusCode: 401, reason: "Invalid EasyPost HMAC signature" };
-  }
-
-  return { ok: true, skipped: false };
 }
 
 async function ensureOrderTrackingColumn(pool) {
