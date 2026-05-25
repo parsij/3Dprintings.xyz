@@ -145,7 +145,7 @@ async function createEasyPostTracker({ trackingCode, carrier }) {
 }
 
 function chooseCheapestRate(rates = []) {
-  console.log("rates" + rates)
+  console.log("rates", rates)
   return rates
     .map((rate) => ({
       ...rate,
