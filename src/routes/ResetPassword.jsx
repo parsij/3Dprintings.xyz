@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
@@ -18,6 +18,8 @@ export default function ResetPassword({ setUser }) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingLink, setIsCheckingLink] = useState(true);
+  const [resetSessionToken, setResetSessionToken] = useState("");
 
   const errors = useMemo(() => {
     const nextErrors = {};
@@ -33,7 +35,46 @@ export default function ResetPassword({ setUser }) {
     return nextErrors;
   }, [form]);
 
-  const canSubmit = token && Object.keys(errors).length === 0 && !isSubmitting;
+  const canSubmit = resetSessionToken && Object.keys(errors).length === 0 && !isSubmitting;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function consumeResetLink() {
+      try {
+        const response = await axios.post(
+          `${API_BASE}/api/password-reset/consume`,
+          { token },
+          { withCredentials: true }
+        );
+
+        if (isMounted) {
+          setResetSessionToken(response.data?.resetSessionToken || "");
+          setIsCheckingLink(false);
+        }
+      } catch {
+        if (isMounted) {
+          navigate("/signin", {
+            replace: true,
+            state: { message: "Expired link. Please request a new password reset link." },
+          });
+        }
+      }
+    }
+
+    if (!token) {
+      navigate("/signin", {
+        replace: true,
+        state: { message: "Expired link. Please request a new password reset link." },
+      });
+    } else {
+      consumeResetLink();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, token]);
 
   const onChange = (event) => {
     const { name, value } = event.target;
@@ -52,7 +93,7 @@ export default function ResetPassword({ setUser }) {
       setIsSubmitting(true);
       const response = await axios.post(
         `${API_BASE}/api/password-reset/confirm`,
-        { token, password: form.password },
+        { resetSessionToken, password: form.password },
         { withCredentials: true }
       );
 
@@ -77,6 +118,10 @@ export default function ResetPassword({ setUser }) {
       <SmallNavBar />
       <SideMenu />
       <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-6 sm:p-8 shadow-xl animate-fade-in-up">
+        {isCheckingLink ? (
+          <div className="text-center text-sm text-gray-700">Checking reset link...</div>
+        ) : (
+          <>
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-extrabold tracking-tight">
             Change your <span className="text-orange-500">password</span>
@@ -149,6 +194,8 @@ export default function ResetPassword({ setUser }) {
             Request another reset
           </Link>
         </p>
+          </>
+        )}
       </section>
     </main>
   );

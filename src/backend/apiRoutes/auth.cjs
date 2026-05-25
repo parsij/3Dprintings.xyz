@@ -156,10 +156,12 @@ module.exports = function authRoutes(deps) {
       );
 
       if (userResult.rows.length === 0) {
+        console.log(`user(null) with email(${normalizedEmail}) requested a forgot password. But email does not exist`);
         return res.json({ message: genericMessage });
       }
 
       const user = userResult.rows[0];
+      console.log(`user(${user.id}) with email(${user.email}) requested a forgot password`);
       const rawToken = randomBytes(32).toString('base64url');
       const tokenHash = hashResetToken(rawToken);
       const resetUrl = buildResetUrl(req, frontendOrigin, rawToken);
@@ -178,14 +180,62 @@ module.exports = function authRoutes(deps) {
     }
   });
 
-  app.post('/api/password-reset/confirm', async (req, res) => {
+  app.post('/api/password-reset/consume', async (req, res) => {
     const client = await pool.connect();
 
     try {
       const token = String(req.body?.token || '').trim();
-      const password = String(req.body?.password || '');
 
       if (!token || token.length > 200) {
+        return res.status(400).json({ message: 'Expired link' });
+      }
+
+      const tokenHash = hashResetToken(token);
+      const resetSessionToken = randomBytes(32).toString('base64url');
+      const resetSessionHash = hashResetToken(resetSessionToken);
+
+      await client.query('BEGIN');
+      const tokenResult = await client.query(
+        `SELECT id
+         FROM password_reset_tokens
+         WHERE token_hash = $1
+           AND used_at IS NULL
+           AND expires_at > NOW()
+         FOR UPDATE`,
+        [tokenHash]
+      );
+
+      if (tokenResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Expired link' });
+      }
+
+      await client.query(
+        `UPDATE password_reset_tokens
+         SET used_at = NOW(), reset_session_hash = $1
+         WHERE id = $2`,
+        [resetSessionHash, tokenResult.rows[0].id]
+      );
+      await client.query('COMMIT');
+
+      return res.json({ resetSessionToken });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => null);
+      console.error('Password reset consume error:', err.message || err);
+      return res.status(500).json({ message: 'Could not open reset link. Please request a new link.' });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.post('/api/password-reset/confirm', async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const resetSessionToken = String(req.body?.resetSessionToken || '').trim();
+      const password = String(req.body?.password || '');
+
+      if (!resetSessionToken || resetSessionToken.length > 200) {
         return res.status(400).json({ message: 'Invalid or expired reset link' });
       }
 
@@ -195,18 +245,19 @@ module.exports = function authRoutes(deps) {
         });
       }
 
-      const tokenHash = hashResetToken(token);
+      const resetSessionHash = hashResetToken(resetSessionToken);
       await client.query('BEGIN');
 
       const tokenResult = await client.query(
         `SELECT prt.id, prt.user_id, users.username, users.email, users.phone_number, users.password, COALESCE(users.role, 'customer') AS role
          FROM password_reset_tokens prt
          JOIN users ON users.id = prt.user_id
-         WHERE prt.token_hash = $1
-           AND prt.used_at IS NULL
+         WHERE prt.reset_session_hash = $1
+           AND prt.used_at IS NOT NULL
+           AND prt.password_reset_at IS NULL
            AND prt.expires_at > NOW()
          FOR UPDATE`,
-        [tokenHash]
+        [resetSessionHash]
       );
 
       if (tokenResult.rows.length === 0) {
@@ -223,7 +274,7 @@ module.exports = function authRoutes(deps) {
 
       const hashedPassword = await bcrypt.hash(password, 12);
       await client.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, user.user_id]);
-      await client.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1', [user.id]);
+      await client.query('UPDATE password_reset_tokens SET password_reset_at = NOW() WHERE id = $1', [user.id]);
       await client.query(
         `UPDATE password_reset_tokens
          SET used_at = COALESCE(used_at, NOW())

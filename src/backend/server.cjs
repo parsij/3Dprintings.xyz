@@ -677,10 +677,20 @@ async function initializeDatabase() {
          id BIGSERIAL PRIMARY KEY,
          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
          token_hash TEXT NOT NULL UNIQUE,
+         reset_session_hash TEXT UNIQUE,
          expires_at TIMESTAMPTZ NOT NULL,
          used_at TIMESTAMPTZ,
+         password_reset_at TIMESTAMPTZ,
          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
        )
+     `);
+     await pool.query(`
+       ALTER TABLE password_reset_tokens
+       ADD COLUMN IF NOT EXISTS reset_session_hash TEXT
+     `);
+     await pool.query(`
+       ALTER TABLE password_reset_tokens
+       ADD COLUMN IF NOT EXISTS password_reset_at TIMESTAMPTZ
      `);
      await pool.query(`
        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id_created_at
@@ -689,6 +699,11 @@ async function initializeDatabase() {
      await pool.query(`
        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at
        ON password_reset_tokens (expires_at)
+     `);
+     await pool.query(`
+       CREATE UNIQUE INDEX IF NOT EXISTS password_reset_tokens_reset_session_hash_unique_idx
+       ON password_reset_tokens (reset_session_hash)
+       WHERE reset_session_hash IS NOT NULL
      `);
      console.log("Password reset token table ensured.");
 

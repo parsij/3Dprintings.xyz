@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg";
 import googleLogo from "../assets/google.svg";
@@ -11,6 +11,7 @@ const SELLER_SITE_ORIGIN = "https://seller.3dprintings.xyz";
 
 export default function SignIn({ setUser, postLoginSellerFlow = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
   const [form, setForm] = useState({
     email: "",
@@ -31,6 +32,15 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const googleButtonRef = useRef(null);
+
+  useEffect(() => {
+    const message = String(location.state?.message || "").trim();
+    if (!message) return;
+
+    setSubmitError(true);
+    setSubmitMessage(message);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   const validators = {
     email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
