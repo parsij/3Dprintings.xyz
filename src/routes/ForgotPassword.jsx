@@ -89,7 +89,7 @@ export default function ForgotPassword() {
               <p
                 className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${
                   (activeField === "email") || touched
-                    ? "text-red-500 animate-pulse"
+                    ? "text-red-500"
                     : "text-red-400"
                 }`}
               >

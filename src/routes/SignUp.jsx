@@ -123,7 +123,7 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "username") || touched.username) && !isFieldValid("username") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "username") || touched.username) && !isFieldValid("username") ? "text-red-500" : "text-red-400"}`}>
                 {((activeField === "username") || touched.username) &&
                 !isFieldValid("username")
                   ? fieldErrors.username
@@ -152,7 +152,7 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "email") || touched.email) && !isFieldValid("email") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "email") || touched.email) && !isFieldValid("email") ? "text-red-500" : "text-red-400"}`}>
                 {((activeField === "email") || touched.email) && !isFieldValid("email")
                   ? fieldErrors.email
                   : ""}
@@ -187,7 +187,7 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 text-xs transition-all duration-300 ${((activeField === "password") || touched.password) && !isFieldValid("password") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 text-xs transition-all duration-300 ${((activeField === "password") || touched.password) && !isFieldValid("password") ? "text-red-500" : "text-red-400"}`}>
                 {((activeField === "password") || touched.password) && !isFieldValid("password")
                   ? fieldErrors.password
                   : ""}
@@ -215,7 +215,7 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${((activeField === "confirmPassword") || touched.confirmPassword) && !isFieldValid("confirmPassword") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${((activeField === "confirmPassword") || touched.confirmPassword) && !isFieldValid("confirmPassword") ? "text-red-500" : "text-red-400"}`}>
                 {((activeField === "confirmPassword") || touched.confirmPassword) &&
                 !isFieldValid("confirmPassword")
                   ? fieldErrors.confirmPassword

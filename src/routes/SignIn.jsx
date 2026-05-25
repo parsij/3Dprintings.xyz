@@ -286,7 +286,7 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "email") || touched.email) && !isFieldValid("email") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "email") || touched.email) && !isFieldValid("email") ? "text-red-500" : "text-red-400"}`}>
                 {((activeField === "email") || touched.email) &&
                 !isFieldValid("email")
                   ? fieldErrors.email
@@ -332,7 +332,7 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
                 </button>
               </div>
 
-              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "password") || touched.password) && !isFieldValid("password") ? "text-red-500 animate-pulse" : "text-red-400"}`}>
+              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "password") || touched.password) && !isFieldValid("password") ? "text-red-500" : "text-red-400"}`}>
                 {((activeField === "password") || touched.password) &&
                 !isFieldValid("password")
                   ? fieldErrors.password
@@ -356,7 +356,7 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
               <p
                 className={`rounded-lg border px-3 py-2 text-sm animate-fade-in-up transition-all duration-300 ${
                   submitError
-                    ? "border-red-200 bg-red-50 text-red-600 animate-pulse"
+                    ? "border-red-200 bg-red-50 text-red-600"
                     : "border-green-200 bg-green-50 text-green-700"
                 }`}
               >
