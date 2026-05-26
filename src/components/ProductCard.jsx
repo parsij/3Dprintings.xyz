@@ -72,7 +72,7 @@ const ProductCard = ({
   return (
     <div
       onClick={handleCardClick}
-      className="flex flex-col rounded-xl bg-white overflow-hidden hover:scale-105 cursor-pointer transition-transform duration-300 transform-gpu text-sm"
+      className="group flex flex-col rounded-xl bg-white overflow-hidden cursor-pointer transition-transform duration-300 transform-gpu origin-center hover:scale-105 text-sm"
     >
       <div className="h-70 overflow-hidden bg-gray-200">
         <img
@@ -88,14 +88,12 @@ const ProductCard = ({
       </div>
 
       <section className="p-3 flex flex-col gap-1 text-left flex-1">
-        <button
-          type="button"
-          onClick={handleCardClick}
-          className="line-clamp-2 min-h-12 font-medium text-left hover:text-orange-600 transition-colors cursor-pointer shadow-none hover:shadow-none focus:shadow-none active:shadow-none outline-none focus:outline-none focus:ring-0"
+        <p
+          className="line-clamp-2 min-h-12 w-full font-medium text-left text-gray-900 transition-colors duration-300 group-hover:text-orange-600"
           title={productName}
         >
           {productName}
-        </button>
+        </p>
 
         <span className="font-bold text-gray-800">
           {rating ? Number(rating).toFixed(1) : "0.0"} ⭐
@@ -106,7 +104,7 @@ const ProductCard = ({
             type="button"
             onClick={handleShopClick}
             disabled={!sellerId}
-            className="flex min-w-0 items-center gap-2 rounded-lg text-left transition hover:text-orange-600 disabled:cursor-default disabled:hover:text-gray-500"
+            className="no-button-motion flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:text-orange-600 disabled:cursor-default disabled:hover:text-gray-500"
           >
             <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-gray-100">
               {shopLogoUrl ? (
@@ -154,7 +152,7 @@ const ProductCard = ({
           <button
             onClick={handleAddToCart}
             disabled={isLoading || success}
-            className={`relative w-full px-4 py-2 rounded-full border text-sm font-medium transition-all duration-300 active:scale-95 ${
+            className={`no-button-motion relative w-full px-4 py-2 rounded-full border text-sm font-medium transition-colors duration-300 ${
               success
                 ? "bg-green-600 border-green-600 text-white cursor-default"
                 : "border-black text-black hover:bg-black hover:text-white cursor-pointer"

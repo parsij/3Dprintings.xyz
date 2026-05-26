@@ -31,6 +31,13 @@
     transition: none;
   }
 
+  .no-button-motion,
+  .no-button-motion:hover:not(:disabled),
+  .no-button-motion:active:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+  }
+
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
