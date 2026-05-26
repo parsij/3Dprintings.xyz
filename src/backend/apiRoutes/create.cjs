@@ -3,7 +3,7 @@ const path = require('path');
 
 
 module.exports = function createRoutes(deps) {
-  const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, isAuthenticatedAnIisValid } = deps;
+  const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, isAuthenticatedAnIisValid, enqueueWrite } = deps;
 
   app.post('/api/create', upload.array('photos', MAX_PHOTOS), async (req, res) => {
     const photos = req.files || [];
@@ -14,6 +14,20 @@ module.exports = function createRoutes(deps) {
       if (!auth?.userId) return; // response is already sent in isAuthenticatedAnIisValid or we wait, wait, the response is actually sent inside isAuthenticatedAnIisValid so if it returns an object with user ID it is valid. But if not, it sends res and returns the res object.. Wait, if it fails, it returns res.status().json() which is undefined or object.
 
       const userId = auth.userId;
+
+      const sellerResult = await pool.query(
+        `SELECT COALESCE(role, 'customer') AS role FROM users WHERE id = $1`,
+        [userId]
+      );
+      if (sellerResult.rows.length === 0) {
+        await cleanupUploadedFiles(photos);
+        return res.status(404).json({ message: 'User not found.' });
+      }
+      if (sellerResult.rows[0].role !== 'seller') {
+        await cleanupUploadedFiles(photos);
+        return res.status(403).json({ message: 'Seller access is required to list products.' });
+      }
+
       const { modelName = '', description = '', price, category = '', tags, quantity } = req.body;
       const parsedPrice = Number(price);
       const parsedQuantity = Math.max(1, Number(quantity) || 1);
@@ -108,34 +122,18 @@ module.exports = function createRoutes(deps) {
       );
       const imageFileNames = renamedPhotos.map(file => file.filename);
 
-      // Update product img_path column with the array of file names
       await pool.query(
         `UPDATE products SET img_path = $1 WHERE id = $2`,
         [imageFileNames, productId]
       );
 
-      // Ensure tags and category are stored correctly after insert.
-      // Some DB schemas use text[] and others use jsonb; updating with the JS array will correctly map to text[]
-      // and will also work for jsonb. Use a second update to be defensive and guarantee data is stored.
-      try {
-        await pool.query(
-          `UPDATE products SET tags = $1::jsonb, category = $2 WHERE id = $3`,
-          [tagsJson, normalizedCategory, productId]
-        );
-      } catch (e) {
-        // Best-effort: log but don't break the create flow
-        console.warn('Failed to run follow-up tags/category update:', e.message || e);
-      }
+      await pool.query(
+        `UPDATE products SET tags = $1::jsonb, category = $2 WHERE id = $3`,
+        [tagsJson, normalizedCategory, productId]
+      );
 
-      // Update tags usage in tags table
-      for (const t of parsedTags) {
-        await pool.query(
-          `INSERT INTO tags (tag_name, uses)
-           VALUES ($1, 1)
-           ON CONFLICT (tag_name) DO UPDATE
-           SET uses = tags.uses + 1`,
-          [t]
-        );
+      if (parsedTags.length > 0) {
+        await enqueueWrite('tags.bumpUsage', { tags: parsedTags });
       }
 
       // Respond

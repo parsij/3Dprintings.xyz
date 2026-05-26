@@ -1,12 +1,16 @@
 const express = require('express');
 const path = require("path");
 const { spawn } = require('child_process');
+const { randomUUID } = require("crypto");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 app.set("trust proxy", 1);
 const pool = require("./db.cjs");
 const cors = require('cors');
+const helmet = require("helmet");
+const { ipKeyGenerator, rateLimit } = require("express-rate-limit");
+const morgan = require("morgan");
 const bcrypt = require("bcrypt");
 const multer = require("multer");
 const cookieParser = require("cookie-parser");
@@ -15,26 +19,56 @@ const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
 const { ensureSellerProfilesTable } = require("./apiRoutes/sellerProfileShared.cjs");
-const { ensureInventoryDeductedColumn, fulfillPaidOrder } = require("./apiRoutes/orderFulfillment.cjs");
+const { ensureInventoryDeductedColumn } = require("./apiRoutes/orderFulfillment.cjs");
+const { initWorkerQueue, startWorkerRunner, shutdownWorkerQueue } = require("./worker/queue.cjs");
+const { enqueueWrite } = require("./asyncDb.cjs");
 const {
   ensureOrderTrackingColumn,
   ensureSellerAddressColumn,
-  mergeTrackerWebhookIntoOrders,
   validateEasyPostWebhookSignature,
 } = require("./apiRoutes/shippingShared.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const MAX_REVIEW_CONTENT_LENGTH = 5000;
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const uploadDir = path.join(__dirname, "imgUploads");
 const JWT_SECRET = process.env.JWT_SECRET;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN || ".3dprintings.xyz";
+const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN || (IS_PRODUCTION ? ".3dprintings.xyz" : "");
+const AUTH_COOKIE_MAX_AGE_DAYS = Number(process.env.AUTH_COOKIE_MAX_AGE_DAYS || 7);
+const AUTH_COOKIE_MAX_AGE_MS = AUTH_COOKIE_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || `${AUTH_COOKIE_MAX_AGE_DAYS}d`;
 
 if (!JWT_SECRET) {
   throw new Error("Missing JWT_SECRET. Add it to src/backend/.env");
+}
+
+if (IS_PRODUCTION && JWT_SECRET.length < 32) {
+  throw new Error("JWT_SECRET must be at least 32 characters in production.");
+}
+
+const requiredProductionEnv = [
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "EASYPOST_WEBHOOK_SECRET",
+  "DB_USER",
+  "DB_HOST",
+  "DB_NAME",
+  "DB_PASSWORD",
+];
+if (IS_PRODUCTION) {
+  const missingEnv = requiredProductionEnv.filter((name) => !String(process.env[name] || "").trim());
+  if (missingEnv.length > 0) {
+    throw new Error(`Missing required production environment variables: ${missingEnv.join(", ")}`);
+  }
+}
+
+if (!Number.isFinite(AUTH_COOKIE_MAX_AGE_MS) || AUTH_COOKIE_MAX_AGE_MS <= 0) {
+  throw new Error("AUTH_COOKIE_MAX_AGE_DAYS must be a positive number.");
 }
 
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -260,6 +294,10 @@ const upload = multer({
     if (!file.mimetype.startsWith("image/")) {
       return cb(new Error("Only image files are allowed."));
     }
+    const extension = path.extname(file.originalname || "").toLowerCase();
+    if (extension && !ALLOWED_UPLOAD_EXTENSIONS.has(extension)) {
+      return cb(new Error("Only JPG, PNG, WEBP, and GIF images are allowed."));
+    }
     cb(null, true);
   },
 });
@@ -268,8 +306,10 @@ const defaultAllowedOrigins = [
   "https://3dprintings.xyz",
   'https://www.3dprintings.xyz',
   "https://seller.3dprintings.xyz",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
+  ...(IS_PRODUCTION ? [] : [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ]),
 ];
 
 const envAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
@@ -291,6 +331,88 @@ function isAllowedOrigin(origin) {
     return false;
   }
 }
+
+function readPositiveIntegerEnv(name, fallbackValue) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallbackValue;
+}
+
+function createJsonRateLimiter({ windowMs, limit, message, keyGenerator, skipSuccessfulRequests = false }) {
+  return rateLimit({
+    windowMs,
+    limit,
+    keyGenerator,
+    skipSuccessfulRequests,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { message },
+    handler(req, res, next, options) {
+      return res.status(options.statusCode).json(options.message);
+    },
+  });
+}
+
+const apiRateLimiter = createJsonRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: readPositiveIntegerEnv("API_RATE_LIMIT_MAX", 600),
+  message: "Too many requests. Please wait a few minutes and try again.",
+});
+
+const authRateLimiter = createJsonRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: readPositiveIntegerEnv("AUTH_RATE_LIMIT_MAX", 20),
+  message: "Too many authentication attempts. Please wait a few minutes and try again.",
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || "").toLowerCase().trim();
+    return `${ipKeyGenerator(req.ip)}:${email || "no-email"}`;
+  },
+});
+
+const passwordResetRateLimiter = createJsonRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: readPositiveIntegerEnv("PASSWORD_RESET_RATE_LIMIT_MAX", 5),
+  message: "Too many password reset attempts. Please wait a few minutes and try again.",
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || req.body?.token || req.body?.resetSessionToken || "").toLowerCase().trim();
+    return `${ipKeyGenerator(req.ip)}:${email || "password-reset"}`;
+  },
+});
+
+const accountPasswordRateLimiter = createJsonRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: readPositiveIntegerEnv("ACCOUNT_PASSWORD_RATE_LIMIT_MAX", 10),
+  message: "Too many password change attempts. Please wait a few minutes and try again.",
+  keyGenerator: (req) => `${ipKeyGenerator(req.ip)}:account-password`,
+});
+
+function createRequestId(rawRequestId) {
+  if (typeof rawRequestId === "string" && /^[a-zA-Z0-9._:-]{1,100}$/.test(rawRequestId)) {
+    return rawRequestId;
+  }
+
+  return randomUUID();
+}
+
+function getSafeRequestPath(req) {
+  return String(req.originalUrl || req.url || "").split("?")[0] || "/";
+}
+
+app.disable("x-powered-by");
+app.use((req, res, next) => {
+  req.id = createRequestId(req.headers["x-request-id"]);
+  res.setHeader("X-Request-Id", req.id);
+  next();
+});
+
+morgan.token("id", (req) => req.id);
+morgan.token("safe-url", getSafeRequestPath);
+app.use(morgan(":id :remote-addr :method :safe-url :status :res[content-length] - :response-time ms"));
+
+app.use(helmet({
+  contentSecurityPolicy: IS_PRODUCTION ? undefined : false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 
 app.use(cors({
   origin(origin, callback) {
@@ -328,7 +450,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
       );
   } catch (err) {
       console.error('Webhook signature verification failed:', err.message);
-      return response.status(400).send(`Webhook Error: ${err.message}`);
+      return response.status(400).send('Webhook Error: invalid signature');
   }
 
   try {
@@ -355,15 +477,13 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
                   }
               }
 
-              const fulfillment = await fulfillPaidOrder(pool, orderId, paymentType);
-              if (fulfillment.completed) {
-                  console.log(`Order ${orderId} marked as completed with payment type: ${paymentType}`);
-              }
-              if (fulfillment.inventoryDeducted) {
-                  console.log(`Inventory deducted for order ${orderId}.`);
-              }
+              await enqueueWrite(
+                  'orders.fulfill',
+                  { orderId, paymentType },
+                  { jobKey: `fulfill:${orderId}` }
+              );
+              console.log(`Order ${orderId} fulfillment queued with payment type: ${paymentType}`);
 
-              // Clear cart for this order's customer. Prefer explicit userId metadata, fallback to DB lookup.
               let userId = session.metadata?.userId;
               if (!userId) {
                   const ownerResult = await pool.query(
@@ -373,11 +493,8 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
                   userId = ownerResult.rows[0]?.customer_id;
               }
               if (userId) {
-                  await pool.query(
-                      `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
-                      [userId]
-                  );
-                  console.log(`Cart cleared for user ${userId}.`);
+                  await enqueueWrite('users.clearCart', { userId }, { jobKey: `cart:${userId}` });
+                  console.log(`Cart clear queued for user ${userId}.`);
               }
           }
       }
@@ -422,8 +539,10 @@ app.post('/api/webhooks/easypost', express.raw({ type: 'application/json' }), as
     const isTrackerEvent = tracker?.object === "Tracker" || eventType.includes("tracker");
 
     if (tracker && isTrackerEvent) {
-      const updatedOrders = await mergeTrackerWebhookIntoOrders(pool, tracker);
-      console.log(`EasyPost webhook ${eventType || "tracker"} updated ${updatedOrders} order(s).`);
+      await enqueueWrite('shipping.mergeTracker', { tracker }, {
+        jobKey: `tracker:${tracker.id || tracker.tracking_code || eventType}`,
+      });
+      console.log(`EasyPost webhook ${eventType || "tracker"} queued for processing.`);
     }
 
     return response.status(200).json({ received: true });
@@ -433,16 +552,17 @@ app.post('/api/webhooks/easypost', express.raw({ type: 'application/json' }), as
   }
 });
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use("/imgUploads", express.static(uploadDir));
 app.use("/api/imgUploads", express.static(uploadDir));
+app.use("/api", apiRateLimiter);
 
 function createAuthToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, username: user.username, role: user.role },
     JWT_SECRET,
-    { expiresIn: "365d" }
+    { expiresIn: JWT_EXPIRES_IN }
   );
 }
 
@@ -451,7 +571,7 @@ function setAuthCookie(res, token) {
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: "lax",
-    maxAge: 93 * 24 * 60 * 60 * 1000,
+    maxAge: AUTH_COOKIE_MAX_AGE_MS,
     path: "/",
   };
   if (AUTH_COOKIE_DOMAIN) {
@@ -506,6 +626,9 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
             }
 
             content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+            if (content.length > MAX_REVIEW_CONTENT_LENGTH) {
+              return res.status(400).json({ message: `Review content must be ${MAX_REVIEW_CONTENT_LENGTH} characters or less` });
+            }
             break;
           case "create":
             rejexValue = /^[a-zA-Z0-9 ]+$/;
@@ -616,31 +739,76 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   stripe,
   EMAIL_REGEX,
   PASSWORD_REGEX,
+  authRateLimiter,
+  passwordResetRateLimiter,
+  accountPasswordRateLimiter,
   MAX_PHOTOS,
   MAX_PHOTO_SIZE,
 });
 
 
 
-app.use((error, req, res, next) => {
+function logUnhandledError(error, req, statusCode) {
+  console.error("Request error:", {
+    requestId: req.id,
+    method: req.method,
+    path: getSafeRequestPath(req),
+    statusCode,
+    message: error?.message,
+    stack: error?.stack,
+  });
+}
+
+function getClientErrorResponse(error) {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ message: "Each photo must be 5MB or less." });
+      return { statusCode: 400, message: "Each photo must be 5MB or less." };
     }
     if (error.code === "LIMIT_FILE_COUNT") {
-      return res.status(400).json({ message: `You can upload up to ${MAX_PHOTOS} photos.` });
+      return { statusCode: 400, message: `You can upload up to ${MAX_PHOTOS} photos.` };
     }
+    return { statusCode: 400, message: "Invalid upload." };
   }
 
   if (error?.message === "Only image files are allowed.") {
-    return res.status(400).json({ message: error.message });
+    return { statusCode: 400, message: "Only image files are allowed." };
+  }
+
+  if (error?.message === "Only JPG, PNG, WEBP, and GIF images are allowed.") {
+    return { statusCode: 400, message: "Only JPG, PNG, WEBP, and GIF images are allowed." };
   }
 
   if (typeof error?.message === "string" && error.message.startsWith("CORS blocked for origin:")) {
-    return res.status(403).json({ message: error.message });
+    return { statusCode: 403, message: "Request origin is not allowed." };
   }
 
-  return next(error);
+  if (error?.type === "entity.parse.failed") {
+    return { statusCode: 400, message: "Invalid JSON request body." };
+  }
+
+  if (error?.type === "entity.too.large") {
+    return { statusCode: 413, message: "Request body is too large." };
+  }
+
+  const statusCode = Number(error?.statusCode || error?.status);
+  if (Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 500) {
+    return { statusCode, message: "Invalid request." };
+  }
+
+  return { statusCode: 500, message: "Something went wrong. Please try again later." };
+}
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) {
+    return next(error);
+  }
+
+  const { statusCode, message } = getClientErrorResponse(error);
+  logUnhandledError(error, req, statusCode);
+  return res.status(statusCode).json({
+    message,
+    requestId: req.id,
+  });
 });
 
 // Initialize database tables
@@ -850,6 +1018,9 @@ function startStripeWebhookListener() {
 // Start server and services
 async function startServer() {
   try {
+    await initWorkerQueue();
+    await startWorkerRunner();
+
     // Initialize database
     await initializeDatabase();
 
@@ -872,5 +1043,12 @@ console.log("the Server is online.")
     process.exit(1);
   }
 }
+
+process.on('SIGINT', () => {
+  shutdownWorkerQueue().finally(() => process.exit(0));
+});
+process.on('SIGTERM', () => {
+  shutdownWorkerQueue().finally(() => process.exit(0));
+});
 
 startServer();

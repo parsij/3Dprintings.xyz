@@ -87,6 +87,8 @@ function buildGeoapifySuggestion(feature) {
   };
 }
 
+const noopMiddleware = (req, res, next) => next();
+
 function accountRoutes(deps) {
   const {
     app,
@@ -96,6 +98,7 @@ function accountRoutes(deps) {
     setAuthCookie,
     EMAIL_REGEX,
     PASSWORD_REGEX,
+    accountPasswordRateLimiter = noopMiddleware,
   } = deps;
 
   const geocodioApiKey = process.env.GEOCODIO_API_KEY;
@@ -353,7 +356,7 @@ function accountRoutes(deps) {
          UPDATE users
          SET username = $1, email = $2, phone_number = $3
          WHERE id = $4
-         RETURNING id, username, email, phone_number
+         RETURNING id, username, email, phone_number, COALESCE(role, 'customer') AS role
        `,
          [normalizedUsername, normalizedEmail, normalizedPhone, authUser.id]
        );
@@ -380,7 +383,7 @@ function accountRoutes(deps) {
      }
    });
 
-  app.put('/api/account/password', async (req, res) => {
+  app.put('/api/account/password', accountPasswordRateLimiter, async (req, res) => {
     try {
       const authUser = getAuthUserFromRequest(req);
       if (!authUser) {
@@ -417,7 +420,7 @@ function accountRoutes(deps) {
         return res.status(400).json({ message: 'New password must be different from current password' });
       }
 
-      const hashedNewPassword = await bcrypt.hash(newPassword, 8);
+      const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
       await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedNewPassword, authUser.id]);
 

@@ -61,7 +61,6 @@ module.exports = function likesSavesRoutes(deps) {
 
       const toggledLike = toggleNumericId(userResult.rows[0].liked_products, productId);
 
-      // Update database
       await pool.query(
         'UPDATE users SET liked_products = $1::jsonb WHERE id = $2',
         [JSON.stringify(toggledLike.ids), authUser.id]
@@ -160,7 +159,6 @@ module.exports = function likesSavesRoutes(deps) {
 
       const toggledSave = toggleNumericId(userResult.rows[0].saved_products, productId);
 
-      // Update database
       await pool.query(
         'UPDATE users SET saved_products = $1::jsonb WHERE id = $2',
         [JSON.stringify(toggledSave.ids), authUser.id]

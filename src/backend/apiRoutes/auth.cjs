@@ -2,12 +2,66 @@ const bcrypt = require('bcrypt');
 const { createHash, randomBytes } = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const nodemailer = require('nodemailer');
+const { z } = require('zod');
 
 const RESET_TOKEN_TTL_MINUTES = 60;
-const RESET_REQUEST_WINDOW_MS = 15 * 60 * 1000;
-const RESET_REQUEST_LIMIT = 5;
-const passwordResetRequests = new Map();
 let mailTransporter = null;
+
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email('Enter a valid email address')
+  .max(254, 'Email is too long');
+
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128, 'Password is too long')
+  .regex(/[a-z]/, 'Password must include a lowercase letter')
+  .regex(/[A-Z]/, 'Password must include an uppercase letter')
+  .regex(/\d/, 'Password must include a number');
+
+const resetTokenSchema = z
+  .string()
+  .trim()
+  .min(20, 'Invalid or expired reset link')
+  .max(200, 'Invalid or expired reset link');
+
+const signupSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .min(3, 'Username must be at least 3 characters')
+    .max(50, 'Username is too long')
+    .regex(/^[a-zA-Z0-9._-]+$/, 'Username can only contain letters, numbers, dots, underscores, and hyphens'),
+  email: emailSchema,
+  password: passwordSchema,
+}).strict();
+
+const loginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, 'Password is required').max(128, 'Password is too long'),
+}).strict();
+
+const passwordResetRequestSchema = z.object({
+  email: emailSchema,
+}).strict();
+
+const passwordResetConsumeSchema = z.object({
+  token: resetTokenSchema,
+}).strict();
+
+const passwordResetConfirmSchema = z.object({
+  resetSessionToken: resetTokenSchema,
+  password: passwordSchema,
+}).strict();
+
+const googleCredentialSchema = z.object({
+  credential: z.string().trim().min(1, 'Missing Google credential').max(4096, 'Google credential is too long'),
+}).strict();
+
+const noopMiddleware = (req, res, next) => next();
 
 function buildUsernameFromGoogleProfile(name, email) {
   const rawName = String(name || '').trim().toLowerCase();
@@ -55,6 +109,18 @@ function hashResetToken(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
+function validateBody(schema, body) {
+  const parsed = schema.safeParse(body);
+  if (parsed.success) {
+    return { ok: true, data: parsed.data };
+  }
+
+  return {
+    ok: false,
+    message: parsed.error.issues[0]?.message || 'Invalid request body',
+  };
+}
+
 function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -93,16 +159,6 @@ function buildResetUrl(req, frontendOrigin, token) {
   return `${origin}/reset-password/${encodeURIComponent(token)}`;
 }
 
-function isPasswordResetRateLimited(req, normalizedEmail) {
-  const key = `${req.ip || req.socket?.remoteAddress || 'unknown'}:${normalizedEmail}`;
-  const now = Date.now();
-  const existing = passwordResetRequests.get(key) || [];
-  const recent = existing.filter((timestamp) => now - timestamp < RESET_REQUEST_WINDOW_MS);
-  recent.push(now);
-  passwordResetRequests.set(key, recent);
-  return recent.length > RESET_REQUEST_LIMIT;
-}
-
 async function sendPasswordResetEmail(userEmail, resetUrl) {
   const transporter = getMailTransporter();
   const safeResetUrl = escapeHtml(resetUrl);
@@ -129,26 +185,21 @@ module.exports = function authRoutes(deps) {
     clearAuthCookie,
     getAuthUserFromRequest,
     EMAIL_REGEX,
-    PASSWORD_REGEX,
+    authRateLimiter = noopMiddleware,
+    passwordResetRateLimiter = noopMiddleware,
   } = deps;
   const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
   const googleOAuthClient = googleClientId ? new OAuth2Client(googleClientId) : null;
   const frontendOrigin = normalizeOrigin(process.env.FRONTEND_URL);
 
-  app.post('/api/password-reset/request', async (req, res) => {
+  app.post('/api/password-reset/request', passwordResetRateLimiter, async (req, res) => {
     try {
-      const normalizedEmail = String(req.body?.email || '').toLowerCase().trim();
-
-      if (!EMAIL_REGEX.test(normalizedEmail)) {
-        return res.status(400).json({ message: 'Enter a valid email address' });
+      const validation = validateBody(passwordResetRequestSchema, req.body);
+      if (!validation.ok) {
+        return res.status(400).json({ message: validation.message });
       }
 
-      if (isPasswordResetRateLimited(req, normalizedEmail)) {
-        return res.status(429).json({
-          message: 'Too many reset requests. Please wait a few minutes and try again.',
-        });
-      }
-
+      const normalizedEmail = validation.data.email;
       const genericMessage = 'If an account exists for that email, a reset link has been sent.';
       const userResult = await pool.query(
         'SELECT id, email FROM users WHERE email = $1 LIMIT 1',
@@ -156,12 +207,10 @@ module.exports = function authRoutes(deps) {
       );
 
       if (userResult.rows.length === 0) {
-        console.log(`user(null) with email(${normalizedEmail}) requested a forgot password. But email does not exist`);
         return res.json({ message: genericMessage });
       }
 
       const user = userResult.rows[0];
-      console.log(`user(${user.id}) with email(${user.email}) requested a forgot password`);
       const rawToken = randomBytes(32).toString('base64url');
       const tokenHash = hashResetToken(rawToken);
       const resetUrl = buildResetUrl(req, frontendOrigin, rawToken);
@@ -180,16 +229,16 @@ module.exports = function authRoutes(deps) {
     }
   });
 
-  app.post('/api/password-reset/consume', async (req, res) => {
+  app.post('/api/password-reset/consume', passwordResetRateLimiter, async (req, res) => {
     const client = await pool.connect();
 
     try {
-      const token = String(req.body?.token || '').trim();
-
-      if (!token || token.length > 200) {
+      const validation = validateBody(passwordResetConsumeSchema, req.body);
+      if (!validation.ok) {
         return res.status(400).json({ message: 'Expired link' });
       }
 
+      const { token } = validation.data;
       const tokenHash = hashResetToken(token);
       const resetSessionToken = randomBytes(32).toString('base64url');
       const resetSessionHash = hashResetToken(resetSessionToken);
@@ -228,23 +277,16 @@ module.exports = function authRoutes(deps) {
     }
   });
 
-  app.post('/api/password-reset/confirm', async (req, res) => {
+  app.post('/api/password-reset/confirm', passwordResetRateLimiter, async (req, res) => {
     const client = await pool.connect();
 
     try {
-      const resetSessionToken = String(req.body?.resetSessionToken || '').trim();
-      const password = String(req.body?.password || '');
-
-      if (!resetSessionToken || resetSessionToken.length > 200) {
-        return res.status(400).json({ message: 'Invalid or expired reset link' });
+      const validation = validateBody(passwordResetConfirmSchema, req.body);
+      if (!validation.ok) {
+        return res.status(400).json({ message: validation.message });
       }
 
-      if (!PASSWORD_REGEX.test(password)) {
-        return res.status(400).json({
-          message: 'Password must include uppercase, lowercase, number, and be at least 8 characters',
-        });
-      }
-
+      const { resetSessionToken, password } = validation.data;
       const resetSessionHash = hashResetToken(resetSessionToken);
       await client.query('BEGIN');
 
@@ -311,26 +353,14 @@ module.exports = function authRoutes(deps) {
     }
   });
 
-  app.post('/api/signup', async (req, res) => {
+  app.post('/api/signup', authRateLimiter, async (req, res) => {
     try {
-      const { username, email, password } = req.body;
-
-      if (!username || !email || !password) {
-        return res.status(400).json({ message: 'All fields are required' });
+      const validation = validateBody(signupSchema, req.body);
+      if (!validation.ok) {
+        return res.status(400).json({ message: validation.message });
       }
 
-      const normalizedUsername = username.trim();
-      const normalizedEmail = email.toLowerCase().trim();
-
-      const emailOk = EMAIL_REGEX.test(normalizedEmail);
-      const passwordOk = PASSWORD_REGEX.test(password);
-
-      if (!passwordOk || normalizedUsername.length < 3 || !emailOk) {
-        return res.status(400).json({
-          message: 'some of the data you provided is wrong please try again and refresh the page',
-        });
-      }
-
+      const { username: normalizedUsername, email: normalizedEmail, password } = validation.data;
       const existing = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
 
       if (existing.rows.length > 0) {
@@ -368,21 +398,14 @@ module.exports = function authRoutes(deps) {
     }
   });
 
-  app.post('/api/login', async (req, res) => {
+  app.post('/api/login', authRateLimiter, async (req, res) => {
     try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
+      const validation = validateBody(loginSchema, req.body);
+      if (!validation.ok) {
+        return res.status(400).json({ message: validation.message });
       }
 
-      const normalizedEmail = email.toLowerCase().trim();
-      const emailOk = EMAIL_REGEX.test(normalizedEmail);
-
-      if (!emailOk) {
-        return res.status(400).json({ message: 'Invalid email format' });
-      }
-
+      const { email: normalizedEmail, password } = validation.data;
       const result = await pool.query('SELECT id, username, email, phone_number, password, COALESCE(role, \'customer\') AS role FROM users WHERE email = $1', [
         normalizedEmail,
       ]);
@@ -423,18 +446,19 @@ module.exports = function authRoutes(deps) {
     return res.json({ clientId: googleClientId });
   });
 
-  app.post('/api/auth/google', async (req, res) => {
+  app.post('/api/auth/google', authRateLimiter, async (req, res) => {
     try {
       const requestOrigin = normalizeOrigin(req.headers.origin);
       if (requestOrigin && !isAllowedFrontendOrigin(requestOrigin, frontendOrigin)) {
         return res.status(403).json({ message: 'Blocked origin' });
       }
 
-      const credential = String(req.body?.credential || '').trim();
-      if (!credential) {
-        return res.status(400).json({ message: 'Missing Google credential' });
+      const validation = validateBody(googleCredentialSchema, req.body);
+      if (!validation.ok) {
+        return res.status(400).json({ message: validation.message });
       }
 
+      const { credential } = validation.data;
       if (!googleOAuthClient || !googleClientId) {
         return res.status(503).json({ message: 'Google sign-in is not configured on server' });
       }

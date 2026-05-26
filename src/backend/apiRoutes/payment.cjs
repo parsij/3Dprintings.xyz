@@ -399,7 +399,11 @@ module.exports = function paymentController(deps) {
             }
 
             const result = await pool.query(
-                `UPDATE orders SET status = 'cancelled' WHERE id = $1 AND customer_id = $2 AND status = 'pending' RETURNING *`,
+                `UPDATE orders
+                 SET status = 'cancelled',
+                     updated_at = NOW()
+                 WHERE id = $1 AND customer_id = $2 AND status = 'pending'
+                 RETURNING *`,
                 [orderId, auth.userId]
             );
 
@@ -407,7 +411,10 @@ module.exports = function paymentController(deps) {
                 return res.status(404).json({ error: "Order not found or cannot be cancelled" });
             }
 
-            res.json({ message: "Order cancelled successfully", order: result.rows[0] });
+            res.json({
+                message: "Order cancelled successfully",
+                order: result.rows[0],
+            });
         } catch (error) {
             console.error('Error cancelling order:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -599,10 +606,8 @@ module.exports = function paymentController(deps) {
 
             const existingOrder = orderResult.rows[0];
             if (existingOrder.status === "completed") {
-                const fulfillment = await fulfillPaidOrder(pool, orderId, existingOrder.payment_type || "card");
-                await clearCartForOrderCustomer(orderId);
                 return res.json({
-                    order: fulfillment.order || existingOrder,
+                    order: existingOrder,
                     paymentStatus: "paid",
                     paymentVerified: true,
                 });
@@ -635,7 +640,7 @@ module.exports = function paymentController(deps) {
             await clearCartForOrderCustomer(orderId);
 
             return res.json({
-                order: fulfillment.order || existingOrder,
+                order: fulfillment.order || { ...existingOrder, status: 'completed', payment_type: paymentType },
                 paymentStatus: session.payment_status,
                 paymentVerified: true,
             });

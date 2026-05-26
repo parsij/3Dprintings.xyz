@@ -59,15 +59,48 @@ async function fulfillPaidOrder(pool, orderId, paymentType = "card") {
     }
 
     const order = orderResult.rows[0];
+
+    if (order.status === "cancelled") {
+      await client.query("ROLLBACK");
+      return { order, completed: false, inventoryDeducted: false, cancelled: true };
+    }
+
+    if (order.status === "completed") {
+      await client.query("ROLLBACK");
+      return {
+        order,
+        completed: true,
+        inventoryDeducted: Boolean(order.inventory_deducted),
+      };
+    }
+
     let inventoryDeducted = false;
 
     if (!order.inventory_deducted) {
       const quantitiesByProductId = getProductQuantities(getOrderItems(order));
 
       for (const [productId, quantity] of quantitiesByProductId) {
+        const stockResult = await client.query(
+          `SELECT quantity, name FROM products WHERE id = $1 FOR UPDATE`,
+          [productId]
+        );
+        if (stockResult.rows.length === 0) {
+          await client.query("ROLLBACK");
+          throw new Error(`Product ${productId} not found during fulfillment for order ${orderId}`);
+        }
+        const available = Number(stockResult.rows[0].quantity);
+        if (available < quantity) {
+          await client.query("ROLLBACK");
+          throw new Error(
+            `Insufficient stock for "${stockResult.rows[0].name}" during fulfillment for order ${orderId}`
+          );
+        }
+      }
+
+      for (const [productId, quantity] of quantitiesByProductId) {
         await client.query(
           `UPDATE products
-           SET quantity = GREATEST(0, quantity - $1),
+           SET quantity = quantity - $1,
                sales_count = COALESCE(sales_count, 0) + $1
            WHERE id = $2`,
           [quantity, productId]

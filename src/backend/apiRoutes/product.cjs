@@ -42,11 +42,15 @@ module.exports = function productRoutes(deps) {
     externalPortfolioLink: row.external_portfolio_link || '',
   });
 
+  const parsePagination = (query) => {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 12));
+    return { page, limit, offset: (page - 1) * limit };
+  };
+
   app.get('/api/products', async (req, res) => {
     try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 12;
-      const offset = (page - 1) * limit;
+      const { page, limit, offset } = parsePagination(req.query);
       const sort = req.query.sort || 'relevant';
 
       let orderClause = 'ORDER BY p.id DESC';
@@ -90,10 +94,8 @@ module.exports = function productRoutes(deps) {
 
   app.get('/api/products/search', async (req, res) => {
     try {
-      const q = req.query.q || '';
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 12;
-      const offset = (page - 1) * limit;
+      const q = String(req.query.q || '').slice(0, 200);
+      const { page, limit, offset } = parsePagination(req.query);
       const sort = req.query.sort || 'relevant';
 
       let orderClause = 'ORDER BY p.id DESC';

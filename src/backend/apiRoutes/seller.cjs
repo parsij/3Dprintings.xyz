@@ -61,6 +61,7 @@ module.exports = function sellerRoutes(deps) {
     getAuthUserFromRequest,
     isAuthenticatedAnIisValid,
     EMAIL_REGEX,
+    enqueueWrite,
   } = deps;
 
   const attachAuthenticatedUser = async (req, res, next) => {
@@ -106,30 +107,15 @@ module.exports = function sellerRoutes(deps) {
     return next();
   };
 
-  const adjustTagUsageCounts = async (currentTags, nextTags) => {
+  const scheduleTagUsageCounts = async (currentTags, nextTags) => {
     const currentSet = new Set(normalizeTagList(currentTags));
     const nextSet = new Set(normalizeTagList(nextTags));
     const removedTags = [...currentSet].filter((tag) => !nextSet.has(tag));
     const addedTags = [...nextSet].filter((tag) => !currentSet.has(tag));
 
-    for (const tag of removedTags) {
-      await pool.query(
-        `UPDATE tags
-         SET uses = GREATEST(uses - 1, 0)
-         WHERE tag_name = $1`,
-        [tag]
-      );
-    }
+    if (removedTags.length === 0 && addedTags.length === 0) return;
 
-    for (const tag of addedTags) {
-      await pool.query(
-        `INSERT INTO tags (tag_name, uses)
-         VALUES ($1, 1)
-         ON CONFLICT (tag_name) DO UPDATE
-         SET uses = tags.uses + 1`,
-        [tag]
-      );
-    }
+    await enqueueWrite('tags.adjustUsage', { removedTags, addedTags });
   };
 
   app.post("/api/seller/become", attachAuthenticatedUser, async (req, res) => {
@@ -198,16 +184,12 @@ module.exports = function sellerRoutes(deps) {
 
   app.post("/api/seller/dashboard/refresh", attachAuthenticatedUser, isSeller, async (req, res) => {
     try {
-      const snapshot = await refreshSellerDashboard(pool, req.user.id);
-      return res.status(200).json({
-        message: "seller dashboard metrics refreshed.",
+      await enqueueWrite('seller.refreshDashboard', { sellerId: req.user.id }, {
+        jobKey: `seller-dashboard:${req.user.id}`,
+      });
+      return res.status(202).json({
+        message: "seller dashboard refresh queued.",
         updatedAt: new Date().toISOString(),
-        totals: {
-          lifetimeRevenue: snapshot.lifetimeRevenue,
-          lifetimeUnitsSold: snapshot.lifetimeUnitsSold,
-          lifetimeOrders: snapshot.lifetimeOrders,
-          totalReviews: snapshot.totalReviews,
-        },
       });
     } catch (error) {
       console.error("Error refreshing seller dashboard:", error);
@@ -566,7 +548,7 @@ module.exports = function sellerRoutes(deps) {
       }
 
       const existingProductResult = await pool.query(
-        `SELECT id, user_id, tags
+        `SELECT id, user_id, tags, img_path
          FROM products
          WHERE id = $1
          LIMIT 1`,
@@ -608,24 +590,26 @@ module.exports = function sellerRoutes(deps) {
        }
 
       const currentTags = parseProductTags(existingProduct.tags);
-      await adjustTagUsageCounts(currentTags, nextTags);
+      await scheduleTagUsageCounts(currentTags, nextTags);
 
-       const updatedResult = await pool.query(
-         `UPDATE products
-          SET name = $1,
-              description = $2,
-              original_price = $3,
-              current_price = $3,
-              category = $4,
-              tags = $5::jsonb,
-              quantity = $6
-          WHERE id = $7
-          RETURNING *`,
-         [modelName, description, parsedPrice, category || null, JSON.stringify(nextTags), parsedQuantity, productId]
-       );
+      const updatedResult = await pool.query(
+        `UPDATE products
+         SET name = $1,
+             description = $2,
+             original_price = $3,
+             current_price = $3,
+             category = $4,
+             tags = $5::jsonb,
+             quantity = $6
+         WHERE id = $7
+         RETURNING *`,
+        [modelName, description, parsedPrice, category || null, JSON.stringify(nextTags), parsedQuantity, productId]
+      );
 
       const updatedProduct = updatedResult.rows[0];
-      const firstImage = Array.isArray(updatedProduct.img_path) && updatedProduct.img_path.length > 0 ? updatedProduct.img_path[0] : null;
+      const firstImage = Array.isArray(updatedProduct.img_path) && updatedProduct.img_path.length > 0
+        ? updatedProduct.img_path[0]
+        : null;
 
       return res.status(200).json({
         message: "Product updated.",
@@ -733,9 +717,14 @@ module.exports = function sellerRoutes(deps) {
          SET seller_reply = $1,
              seller_reply_updated_at = CASE WHEN $1::text IS NULL THEN NULL ELSE NOW() END
          WHERE id = $2
+           AND product_id IN (SELECT id FROM products WHERE user_id = $3)
          RETURNING id, seller_reply, seller_reply_updated_at`,
-        [replyValue, reviewId]
+        [replyValue, reviewId, req.user.id]
       );
+
+      if (updatedResult.rows.length === 0) {
+        return res.status(404).json({ message: "Review not found for this seller." });
+      }
 
       const updated = updatedResult.rows[0];
       return res.status(200).json({

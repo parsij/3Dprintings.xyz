@@ -1,9 +1,9 @@
 const { normalizeNumericArray, ensureLikesColumns } = require('./likesShared.cjs');
 
 module.exports = function reviewsRoutes(deps) {
-  const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid } = deps;
+  const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid, enqueueWrite } = deps;
 
-  const updateProductRatingAndCount = async (productId) => {
+  const readProductRatingStats = async (productId) => {
     const aggregateResult = await pool.query(
       `SELECT COALESCE(AVG(rating), 0)::numeric(3,2) AS average_rating,
               COUNT(*)::int AS reviews_count
@@ -12,15 +12,18 @@ module.exports = function reviewsRoutes(deps) {
       [productId]
     );
 
-    const averageRating = Number(aggregateResult.rows[0]?.average_rating || 0);
-    const reviewsCount = Number(aggregateResult.rows[0]?.reviews_count || 0);
+    return {
+      averageRating: Number(aggregateResult.rows[0]?.average_rating || 0),
+      reviewsCount: Number(aggregateResult.rows[0]?.reviews_count || 0),
+    };
+  };
 
-    await pool.query(
-      'UPDATE products SET rating = $1 WHERE id = $2',
-      [averageRating, productId]
+  const scheduleProductRatingUpdate = async (productId) => {
+    await enqueueWrite(
+      'products.updateRating',
+      { productId },
+      { jobKey: `product-rating:${productId}` }
     );
-
-    return { averageRating, reviewsCount };
   };
 
    app.get('/api/user/reviews', async (req, res) => {
@@ -134,7 +137,8 @@ module.exports = function reviewsRoutes(deps) {
         [productId, auth.userId, rating, contentValue || null]
       );
 
-      const { averageRating, reviewsCount } = await updateProductRatingAndCount(productId);
+      await scheduleProductRatingUpdate(productId);
+      const { averageRating, reviewsCount } = await readProductRatingStats(productId);
 
       const usernameResult = await pool.query(
         'SELECT username FROM users WHERE id = $1',
@@ -193,8 +197,8 @@ module.exports = function reviewsRoutes(deps) {
          RETURNING id, product_id, user_id, rating, content, created_at`,
         [auth.rating, auth.content || null, reviewId, productId]
       );
-
-      const { averageRating, reviewsCount } = await updateProductRatingAndCount(productId);
+      await scheduleProductRatingUpdate(productId);
+      const { averageRating, reviewsCount } = await readProductRatingStats(productId);
 
       return res.json({
         message: 'Review updated',
@@ -241,8 +245,8 @@ module.exports = function reviewsRoutes(deps) {
         'DELETE FROM reviews WHERE id = $1 AND product_id = $2',
         [reviewId, productId]
       );
-
-      const { averageRating, reviewsCount } = await updateProductRatingAndCount(productId);
+      await scheduleProductRatingUpdate(productId);
+      const { averageRating, reviewsCount } = await readProductRatingStats(productId);
 
       return res.json({
         message: 'Review deleted',

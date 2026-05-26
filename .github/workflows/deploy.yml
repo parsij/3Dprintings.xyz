@@ -62,15 +62,21 @@ jobs:
             # 4. Install production dependencies
             npm install --omit=dev
 
-            # 5. PM2 Management
+            # 5. PM2 Management (CLUSTER MODE)
             PM2_PATH=$(which pm2 || echo "/usr/local/bin/pm2")
             
             if $PM2_PATH info api-backend > /dev/null 2>&1; then
-              echo "Restarting api-backend..."
-              $PM2_PATH restart api-backend --update-env
+              echo "Reloading api-backend (Zero-Downtime)..."
+              # Use reload instead of restart for zero-downtime deployments
+              $PM2_PATH reload api-backend --update-env
+            
+              # Force scale to max in case it was running on a single thread previously
+              $PM2_PATH scale api-backend max
             else
-              echo "Starting api-backend for the first time..."
-              $PM2_PATH start server.cjs --name "api-backend"
+              echo "Starting api-backend in Multi-Threaded Cluster Mode..."
+              # The -i max flag clones the server across all CPU cores
+              $PM2_PATH start server.cjs --name "api-backend" -i max
             fi
             
+            # 6. Save the PM2 list so it restarts on server reboot
             $PM2_PATH save

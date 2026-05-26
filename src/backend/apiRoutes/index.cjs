@@ -1,14 +1,17 @@
+const { enqueueWrite } = require('../asyncDb.cjs');
+
 module.exports = function registerApiRoutes(deps) {
+  const routeDeps = { ...deps, enqueueWrite };
   // load individual route modules and pass shared dependencies
-  require('./auth.cjs')(deps);
-  require('./account.cjs')(deps);
-  require('./create.cjs')(deps);
-  require('./tags.cjs')(deps);
-  require('./product.cjs')(deps);
-  require('./reviews.cjs')(deps);
-  require('./cart.cjs')(deps);
-  require('./likes.cjs')(deps);
-  require('./payment.cjs')(deps);
-  require('./config.cjs')(deps);
-  require('./seller.cjs')(deps);
+  require('./auth.cjs')(routeDeps);
+  require('./account.cjs')(routeDeps);
+  require('./create.cjs')(routeDeps);
+  require('./tags.cjs')(routeDeps);
+  require('./product.cjs')(routeDeps);
+  require('./reviews.cjs')(routeDeps);
+  require('./cart.cjs')(routeDeps);
+  require('./likes.cjs')(routeDeps);
+  require('./payment.cjs')(routeDeps);
+  require('./config.cjs')(routeDeps);
+  require('./seller.cjs')(routeDeps);
 };
