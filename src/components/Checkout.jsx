@@ -431,7 +431,7 @@ const Checkout = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowAddressDetails(true)}
-                                    className="flex items-center gap-2 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                                    className="flex items-center gap-2 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors shadow-none hover:shadow-none focus:shadow-none active:shadow-none outline-none focus:outline-none focus:ring-0"
                                     aria-expanded="false"
                                 >
                                     <ChevronDown className="h-4 w-4 transition-transform duration-300" />
@@ -444,7 +444,7 @@ const Checkout = () => {
                                         setAddressLine(formatAddressSummary(normalizeAddress(shippingAddress)));
                                         setShowAddressDetails(false);
                                     }}
-                                    className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors mb-4"
+                                    className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors mb-4 shadow-none hover:shadow-none focus:shadow-none active:shadow-none outline-none focus:outline-none focus:ring-0"
                                     aria-expanded="true"
                                 >
                                     <ArrowLeft className="h-4 w-4" />
