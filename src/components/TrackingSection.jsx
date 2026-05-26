@@ -38,12 +38,17 @@ export default function TrackingSection({
   compact = false,
   title = "Tracking",
   showHeader = true,
+  embedded = false,
+  showAllEvents = false,
 }) {
   const shipments = normalizeShipments(tracking);
   const hasShipments = shipments.length > 0;
+  const sectionClassName = embedded
+    ? "space-y-3"
+    : `rounded-lg border border-gray-100 bg-gray-50 ${compact ? "p-3" : "p-4"} space-y-3`;
 
   return (
-    <section className={`rounded-lg border border-gray-100 bg-gray-50 ${compact ? "p-3" : "p-4"} space-y-3`}>
+    <section className={sectionClassName}>
       {showHeader ? (
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-gray-900">{title}</p>
@@ -64,10 +69,13 @@ export default function TrackingSection({
               const rightTime = right.datetime ? new Date(right.datetime).getTime() : 0;
               return rightTime - leftTime;
             });
-            const displayedEvents = compact ? events.slice(0, 2) : events;
+            const displayedEvents = showAllEvents || !compact ? events : events.slice(0, 2);
 
             return (
-              <div key={`${shipment.trackerId || shipment.sellerId || shipmentIndex}-${shipmentIndex}`} className="rounded-lg border border-gray-200 bg-white p-3">
+              <div
+                key={`${shipment.trackerId || shipment.sellerId || shipmentIndex}-${shipmentIndex}`}
+                className={embedded ? "space-y-3" : "rounded-lg border border-gray-200 bg-white p-3"}
+              >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{formatStatus(shipment.status)}</p>

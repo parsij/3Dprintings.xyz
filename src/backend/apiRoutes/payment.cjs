@@ -701,9 +701,12 @@ function sanitizeOrderItems(order) {
     if (order && order.items && Array.isArray(order.items.items)) {
         order.items.items = order.items.items.map(item => {
             const newItem = { ...item };
+            const productId = Number(newItem.id ?? newItem.productId ?? newItem.product_id);
+            if (Number.isFinite(productId) && productId > 0) {
+                newItem.productId = productId;
+            }
             delete newItem.id;
             delete newItem.product_id;
-            delete newItem.productId;
             delete newItem.sellerId;
             delete newItem.seller_id;
             delete newItem.sellerAddress;

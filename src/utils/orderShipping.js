@@ -76,15 +76,36 @@ export function getSellerIdForItem(item, itemsPayload, tracking) {
 
 export function getTrackingForItem(item, { items: itemsPayload, tracking }) {
   const shipments = Array.isArray(tracking?.shipments) ? tracking.shipments : [];
-  const sellerId = getSellerIdForItem(item, itemsPayload, tracking);
+  const productId = Number(item?.id ?? item?.productId ?? item?.product_id);
 
+  if (Number.isFinite(productId) && productId > 0) {
+    const shipmentByProductId = shipments.find((entry) =>
+      (entry.productIds || []).map((value) => Number(value)).includes(productId)
+    );
+    if (shipmentByProductId) {
+      return {
+        shipments: [shipmentByProductId],
+        lastUpdatedAt: tracking?.lastUpdatedAt || shipmentByProductId.updatedAt || null,
+      };
+    }
+  }
+
+  if (item?.name) {
+    const shipmentByName = shipments.find((entry) =>
+      (entry.productNames || []).includes(item.name)
+    );
+    if (shipmentByName) {
+      return {
+        shipments: [shipmentByName],
+        lastUpdatedAt: tracking?.lastUpdatedAt || shipmentByName.updatedAt || null,
+      };
+    }
+  }
+
+  const sellerId = getSellerIdForItem(item, itemsPayload, tracking);
   let shipment = null;
   if (sellerId != null) {
     shipment = shipments.find((entry) => Number(entry.sellerId) === sellerId) || null;
-  }
-
-  if (!shipment && item?.name) {
-    shipment = shipments.find((entry) => (entry.productNames || []).includes(item.name)) || null;
   }
 
   return {

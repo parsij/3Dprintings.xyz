@@ -208,7 +208,7 @@ export default function OrderDetails({ user }) {
                   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
                   const unitPrice = Number(item?.current_price);
                   const safePrice = Number.isFinite(unitPrice) ? unitPrice : 0;
-                  const productId = item?.id ?? item?.product_id;
+                  const productId = item?.productId ?? item?.id ?? item?.product_id;
                   const hasProductLink = Number.isFinite(Number(productId)) && Number(productId) > 0;
                   const productPath = hasProductLink ? `/product/${encodeURIComponent(String(productId))}` : null;
                   const productName = item?.name || "Item";

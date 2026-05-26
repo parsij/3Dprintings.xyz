@@ -17,7 +17,7 @@ export default function CollapsibleTrackingSection({
         onClick={() => setIsOpen((previous) => !previous)}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        className="inline-flex items-center gap-2 rounded-md py-1 text-sm font-semibold text-gray-900 transition-colors duration-200 hover:text-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+        className="inline-flex items-center gap-2 py-1 text-sm font-semibold text-gray-900 transition-colors duration-200 hover:text-orange-600 focus:outline-none"
       >
         <ChevronDown
           aria-hidden="true"
@@ -37,7 +37,7 @@ export default function CollapsibleTrackingSection({
       >
         <div className="overflow-hidden">
           <div className="pt-2">
-            <TrackingSection tracking={tracking} showHeader={false} compact />
+            <TrackingSection tracking={tracking} showHeader={false} embedded showAllEvents />
           </div>
         </div>
       </div>
