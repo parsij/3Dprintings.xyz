@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import CollapsibleTrackingSection from "./CollapsibleTrackingSection.jsx";
 import TrackingSection from "./TrackingSection.jsx";
-
-function getOrderItemsArray(itemsPayload) {
-  if (Array.isArray(itemsPayload)) return itemsPayload;
-  if (itemsPayload && typeof itemsPayload === "object" && Array.isArray(itemsPayload.items)) {
-    return itemsPayload.items;
-  }
-  return [];
-}
+import { getOrderItemsArray, orderHasMultipleSellers } from "../utils/orderShipping.js";
 
 function toMoney(value) {
   const numeric = Number(value);
@@ -133,6 +127,10 @@ export default function OrderDetails({ user }) {
     : null;
 
   const isPending = order && String(order.status || "").toLowerCase() === "pending";
+  const hasMultipleSellers = orderHasMultipleSellers({
+    items: order?.items,
+    tracking: order?.tracking,
+  });
 
   if (!user) return <Navigate to="/signin" replace />;
 
@@ -261,7 +259,11 @@ export default function OrderDetails({ user }) {
             )}
           </div>
 
-          <TrackingSection tracking={order.tracking} />
+          {hasMultipleSellers ? (
+            <CollapsibleTrackingSection tracking={order.tracking} />
+          ) : (
+            <TrackingSection tracking={order.tracking} />
+          )}
 
           {orderTotals && (
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 text-sm">

@@ -1,4 +1,5 @@
 import TrackingSection from "./TrackingSection.jsx";
+import { orderHasMultipleSellers } from "../utils/orderShipping.js";
 
 const OrderCard = ({
   orderId,
@@ -12,6 +13,7 @@ const OrderCard = ({
   onPay,
   isPayLoading = false,
   tracking,
+  items,
 }) => {
   const statusMap = {
     completed: { label: "Completed", styles: "bg-green-50 text-green-600" },
@@ -39,6 +41,7 @@ const OrderCard = ({
   }).format(safeTotal);
 
   const isPending = normalizedStatus === "pending";
+  const showTracking = !orderHasMultipleSellers({ items, tracking });
 
   return (
     <article className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full">
@@ -74,9 +77,11 @@ const OrderCard = ({
           </div>
         </div>
 
-        <div className="mt-4">
-          <TrackingSection tracking={tracking} compact />
-        </div>
+        {showTracking ? (
+          <div className="mt-4">
+            <TrackingSection tracking={tracking} compact />
+          </div>
+        ) : null}
       </div>
 
       <div className="px-4 md:px-5 py-3 bg-gray-50/40 border-t border-gray-100 flex flex-row gap-2 items-center justify-start md:justify-end">

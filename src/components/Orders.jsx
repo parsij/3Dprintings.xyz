@@ -183,6 +183,7 @@ export default function Orders({ user }) {
               paymentMethod={normalizePaymentType(order.payment_type)}
               totalAmount={order.total_amount}
               totalItemsCount={getOrderItemsCount(order.items)}
+              items={order.items}
               tracking={order.tracking}
               onViewDetails={() => navigate(`/account/orders/${encodeURIComponent(order.id)}`)}
               isDetailsLoading={false}
