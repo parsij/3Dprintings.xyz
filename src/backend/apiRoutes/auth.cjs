@@ -572,8 +572,9 @@ module.exports = function authRoutes(deps) {
   });
 
   app.post('/api/signout', (req, res) => {
-    clearAuthCookie(res);
+    clearAuthCookie(res, req);
     clearCsrfCookie(res);
+    res.setHeader("Clear-Site-Data", '"cookies"');
     return res.json({ message: 'Signed out' });
   });
 

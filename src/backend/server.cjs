@@ -35,6 +35,7 @@ const {
   isTestMode,
   normalizeOrigin,
 } = require("./envShared.cjs");
+const { clearAuthCookie: expireAuthCookies } = require("./authCookies.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
@@ -669,27 +670,13 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
   }
 }
 
-function clearAuthCookie(res) {
-  const baseOptions = {
-    httpOnly: true,
-    secure: IS_PRODUCTION,
-    sameSite: "lax",
-    path: "/",
-  };
-
-  res.clearCookie("token", baseOptions);
-
-  const domainVariants = new Set();
-  if (AUTH_COOKIE_DOMAIN) {
-    domainVariants.add(AUTH_COOKIE_DOMAIN);
-  }
-  if (IS_PRODUCTION) {
-    domainVariants.add(".3dprintings.xyz");
-  }
-
-  for (const domain of domainVariants) {
-    res.clearCookie("token", { ...baseOptions, domain });
-  }
+function clearAuthCookie(res, req) {
+  const hostname = String(req?.headers?.host || "").split(":")[0].toLowerCase();
+  expireAuthCookies(res, {
+    isProduction: IS_PRODUCTION,
+    authCookieDomain: AUTH_COOKIE_DOMAIN,
+    hostname,
+  });
 }
 
 function getCookieValuesFromRequest(req, cookieName) {

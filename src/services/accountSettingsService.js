@@ -44,10 +44,15 @@ export async function signOutAccount() {
     await ensureCsrfToken(API_BASE);
     const response = await apiClient.post(`${API_BASE}/api/signout`, {});
 
+    if (response.data?.message !== "Signed out") {
+      throw new Error(response.data?.message || "Sign out did not complete.");
+    }
+
     return response.data;
   } catch (error) {
     const message =
       error?.response?.data?.message ||
+      error?.message ||
       "Could not sign you out right now. Please try again.";
     throw new Error(message);
   }

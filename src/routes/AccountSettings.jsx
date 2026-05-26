@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate, Routes, Route, Link, useLocation } from "react-router-dom";
+import { Navigate, Routes, Route, Link, useLocation } from "react-router-dom";
 import Account from "../components/Account.jsx";
 import ChangePassword from "../components/ChangePassword.jsx";
 import SideMenu from "../components/SideMenu.jsx";
@@ -21,7 +21,6 @@ const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const ADDRESS_AUTOCOMPLETE_DEBOUNCE_MS = 100;
 
 export default function AccountSettings({ user, setUser }) {
-  const navigate = useNavigate();
   const [profileForm, setProfileForm] = useState({ username: "", email: "", phone_number: "" });
   const [addressForm, setAddressForm] = useState({
     street_address: "",
@@ -386,11 +385,9 @@ export default function AccountSettings({ user, setUser }) {
     try {
       setIsSigningOut(true);
       await signOutAccount();
-      setUser(null);
-      navigate("/signin", { replace: true });
+      window.location.replace("/signin");
     } catch (error) {
       setSignOutMessage(error.message || "Sign out failed.");
-    } finally {
       setIsSigningOut(false);
     }
   }

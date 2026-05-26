@@ -21,7 +21,8 @@ export default defineConfig({
       '/api': {
         target: backendTarget,
         changeOrigin: true,
-        secure: false
+        secure: false,
+        cookieDomainRewrite: '',
       }
     }
   },

@@ -1,4 +1,5 @@
 const { randomBytes, timingSafeEqual } = require("crypto");
+const { isTestMode } = require("./envShared.cjs");
 
 const CSRF_COOKIE_NAME = "csrf-token";
 const CSRF_HEADER_NAME = "x-csrf-token";
@@ -36,27 +37,33 @@ function setCsrfCookie(res, token = generateCsrfToken()) {
 }
 
 function clearCsrfCookie(res) {
-  const baseOptions = {
-    httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-  };
-
-  res.clearCookie(CSRF_COOKIE_NAME, baseOptions);
-
-  const domainVariants = new Set();
+  const expire = new Date(0);
   const authCookieDomain = process.env.AUTH_COOKIE_DOMAIN
     || (process.env.NODE_ENV === "production" ? ".3dprintings.xyz" : "");
-  if (authCookieDomain) {
-    domainVariants.add(authCookieDomain);
+  const isProduction = process.env.NODE_ENV === "production";
+  const domains = new Set([undefined]);
+
+  if (authCookieDomain) domains.add(authCookieDomain);
+  if (isProduction || isTestMode()) {
+    domains.add(".3dprintings.xyz");
+    domains.add("3dprintings.xyz");
   }
-  if (process.env.NODE_ENV === "production") {
-    domainVariants.add(".3dprintings.xyz");
+  if (!isProduction || isTestMode()) {
+    domains.add("localhost");
+    domains.add(".localhost");
   }
 
-  for (const domain of domainVariants) {
-    res.clearCookie(CSRF_COOKIE_NAME, { ...baseOptions, domain });
+  const secureVariants = [
+    { httpOnly: false, sameSite: "lax", path: "/", secure: false },
+    { httpOnly: false, sameSite: "lax", path: "/", secure: true },
+  ];
+
+  for (const variant of secureVariants) {
+    for (const domain of domains) {
+      const options = domain ? { ...variant, domain } : variant;
+      res.clearCookie(CSRF_COOKIE_NAME, options);
+      res.cookie(CSRF_COOKIE_NAME, "", { ...options, expires: expire, maxAge: 0 });
+    }
   }
 }
 
