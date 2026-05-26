@@ -4,8 +4,23 @@ import PasswordEye from "../assets/PasswordEye.svg"
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 import axios from "axios";
+import { API_BASE } from "../config/api.js";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+function getSignupErrorMessage(error) {
+  return (
+    error?.response?.data?.message ||
+    error?.message ||
+    "Signup failed. Please try again."
+  );
+}
+
+function getSignupErrorField(message) {
+  const lower = String(message || "").toLowerCase();
+  if (lower.includes("email")) return "email";
+  if (lower.includes("password")) return "password";
+  if (lower.includes("username")) return "username";
+  return null;
+}
 
 export default function SignUp({ setUser }) {
   const navigate = useNavigate();
@@ -25,6 +40,10 @@ export default function SignUp({ setUser }) {
 
   const [activeField, setActiveField] = useState(null);
   const [showPasswords, setShowPasswords] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [submitError, setSubmitError] = useState(false);
+  const [serverFieldErrors, setServerFieldErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validators = {
     username: (v) => v.trim().length >= 3,
@@ -50,6 +69,22 @@ export default function SignUp({ setUser }) {
   const onChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    setSubmitMessage("");
+    setSubmitError(false);
+    setServerFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
+
+  const getDisplayedFieldError = (name) => {
+    if (serverFieldErrors[name]) return serverFieldErrors[name];
+    if ((activeField === name || touched[name]) && !isFieldValid(name)) {
+      return fieldErrors[name];
+    }
+    return "";
   };
 
   const onSubmit = async (event) => {
@@ -62,9 +97,18 @@ export default function SignUp({ setUser }) {
       confirmPassword: true,
     });
 
-    if (!isFormValid) return;
+    setSubmitMessage("");
+    setSubmitError(false);
+    setServerFieldErrors({});
+
+    if (!isFormValid) {
+      setSubmitError(true);
+      setSubmitMessage("Fix the highlighted fields before continuing.");
+      return;
+    }
 
     try {
+      setIsSubmitting(true);
       const response = await axios.post(
         `${API_BASE}/api/signup`,
         {
@@ -76,10 +120,21 @@ export default function SignUp({ setUser }) {
         }
       );
 
-      setUser(response.data.user); // auto log in
+      setUser(response.data.user);
       navigate("/home", { replace: true });
     } catch (error) {
-      console.log(error.response?.data?.message || "Signup failed");
+      const message = getSignupErrorMessage(error);
+      const errorField = getSignupErrorField(message);
+
+      setSubmitError(true);
+      setSubmitMessage(message);
+
+      if (errorField) {
+        setServerFieldErrors({ [errorField]: message });
+        setTouched((prev) => ({ ...prev, [errorField]: true }));
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -128,11 +183,8 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${((activeField === "username") || touched.username) && !isFieldValid("username") ? "text-red-500" : "text-red-400"}`}>
-                {((activeField === "username") || touched.username) &&
-                !isFieldValid("username")
-                  ? fieldErrors.username
-                  : ""}
+              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${getDisplayedFieldError("username") ? "text-red-500" : "text-red-400"}`}>
+                {getDisplayedFieldError("username")}
               </p>
             </div>
 
@@ -162,10 +214,8 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${((activeField === "email") || touched.email) && !isFieldValid("email") ? "text-red-500" : "text-red-400"}`}>
-                {((activeField === "email") || touched.email) && !isFieldValid("email")
-                  ? fieldErrors.email
-                  : ""}
+              <p className={`mt-1 min-h-[16px] text-xs transition-all duration-300 ${getDisplayedFieldError("email") ? "text-red-500" : "text-red-400"}`}>
+                {getDisplayedFieldError("email")}
               </p>
             </div>
 
@@ -197,10 +247,8 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 text-xs transition-all duration-300 ${((activeField === "password") || touched.password) && !isFieldValid("password") ? "text-red-500" : "text-red-400"}`}>
-                {((activeField === "password") || touched.password) && !isFieldValid("password")
-                  ? fieldErrors.password
-                  : ""}
+              <p className={`mt-1 text-xs transition-all duration-300 ${getDisplayedFieldError("password") ? "text-red-500" : "text-red-400"}`}>
+                {getDisplayedFieldError("password")}
               </p>
             </div>
 
@@ -225,25 +273,34 @@ export default function SignUp({ setUser }) {
                   </span>
                 )}
               </div>
-              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${((activeField === "confirmPassword") || touched.confirmPassword) && !isFieldValid("confirmPassword") ? "text-red-500" : "text-red-400"}`}>
-                {((activeField === "confirmPassword") || touched.confirmPassword) &&
-                !isFieldValid("confirmPassword")
-                  ? fieldErrors.confirmPassword
-                  : ""}
+              <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${getDisplayedFieldError("confirmPassword") ? "text-red-500" : "text-red-400"}`}>
+                {getDisplayedFieldError("confirmPassword")}
               </p>
             </div>
 
             <button
               type="submit"
-              disabled={!isFormValid}
+              disabled={!isFormValid || isSubmitting}
               className={`w-full rounded-xl py-3 font-semibold text-white transition-all duration-300 ${
-                isFormValid
+                isFormValid && !isSubmitting
                   ? "cursor-pointer bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
                   : "bg-gray-300 cursor-not-allowed opacity-70"
               }`}
             >
-              Create Account
+              {isSubmitting ? "Creating account..." : "Create Account"}
             </button>
+
+            {submitMessage && (
+              <p
+                className={`rounded-lg border px-3 py-2 text-sm animate-fade-in-up transition-all duration-300 ${
+                  submitError
+                    ? "border-red-200 bg-red-50 text-red-600"
+                    : "border-green-200 bg-green-50 text-green-700"
+                }`}
+              >
+                {submitMessage}
+              </p>
+            )}
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600 transition-colors duration-300 hover:text-gray-700">
