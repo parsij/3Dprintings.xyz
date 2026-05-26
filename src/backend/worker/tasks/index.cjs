@@ -1,0 +1,91 @@
+const { fulfillPaidOrder } = require("../../apiRoutes/orderFulfillment.cjs");
+const { mergeTrackerWebhookIntoOrders } = require("../../apiRoutes/shippingShared.cjs");
+const { refreshSellerDashboard } = require("../../apiRoutes/sellerShared.cjs");
+const appPool = require("../../db.cjs");
+
+async function withPool(helpers, fn) {
+  return helpers.withPgClient((client) => fn(client));
+}
+
+const taskList = {
+  "users.clearCart": async (payload, helpers) => {
+    const { userId } = payload;
+    await withPool(helpers, (client) =>
+      client.query(`UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`, [userId])
+    );
+  },
+
+  "products.updateRating": async (payload, helpers) => {
+    const { productId } = payload;
+    await withPool(helpers, async (client) => {
+      const aggregateResult = await client.query(
+        `SELECT COALESCE(AVG(rating), 0)::numeric(3,2) AS average_rating
+         FROM reviews
+         WHERE product_id = $1`,
+        [productId]
+      );
+      const averageRating = Number(aggregateResult.rows[0]?.average_rating || 0);
+      await client.query(`UPDATE products SET rating = $1 WHERE id = $2`, [
+        averageRating,
+        productId,
+      ]);
+    });
+  },
+
+  "tags.bumpUsage": async (payload, helpers) => {
+    const { tags } = payload;
+    if (!Array.isArray(tags) || tags.length === 0) return;
+
+    await withPool(helpers, async (client) => {
+      for (const tag of tags) {
+        await client.query(
+          `INSERT INTO tags (tag_name, uses)
+           VALUES ($1, 1)
+           ON CONFLICT (tag_name) DO UPDATE
+           SET uses = tags.uses + 1`,
+          [tag]
+        );
+      }
+    });
+  },
+
+  "tags.adjustUsage": async (payload, helpers) => {
+    const { addedTags = [], removedTags = [] } = payload;
+
+    await withPool(helpers, async (client) => {
+      for (const tag of removedTags) {
+        await client.query(
+          `UPDATE tags SET uses = GREATEST(uses - 1, 0) WHERE tag_name = $1`,
+          [tag]
+        );
+      }
+      for (const tag of addedTags) {
+        await client.query(
+          `INSERT INTO tags (tag_name, uses)
+           VALUES ($1, 1)
+           ON CONFLICT (tag_name) DO UPDATE
+           SET uses = tags.uses + 1`,
+          [tag]
+        );
+      }
+    });
+  },
+
+  "orders.fulfill": async (payload, helpers) => {
+    const { orderId, paymentType } = payload;
+    await fulfillPaidOrder(appPool, orderId, paymentType);
+  },
+
+  "shipping.mergeTracker": async (payload, helpers) => {
+    const { tracker } = payload;
+    await withPool(helpers, (client) => mergeTrackerWebhookIntoOrders(client, tracker));
+  },
+
+  "seller.refreshDashboard": async (payload, helpers) => {
+    const { sellerId } = payload;
+    await withPool(helpers, (client) => refreshSellerDashboard(client, sellerId));
+  },
+
+};
+
+module.exports = taskList;
