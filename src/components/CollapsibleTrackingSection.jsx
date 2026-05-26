@@ -11,23 +11,21 @@ export default function CollapsibleTrackingSection({
   const panelId = useId();
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="mt-3 border-t border-gray-200 pt-3">
       <button
         type="button"
         onClick={() => setIsOpen((previous) => !previous)}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-2"
+        className="inline-flex items-center gap-2 rounded-md py-1 text-sm font-semibold text-gray-900 transition-colors duration-200 hover:text-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
       >
         <ChevronDown
           aria-hidden="true"
-          className={`h-5 w-5 shrink-0 text-gray-600 transition-transform duration-300 ease-in-out ${
+          className={`h-4 w-4 shrink-0 text-current transition-transform duration-300 ease-in-out ${
             isOpen ? "rotate-180" : "rotate-0"
           }`}
         />
-        <span className="text-sm font-semibold text-gray-900">
-          {isOpen ? hideLabel : title}
-        </span>
+        <span className="inline-block min-w-[7.75rem] text-left">{isOpen ? hideLabel : title}</span>
       </button>
 
       <div
@@ -38,11 +36,11 @@ export default function CollapsibleTrackingSection({
         }`}
       >
         <div className="overflow-hidden">
-          <div className="border-t border-gray-100 px-4 pb-4 pt-3">
-            <TrackingSection tracking={tracking} title="Tracking" />
+          <div className="pt-2">
+            <TrackingSection tracking={tracking} showHeader={false} compact />
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

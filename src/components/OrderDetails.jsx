@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import CollapsibleTrackingSection from "./CollapsibleTrackingSection.jsx";
 import TrackingSection from "./TrackingSection.jsx";
-import { getOrderItemsArray, orderHasMultipleSellers } from "../utils/orderShipping.js";
+import { getOrderItemsArray, getTrackingForItem, orderHasMultipleSellers } from "../utils/orderShipping.js";
 
 function toMoney(value) {
   const numeric = Number(value);
@@ -213,6 +213,10 @@ export default function OrderDetails({ user }) {
                   const productPath = hasProductLink ? `/product/${encodeURIComponent(String(productId))}` : null;
                   const productName = item?.name || "Item";
                   const imageUrl = typeof item?.image_url === "string" ? item.image_url : "";
+                  const itemTracking = getTrackingForItem(item, {
+                    items: order.items,
+                    tracking: order.tracking,
+                  });
                   return (
                     <div key={`${item?.id || item?.name || "item"}-${index}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                       <div className="flex items-start justify-between gap-3">
@@ -252,6 +256,10 @@ export default function OrderDetails({ user }) {
                         </div>
                         <p className="text-sm font-semibold text-gray-900 shrink-0">{toMoney(safePrice * safeQuantity)}</p>
                       </div>
+
+                      {hasMultipleSellers ? (
+                        <CollapsibleTrackingSection tracking={itemTracking} embedded />
+                      ) : null}
                     </div>
                   );
                 })}
@@ -259,11 +267,7 @@ export default function OrderDetails({ user }) {
             )}
           </div>
 
-          {hasMultipleSellers ? (
-            <CollapsibleTrackingSection tracking={order.tracking} />
-          ) : (
-            <TrackingSection tracking={order.tracking} />
-          )}
+          {!hasMultipleSellers ? <TrackingSection tracking={order.tracking} /> : null}
 
           {orderTotals && (
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 text-sm">

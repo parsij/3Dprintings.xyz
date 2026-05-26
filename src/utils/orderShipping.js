@@ -44,3 +44,51 @@ export function orderHasMultipleSellers({ items, tracking }) {
   if (orderItems.length < 2) return false;
   return collectSellerIds(items, tracking).size >= 2;
 }
+
+export function getSellerIdForItem(item, itemsPayload, tracking) {
+  const directSellerId = Number(item?.sellerId ?? item?.seller_id);
+  if (Number.isFinite(directSellerId) && directSellerId > 0) {
+    return directSellerId;
+  }
+
+  const productId = Number(item?.id ?? item?.productId ?? item?.product_id);
+  const candidateShipments = [
+    ...(Array.isArray(itemsPayload?.shippingQuote?.shipments) ? itemsPayload.shippingQuote.shipments : []),
+    ...(Array.isArray(tracking?.shipments) ? tracking.shipments : []),
+  ];
+
+  for (const shipment of candidateShipments) {
+    const sellerId = Number(shipment?.sellerId);
+    if (!Number.isFinite(sellerId) || sellerId <= 0) continue;
+
+    const productIds = (shipment.productIds || []).map((value) => Number(value));
+    if (Number.isFinite(productId) && productId > 0 && productIds.includes(productId)) {
+      return sellerId;
+    }
+
+    if (item?.name && (shipment.productNames || []).includes(item.name)) {
+      return sellerId;
+    }
+  }
+
+  return null;
+}
+
+export function getTrackingForItem(item, { items: itemsPayload, tracking }) {
+  const shipments = Array.isArray(tracking?.shipments) ? tracking.shipments : [];
+  const sellerId = getSellerIdForItem(item, itemsPayload, tracking);
+
+  let shipment = null;
+  if (sellerId != null) {
+    shipment = shipments.find((entry) => Number(entry.sellerId) === sellerId) || null;
+  }
+
+  if (!shipment && item?.name) {
+    shipment = shipments.find((entry) => (entry.productNames || []).includes(item.name)) || null;
+  }
+
+  return {
+    shipments: shipment ? [shipment] : [],
+    lastUpdatedAt: tracking?.lastUpdatedAt || shipment?.updatedAt || null,
+  };
+}

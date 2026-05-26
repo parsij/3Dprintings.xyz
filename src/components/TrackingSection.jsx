@@ -33,18 +33,25 @@ function formatEventMessage(event) {
   return message || formatStatus(event?.status);
 }
 
-export default function TrackingSection({ tracking, compact = false, title = "Tracking" }) {
+export default function TrackingSection({
+  tracking,
+  compact = false,
+  title = "Tracking",
+  showHeader = true,
+}) {
   const shipments = normalizeShipments(tracking);
   const hasShipments = shipments.length > 0;
 
   return (
     <section className={`rounded-lg border border-gray-100 bg-gray-50 ${compact ? "p-3" : "p-4"} space-y-3`}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        {tracking?.lastUpdatedAt ? (
-          <p className="text-xs text-gray-500">Updated {formatDateTime(tracking.lastUpdatedAt)}</p>
-        ) : null}
-      </div>
+      {showHeader ? (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-gray-900">{title}</p>
+          {tracking?.lastUpdatedAt ? (
+            <p className="text-xs text-gray-500">Updated {formatDateTime(tracking.lastUpdatedAt)}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hasShipments ? (
         <p className="text-sm text-gray-600">No tracking updates yet.</p>
