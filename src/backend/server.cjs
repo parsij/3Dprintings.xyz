@@ -21,6 +21,7 @@ const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
 const { ensureSellerProfilesTable } = require("./apiRoutes/sellerProfileShared.cjs");
 const { ensureInventoryDeductedColumn } = require("./apiRoutes/orderFulfillment.cjs");
 const { initWorkerQueue, startWorkerRunner, shutdownWorkerQueue } = require("./worker/queue.cjs");
+const { csrfProtection, setCsrfCookie, clearCsrfCookie } = require("./csrf.cjs");
 const { enqueueWrite } = require("./asyncDb.cjs");
 const {
   ensureOrderTrackingColumn,
@@ -554,6 +555,7 @@ app.post('/api/webhooks/easypost', express.raw({ type: 'application/json' }), as
 
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
+app.use("/api", csrfProtection);
 app.use("/imgUploads", express.static(uploadDir));
 app.use("/api/imgUploads", express.static(uploadDir));
 app.use("/api", apiRateLimiter);
@@ -733,6 +735,8 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   createAuthToken,
   setAuthCookie,
   clearAuthCookie,
+  setCsrfCookie,
+  clearCsrfCookie,
   getAuthUserFromRequest,
   isAuthenticatedAnIisValid,
   calculateTax: calculateTaxAndAuthentication,

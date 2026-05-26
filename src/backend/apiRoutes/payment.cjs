@@ -1,5 +1,5 @@
 module.exports = function paymentController(deps) {
-    const { app, pool, isAuthenticatedAnIisValid, stripe } = deps;
+    const { app, pool, isAuthenticatedAnIisValid, stripe, enqueueWrite } = deps;
     const { fulfillPaidOrder } = require("./orderFulfillment.cjs");
     const {
         calculateEasyPostShippingQuote,
@@ -7,10 +7,13 @@ module.exports = function paymentController(deps) {
         normalizeAddressPayload,
         normalizeSellerAddressFromRow,
     } = require("./shippingShared.cjs");
+    const {
+        bootstrapPendingOrderPolling,
+        clearCartForOrderCustomer,
+        getPaymentTypeFromSession,
+        scheduleOrderPaymentPoll,
+    } = require("./orderPaymentPolling.cjs");
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const ORDER_PAYMENT_POLL_INTERVAL_MS = 10_000;
-    const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
-    const orderPaymentPollers = new Map();
     const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
     const parseIntInRange = (value, field, min, max) => {
         const parsed = Number.parseInt(value, 10);
@@ -19,28 +22,6 @@ module.exports = function paymentController(deps) {
         }
         return { value: parsed };
     };
-    const getPaymentTypeFromSession = (session, fallback = "card") => {
-        if (Array.isArray(session?.payment_method_types) && session.payment_method_types[0]) {
-            return session.payment_method_types[0];
-        }
-        return fallback;
-    };
-    const clearCartForOrderCustomer = async (orderId) => {
-         if (!orderId) return;
-
-         const ownerResult = await pool.query(
-             `SELECT customer_id FROM orders WHERE id = $1`,
-             [orderId]
-         );
-         const customerId = ownerResult.rows[0]?.customer_id;
-         if (!customerId) return;
-
-         await pool.query(
-             `UPDATE users SET cart_json = '{}'::jsonb WHERE id = $1`,
-             [customerId]
-         );
-     };
-
     const getProductImageUrl = (imgPath) => {
         if (!Array.isArray(imgPath) || imgPath.length === 0 || !imgPath[0]) return "";
         return `${IMAGE_BASE_URL}/${imgPath[0]}`;
@@ -206,117 +187,6 @@ module.exports = function paymentController(deps) {
             totalCents,
             shippingQuote,
         };
-    };
-
-    const stopOrderPaymentPolling = (orderId) => {
-        const existingInterval = orderPaymentPollers.get(orderId);
-        if (existingInterval) {
-            clearInterval(existingInterval);
-            orderPaymentPollers.delete(orderId);
-        }
-    };
-
-    const runOrderPaymentCheck = async (orderId) => {
-        const result = await pool.query(
-            `SELECT id, status, created_at, stripe_session_id, payment_type
-             FROM orders
-             WHERE id = $1`,
-            [orderId]
-        );
-
-        if (result.rows.length === 0) {
-            stopOrderPaymentPolling(orderId);
-            return;
-        }
-
-        const order = result.rows[0];
-        if (order.status !== "pending") {
-            stopOrderPaymentPolling(orderId);
-            return;
-        }
-
-        const createdAtMs = new Date(order.created_at).getTime();
-        if (!Number.isFinite(createdAtMs)) {
-            stopOrderPaymentPolling(orderId);
-            return;
-        }
-
-        const ageMs = Date.now() - createdAtMs;
-        if (ageMs >= ORDER_PAYMENT_TIMEOUT_MS) {
-            await pool.query(
-                `UPDATE orders
-                 SET status = 'cancelled',
-                     updated_at = NOW()
-                 WHERE id = $1 AND status = 'pending'`,
-                [orderId]
-            );
-            stopOrderPaymentPolling(orderId);
-            return;
-        }
-
-        if (!order.stripe_session_id) {
-            return;
-        }
-
-        let session;
-        try {
-            session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
-        } catch (error) {
-            console.error(`Stripe session check failed for order ${orderId}:`, error.message || error);
-            return;
-        }
-
-        if (session?.payment_status !== "paid") {
-            return;
-        }
-
-         const paymentType = getPaymentTypeFromSession(session, order.payment_type || "card");
-         const fulfillment = await fulfillPaidOrder(pool, orderId, paymentType);
-         if (fulfillment.completed) {
-             await clearCartForOrderCustomer(orderId);
-         }
-
-         stopOrderPaymentPolling(orderId);
-    };
-
-    const startOrderPaymentPolling = (orderId) => {
-        if (!orderId || orderPaymentPollers.has(orderId)) return;
-
-        // Run first check immediately, then every 10 seconds.
-        runOrderPaymentCheck(orderId).catch((error) => {
-            console.error(`Initial payment check failed for order ${orderId}:`, error);
-        });
-
-        const intervalId = setInterval(() => {
-            runOrderPaymentCheck(orderId).catch((error) => {
-                console.error(`Payment polling failed for order ${orderId}:`, error);
-            });
-        }, ORDER_PAYMENT_POLL_INTERVAL_MS);
-
-        orderPaymentPollers.set(orderId, intervalId);
-    };
-
-    const bootstrapPendingOrderPolling = async () => {
-        try {
-            await pool.query(
-                `UPDATE orders
-                 SET status = 'cancelled',
-                     updated_at = NOW()
-                 WHERE status = 'pending' AND created_at <= NOW() - INTERVAL '2 hours'`
-            );
-
-            const pending = await pool.query(
-                `SELECT id
-                 FROM orders
-                 WHERE status = 'pending' AND created_at > NOW() - INTERVAL '2 hours'`
-            );
-
-            for (const row of pending.rows) {
-                startOrderPaymentPolling(row.id);
-            }
-        } catch (error) {
-            console.error("Error bootstrapping order payment polling:", error);
-        }
     };
 
     // List orders for authenticated user (supports pagination via ?page=&limit=)
@@ -572,7 +442,7 @@ module.exports = function paymentController(deps) {
                 `UPDATE orders SET stripe_session_id = $1, updated_at = NOW() WHERE id = $2`,
                 [session.id, orderId]
             );
-            startOrderPaymentPolling(orderId);
+            scheduleOrderPaymentPoll(enqueueWrite, orderId);
 
             res.json({ url: session.url, orderId });
         } catch (error) {
@@ -637,7 +507,7 @@ module.exports = function paymentController(deps) {
             }
 
             const fulfillment = await fulfillPaidOrder(pool, orderId, paymentType);
-            await clearCartForOrderCustomer(orderId);
+            await clearCartForOrderCustomer(pool, orderId);
 
             return res.json({
                 order: fulfillment.order || { ...existingOrder, status: 'completed', payment_type: paymentType },
@@ -651,7 +521,7 @@ module.exports = function paymentController(deps) {
     });
 
     // The Stripe webhook handler has been moved to server.cjs BEFORE express.json()
-    bootstrapPendingOrderPolling();
+    bootstrapPendingOrderPolling(pool, enqueueWrite);
 }
 
 function sanitizeOrderItems(order) {

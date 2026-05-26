@@ -12,7 +12,10 @@ const PaymentCancel = () => {
         if (orderId) {
             const cancelOrder = async () => {
                 try {
-                    await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+                    await fetch(`/api/orders/${orderId}/cancel`, {
+                        method: 'POST',
+                        credentials: 'include',
+                    });
                 } catch (error) {
                     console.error('Error cancelling order:', error);
                 }

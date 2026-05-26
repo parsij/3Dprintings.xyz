@@ -1,7 +1,14 @@
 const { fulfillPaidOrder } = require("../../apiRoutes/orderFulfillment.cjs");
+const {
+  ORDER_PAYMENT_POLL_INTERVAL_MS,
+  ORDER_PAYMENT_POLL_JOB_PREFIX,
+  runOrderPaymentCheck,
+} = require("../../apiRoutes/orderPaymentPolling.cjs");
 const { mergeTrackerWebhookIntoOrders } = require("../../apiRoutes/shippingShared.cjs");
 const { refreshSellerDashboard } = require("../../apiRoutes/sellerShared.cjs");
+const { enqueueWrite } = require("../../worker/queue.cjs");
 const appPool = require("../../db.cjs");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 async function withPool(helpers, fn) {
   return helpers.withPgClient((client) => fn(client));
@@ -74,6 +81,23 @@ const taskList = {
   "orders.fulfill": async (payload, helpers) => {
     const { orderId, paymentType } = payload;
     await fulfillPaidOrder(appPool, orderId, paymentType);
+  },
+
+  "orders.pollPayment": async (payload) => {
+    const { orderId } = payload;
+    if (!orderId) return;
+
+    const { shouldContinue } = await runOrderPaymentCheck(appPool, stripe, orderId);
+    if (!shouldContinue) return;
+
+    await enqueueWrite(
+      "orders.pollPayment",
+      { orderId },
+      {
+        jobKey: `${ORDER_PAYMENT_POLL_JOB_PREFIX}${orderId}`,
+        runAt: new Date(Date.now() + ORDER_PAYMENT_POLL_INTERVAL_MS),
+      }
+    );
   },
 
   "shipping.mergeTracker": async (payload, helpers) => {

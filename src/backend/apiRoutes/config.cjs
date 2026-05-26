@@ -1,5 +1,10 @@
 module.exports = function configRoutes(deps) {
-  const { app } = deps;
+  const { app, setCsrfCookie } = deps;
+
+  app.get("/api/csrf-token", (req, res) => {
+    const token = setCsrfCookie(res);
+    return res.json({ token });
+  });
 
   app.get("/api/config", (req, res) => {
     const rawHost = req.get("host") || "";

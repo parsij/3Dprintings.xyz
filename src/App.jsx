@@ -3,6 +3,7 @@ import "./App.css";
 import Router from "./Router.jsx";
 import SellerRouter from "./SellerRouter.jsx";
 import axios from "axios";
+import { ensureCsrfToken } from "./services/csrf.js";
 
 // Best practice: Use an environment variable or leave it blank to default to relative paths
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
@@ -18,6 +19,7 @@ const App = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        await ensureCsrfToken(API_BASE);
         // FIXED: Cleaned up the path to use the proxy structure correctly
         const response = await axios.get(`${API_BASE}/api/auth`, {
           withCredentials: true,

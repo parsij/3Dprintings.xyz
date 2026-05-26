@@ -183,6 +183,8 @@ module.exports = function authRoutes(deps) {
     createAuthToken,
     setAuthCookie,
     clearAuthCookie,
+    setCsrfCookie,
+    clearCsrfCookie,
     getAuthUserFromRequest,
     EMAIL_REGEX,
     authRateLimiter = noopMiddleware,
@@ -381,6 +383,7 @@ module.exports = function authRoutes(deps) {
       const user = result.rows[0];
       const token = createAuthToken(user);
       setAuthCookie(res, token);
+      setCsrfCookie(res);
 
       return res.status(201).json({
         message: 'User created',
@@ -422,6 +425,7 @@ module.exports = function authRoutes(deps) {
       }
       const token = createAuthToken(user);
       setAuthCookie(res, token);
+      setCsrfCookie(res);
       return res.json({
         message: 'Signed in',
         user: {
@@ -587,6 +591,7 @@ module.exports = function authRoutes(deps) {
 
       const token = createAuthToken(user);
       setAuthCookie(res, token);
+      setCsrfCookie(res);
 
       return res.json({
         message: 'Signed in with Google',
@@ -617,6 +622,7 @@ module.exports = function authRoutes(deps) {
       return res.status(401).json({message: 'User not authenticated.'});
     }
     clearAuthCookie(res);
+    clearCsrfCookie(res);
     return res.json({message: 'Signed out'});
   });
 
