@@ -89,7 +89,7 @@ const ProductCard = ({
 
       <section className="p-3 flex flex-col gap-1 text-left flex-1">
         <p
-          className="line-clamp-2 min-h-12 w-full font-medium text-left text-gray-900 transition-colors duration-300 group-hover:text-orange-600"
+          className="line-clamp-2 min-h-12 w-full font-medium text-left text-gray-900 transform-gpu duration-300 group-hover:scale-110"
           title={productName}
         >
           {productName}
