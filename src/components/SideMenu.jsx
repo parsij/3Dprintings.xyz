@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useMenu } from "../MenuContext.jsx";
+import { MARKETPLACE_HOME_URL } from "../config/api.js";
 
 const main = [
   { label: "Home", to: "/home" },
@@ -19,7 +20,7 @@ const seller = [
   { label: "Orders", to: "/orders" },
   { label: "Reviews", to: "/reviews" },
   { label: "Preferences", to: "/preferences" },
-  { label: "Back to Marketplace", to: "https://3dprintings.xyz/home" },
+  { label: "Back to Marketplace", to: MARKETPLACE_HOME_URL },
 ];
 
 const SideMenu = ({ title = "Menu", role = "customer" }) => {

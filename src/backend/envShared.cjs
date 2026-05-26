@@ -22,16 +22,23 @@ function getFrontendUrl() {
 function getSellerFrontendUrl() {
   const configured = normalizeOrigin(process.env.SELLER_FRONTEND_URL);
   if (configured) return configured;
-  if (isTestMode()) return "http://localhost:5173";
+  if (isTestMode()) return "http://seller.localhost:5173";
   return "https://seller.3dprintings.xyz";
+}
+
+function isLocalDevHostname(hostname) {
+  const host = String(hostname || "").toLowerCase();
+  return host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
 }
 
 function getLocalDevOrigins() {
   const origins = new Set([
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://seller.localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://seller.localhost:3000",
     "http://localhost:5000",
     "http://127.0.0.1:5000",
   ]);
@@ -58,7 +65,7 @@ function isLocalDevOrigin(origin) {
   try {
     const parsed = new URL(origin);
     if (!["http:", "https:"].includes(parsed.protocol)) return false;
-    return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+    return isLocalDevHostname(parsed.hostname);
   } catch {
     return false;
   }
@@ -112,6 +119,7 @@ module.exports = {
   getServerPort,
   isAllowedAppOrigin,
   isAllowedFrontendOrigin,
+  isLocalDevHostname,
   isLocalDevOrigin,
   isProductionSiteOrigin,
   isTestMode,

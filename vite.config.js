@@ -13,6 +13,8 @@ export default defineConfig({
       '3dprintings.xyz',
       'www.3dprintings.xyz',
       'localhost',
+      'seller.localhost',
+      '.localhost',
       '127.0.0.1',
     ],
     proxy: {

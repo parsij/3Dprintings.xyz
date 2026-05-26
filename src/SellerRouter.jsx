@@ -11,6 +11,7 @@ import SellerInventory from "./seller/routes/SellerInventory.jsx";
 import SellerOrders from "./seller/routes/SellerOrders.jsx";
 import SellerPreferences from "./seller/routes/SellerPreferences.jsx";
 import SellerReviews from "./seller/routes/SellerReviews.jsx";
+import { BECOME_SELLER_URL } from "./config/api.js";
 // Safety Wrapper: Ensures the user is logged in AND is actually a seller
 function hasSellerRole(user) {
     return String(user?.role || "").trim().toLowerCase() === "seller";
@@ -20,8 +21,7 @@ function ProtectedSellerRoute({ user, children }) {
 
     useEffect(() => {
         if (user && !hasSellerRole(user)) {
-            // FIXED: Safe side effect executed comfortably outside the rendering timeline
-            window.location.href = "https://3dprintings.xyz/become-seller";
+            window.location.href = BECOME_SELLER_URL;
         }
     }, [user]);
 

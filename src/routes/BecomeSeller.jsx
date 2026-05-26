@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
-import { API_BASE, SELLER_SITE_ORIGIN } from "../config/api.js";
+import { API_BASE, IS_LOCAL_DEV, SELLER_SITE_ORIGIN } from "../config/api.js";
 
 export default function BecomeSeller({ setUser }) {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ export default function BecomeSeller({ setUser }) {
 
       setMessage(response.data?.message || "seller access granted.");
       setTimeout(() => {
-        if (window.location.hostname.endsWith("3dprintings.xyz")) {
+        if (IS_LOCAL_DEV || window.location.hostname.endsWith("3dprintings.xyz")) {
           window.location.assign(`${SELLER_SITE_ORIGIN}/dashboard`);
           return;
         }

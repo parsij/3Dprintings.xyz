@@ -127,7 +127,7 @@ export default function SignUp({ setUser }) {
                     ✓
                   </span>
                 )}
-cy              </div>
+              </div>
               <p className={`mt-1 min-h-4 text-xs transition-all duration-300 ${((activeField === "username") || touched.username) && !isFieldValid("username") ? "text-red-500" : "text-red-400"}`}>
                 {((activeField === "username") || touched.username) &&
                 !isFieldValid("username")

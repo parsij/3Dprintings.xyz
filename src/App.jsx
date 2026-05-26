@@ -4,9 +4,7 @@ import Router from "./Router.jsx";
 import SellerRouter from "./SellerRouter.jsx";
 import axios from "axios";
 import { ensureCsrfToken } from "./services/csrf.js";
-
-// Best practice: Use an environment variable or leave it blank to default to relative paths
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE, isSellerHostname } from "./config/api.js";
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -14,7 +12,7 @@ const App = () => {
 
   // Get the domain name from the browser address bar
   const hostname = window.location.hostname;
-  const isSellerSubdomain = hostname.startsWith("seller.");
+  const isSellerSubdomain = isSellerHostname(hostname);
 
   useEffect(() => {
     const checkAuth = async () => {
