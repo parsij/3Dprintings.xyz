@@ -16,12 +16,18 @@ function normalizeOrigin(origin) {
 function getFrontendUrl() {
   const configured = normalizeOrigin(process.env.FRONTEND_URL);
   if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    return "https://3dprintings.xyz";
+  }
   return isTestMode() ? "http://localhost:5173" : "https://3dprintings.xyz";
 }
 
 function getSellerFrontendUrl() {
   const configured = normalizeOrigin(process.env.SELLER_FRONTEND_URL);
   if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    return "https://seller.3dprintings.xyz";
+  }
   if (isTestMode()) return "http://seller.localhost:5173";
   return "https://seller.3dprintings.xyz";
 }

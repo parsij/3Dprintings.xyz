@@ -670,12 +670,10 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
   }
 }
 
-function clearAuthCookie(res, req) {
-  const hostname = String(req?.headers?.host || "").split(":")[0].toLowerCase();
+function clearAuthCookie(res) {
   expireAuthCookies(res, {
     isProduction: IS_PRODUCTION,
     authCookieDomain: AUTH_COOKIE_DOMAIN,
-    hostname,
   });
 }
 

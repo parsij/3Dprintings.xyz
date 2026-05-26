@@ -13,9 +13,10 @@ function isLocalHostname(hostname = "") {
 }
 
 export function isLocalDevRuntime() {
-  if (isTruthyEnv(import.meta.env.VITE_TEST_MODE)) return true;
-  if (typeof window === "undefined") return false;
-  return isLocalHostname(window.location.hostname);
+  if (typeof window !== "undefined") {
+    return isLocalHostname(window.location.hostname);
+  }
+  return Boolean(import.meta.env.DEV);
 }
 
 export function isSellerHostname(hostname = typeof window !== "undefined" ? window.location.hostname : "") {

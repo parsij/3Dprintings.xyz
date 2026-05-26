@@ -1,56 +1,72 @@
 const { isTestMode } = require("./envShared.cjs");
 
-function getAuthCookieDomains(isProduction, authCookieDomain, hostname = "") {
-  const domains = new Set([undefined]);
+const CSRF_COOKIE_NAME = "csrf-token";
 
-  if (authCookieDomain) {
-    domains.add(authCookieDomain);
-  }
+function dedupeCookieOptions(options) {
+  const seen = new Set();
 
-  if (isProduction || isTestMode()) {
-    domains.add(".3dprintings.xyz");
-    domains.add("3dprintings.xyz");
-  }
-
-  if (!isProduction || isTestMode()) {
-    domains.add("localhost");
-    domains.add(".localhost");
-  }
-
-  const normalizedHost = String(hostname || "").trim().toLowerCase();
-  if (normalizedHost && normalizedHost !== "localhost" && normalizedHost !== "127.0.0.1") {
-    domains.add(normalizedHost);
-    if (!normalizedHost.startsWith(".")) {
-      domains.add(`.${normalizedHost}`);
-    }
-  }
-
-  return [...domains];
-}
-
-function expireCookie(res, name, options) {
-  res.clearCookie(name, options);
-  res.cookie(name, "", {
-    ...options,
-    expires: new Date(0),
-    maxAge: 0,
+  return options.filter((option) => {
+    const key = JSON.stringify(option);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 }
 
-function clearAuthCookie(res, { isProduction, authCookieDomain, hostname = "" }) {
-  const secureVariants = [
-    { httpOnly: true, sameSite: "lax", path: "/", secure: false },
-    { httpOnly: true, sameSite: "lax", path: "/", secure: true },
-  ];
+function buildCookieClearOptions({ isProduction, authCookieDomain, httpOnly }) {
+  const options = [];
+  const base = { httpOnly, sameSite: "lax", path: "/" };
 
-  for (const variant of secureVariants) {
-    for (const domain of getAuthCookieDomains(isProduction, authCookieDomain, hostname)) {
-      const options = domain ? { ...variant, domain } : variant;
-      expireCookie(res, "token", options);
+  if (isProduction) {
+    const secureBase = { ...base, secure: true };
+    if (authCookieDomain) {
+      options.push({ ...secureBase, domain: authCookieDomain });
     }
+    options.push({ ...secureBase });
+  } else {
+    const insecureBase = { ...base, secure: false };
+    if (authCookieDomain) {
+      options.push({ ...insecureBase, domain: authCookieDomain });
+    }
+    options.push({ ...insecureBase });
+  }
+
+  if (isTestMode()) {
+    options.push({ ...base, secure: false });
+    options.push({ ...base, secure: false, domain: "localhost" });
+  }
+
+  return dedupeCookieOptions(options);
+}
+
+function clearNamedCookie(res, name, clearOptions) {
+  for (const options of clearOptions) {
+    res.clearCookie(name, options);
   }
 }
 
+function clearAuthCookie(res, { isProduction, authCookieDomain }) {
+  const clearOptions = buildCookieClearOptions({
+    isProduction,
+    authCookieDomain,
+    httpOnly: true,
+  });
+  clearNamedCookie(res, "token", clearOptions);
+}
+
+function clearCsrfNamedCookie(res, { isProduction, authCookieDomain }) {
+  const clearOptions = buildCookieClearOptions({
+    isProduction,
+    authCookieDomain,
+    httpOnly: false,
+  });
+  clearNamedCookie(res, CSRF_COOKIE_NAME, clearOptions);
+}
+
 module.exports = {
+  CSRF_COOKIE_NAME,
+  buildCookieClearOptions,
   clearAuthCookie,
+  clearCsrfNamedCookie,
+  clearNamedCookie,
 };
