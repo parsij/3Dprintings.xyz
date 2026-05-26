@@ -5,14 +5,13 @@ import googleLogo from "../assets/google.svg";
 import SideMenu from "../components/SideMenu.jsx";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import axios from "axios";
+import { API_BASE, SELLER_SITE_ORIGIN } from "../config/api.js";
 
 const GOOGLE_GSI_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
-const SELLER_SITE_ORIGIN = "https://seller.3dprintings.xyz";
 
 export default function SignIn({ setUser, postLoginSellerFlow = false }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
   const [form, setForm] = useState({
     email: "",
     password: "",

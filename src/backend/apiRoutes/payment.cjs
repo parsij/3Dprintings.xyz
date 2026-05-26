@@ -13,6 +13,7 @@ module.exports = function paymentController(deps) {
         getPaymentTypeFromSession,
         scheduleOrderPaymentPoll,
     } = require("./orderPaymentPolling.cjs");
+    const { getFrontendUrl } = require("../envShared.cjs");
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
     const parseIntInRange = (value, field, min, max) => {
@@ -429,8 +430,8 @@ module.exports = function paymentController(deps) {
                 payment_method_types: ['card'],
                 line_items,
                 mode: 'payment',
-                success_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz:5173'}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'https://3dprintings.xyz:5173'}/cancel?order_id=${orderId}`,
+                success_url: `${getFrontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
+                cancel_url: `${getFrontendUrl()}/cancel?order_id=${orderId}`,
                 ...(userEmail ? { customer_email: userEmail } : {}),
                 metadata: {
                     orderId,

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { applyCsrfInterceptor } from "./csrf.js";
 
-const API_BASE = "https://3dprintings.xyz";
+import { API_BASE } from "../config/api.js";
 
 const axiosWithCredentials = applyCsrfInterceptor(axios.create({
   baseURL: API_BASE,

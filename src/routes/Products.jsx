@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
 import Navbar from "../components/NavBar.jsx";
+import { API_BASE } from "../config/api.js";
 
 const Products = ({ user, NoNavBarLimit }) => {
   const [products, setProducts] = useState([]);
@@ -28,7 +29,7 @@ const Products = ({ user, NoNavBarLimit }) => {
     try {
       // Ensure backend matches: https://3dprintings.xyz/api/products?page=...&limit=12
       console.log('[Products fetchProducts] Fetching page:', page, 'with sort:', sort);
-      const response = await axios.get("https://3dprintings.xyz/api/products", {
+      const response = await axios.get(`${API_BASE}/api/products`, {
         params: { page, limit: 12, sort },
       });
       const data = response.data;

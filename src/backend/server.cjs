@@ -28,6 +28,13 @@ const {
   ensureSellerAddressColumn,
   validateEasyPostWebhookSignature,
 } = require("./apiRoutes/shippingShared.cjs");
+const {
+  getLocalDevOrigins,
+  getServerPort,
+  isAllowedAppOrigin,
+  isTestMode,
+  normalizeOrigin,
+} = require("./envShared.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
@@ -305,32 +312,26 @@ const upload = multer({
 
 const defaultAllowedOrigins = [
   "https://3dprintings.xyz",
-  'https://www.3dprintings.xyz',
+  "https://www.3dprintings.xyz",
   "https://seller.3dprintings.xyz",
-  ...(IS_PRODUCTION ? [] : [
+  ...(isTestMode() ? getLocalDevOrigins() : []),
+  ...(!IS_PRODUCTION && !isTestMode() ? [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-  ]),
+  ] : []),
 ];
 
 const envAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => normalizeOrigin(origin))
   .filter(Boolean);
 
-const allowedOrigins = new Set([...defaultAllowedOrigins, ...envAllowedOrigins]);
+const allowedOrigins = new Set(
+  [...defaultAllowedOrigins, ...envAllowedOrigins].map((origin) => normalizeOrigin(origin))
+);
 
 function isAllowedOrigin(origin) {
-  if (allowedOrigins.has(origin)) {
-    return true;
-  }
-
-  try {
-    const parsed = new URL(origin);
-    return parsed.protocol === "https:" && parsed.hostname.endsWith(".3dprintings.xyz");
-  } catch {
-    return false;
-  }
+  return isAllowedAppOrigin(normalizeOrigin(origin), allowedOrigins);
 }
 
 function readPositiveIntegerEnv(name, fallbackValue) {
@@ -1029,8 +1030,11 @@ async function startServer() {
     await initializeDatabase();
 
     // Start Express server
-    app.listen(3000, '0.0.0.0', () => {
-console.log("the Server is online.")
+    app.listen(getServerPort(), "0.0.0.0", () => {
+console.log(`the Server is online on port ${getServerPort()}.`)
+      if (isTestMode()) {
+        console.log("TEST_MODE enabled: local development origins are allowed for CORS.");
+      }
       // Start webhook listener in non-production so local webhook secrets stay in sync.
       if (process.env.NODE_ENV !== 'production') {
         console.log('🔔 Starting Stripe Webhook Listener...');

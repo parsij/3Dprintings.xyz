@@ -5,13 +5,12 @@ import {
   downloadSellerOrderLabel,
   getSellerOrderLabelViewUrl,
 } from "../services/sellerPortalService.js";
+import { MARKETPLACE_ORIGIN } from "../../config/api.js";
 
 const currencyFormatter = new Intl.NumberFormat(undefined, {
   style: "currency",
   currency: "USD",
 });
-
-const MARKETPLACE_ORIGIN = "https://3dprintings.xyz";
 
 function formatCurrency(value) {
   const amount = Number(value);

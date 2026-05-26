@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
 import Navbar from "../components/NavBar.jsx";
+import { API_BASE } from "../config/api.js";
 
 const LikedProducts = ({ user }) => {
   const [products, setProducts] = useState([]);
@@ -16,7 +17,7 @@ const LikedProducts = ({ user }) => {
       try {
         setLoading(true);
         const response = await axios.get(
-          `https://3dprintings.xyz/api/likes/liked-products`,
+          `${API_BASE}/api/likes/liked-products`,
           { withCredentials: true }
         );
         setProducts(response.data.products || []);

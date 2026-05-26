@@ -1,5 +1,6 @@
 let inventoryDeductedColumnReady = false;
 const { scheduleTestTrackingTimeline } = require("./shippingShared.cjs");
+const { notifySellersOfNewOrder } = require("./sellerNotifications.cjs");
 
 async function ensureInventoryDeductedColumn(pool) {
   if (inventoryDeductedColumnReady) return;
@@ -59,6 +60,7 @@ async function fulfillPaidOrder(pool, orderId, paymentType = "card") {
     }
 
     const order = orderResult.rows[0];
+    const wasAlreadyCompleted = order.status === "completed";
 
     if (order.status === "cancelled") {
       await client.query("ROLLBACK");
@@ -124,6 +126,14 @@ async function fulfillPaidOrder(pool, orderId, paymentType = "card") {
     await client.query("COMMIT");
 
     scheduleTestTrackingTimeline(pool, orderId);
+
+    if (!wasAlreadyCompleted) {
+      setImmediate(() => {
+        notifySellersOfNewOrder(pool, orderId).catch((error) => {
+          console.error(`Failed to send seller order notifications for ${orderId}:`, error);
+        });
+      });
+    }
 
     return {
       order: updatedOrderResult.rows[0] || order,

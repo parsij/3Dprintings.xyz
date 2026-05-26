@@ -1,4 +1,5 @@
 const { normalizeNumericArray, ensureLikesColumns } = require('./likesShared.cjs');
+const { notifySellerOfNewReview } = require('./sellerNotifications.cjs');
 
 module.exports = function reviewsRoutes(deps) {
   const { app, pool, getAuthUserFromRequest, isAuthenticatedAnIisValid, enqueueWrite } = deps;
@@ -144,6 +145,15 @@ module.exports = function reviewsRoutes(deps) {
         'SELECT username FROM users WHERE id = $1',
         [auth.userId]
       );
+
+      notifySellerOfNewReview(pool, {
+        productId,
+        rating,
+        content: contentValue,
+        reviewerUsername: usernameResult.rows[0]?.username,
+      }).catch((error) => {
+        console.error(`Failed to send seller review notification for product ${productId}:`, error);
+      });
 
       return res.status(201).json({
         message: 'Review submitted',

@@ -3,9 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
-const SELLER_SITE_ORIGIN = "https://seller.3dprintings.xyz";
+import { API_BASE, SELLER_SITE_ORIGIN } from "../config/api.js";
 
 export default function BecomeSeller({ setUser }) {
   const navigate = useNavigate();

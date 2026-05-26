@@ -4,7 +4,7 @@ import axios from "axios";
 import Navbar from "../components/NavBar.jsx";
 import ProductCard from "../components/ProductCard.jsx";
 
-const API_BASE = "https://3dprintings.xyz";
+import { API_BASE } from "../config/api.js";
 
 const printerLabels = {
   fdm: "FDM (Filament)",

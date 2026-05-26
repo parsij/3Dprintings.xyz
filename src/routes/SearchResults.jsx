@@ -4,6 +4,7 @@ import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
 import Navbar from "../components/NavBar.jsx";
 import backIcon from "../assets/back.svg";
+import { API_BASE } from "../config/api.js";
 
 const SearchResults = ({ user }) => {
   const [searchParams] = useSearchParams();
@@ -56,7 +57,7 @@ const SearchResults = ({ user }) => {
       try {
         setLoading(true);
         console.log('[SearchResults] Fetching:', query, 'page:', page, 'sort:', sort);
-        const response = await axios.get(`https://3dprintings.xyz/api/products/search`, {
+        const response = await axios.get(`${API_BASE}/api/products/search`, {
           params: { q: query, page, limit: 12, sort }
         });
 

@@ -1,11 +1,11 @@
 const bcrypt = require('bcrypt');
 const { createHash, randomBytes } = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
-const nodemailer = require('nodemailer');
 const { z } = require('zod');
+const { escapeHtml, sendEmail, isMailConfigured } = require('./mailShared.cjs');
+const { getFrontendUrl, isAllowedFrontendOrigin, normalizeOrigin } = require('../envShared.cjs');
 
 const RESET_TOKEN_TTL_MINUTES = 60;
-let mailTransporter = null;
 
 const emailSchema = z
   .string()
@@ -85,26 +85,6 @@ function buildUsernameFromGoogleProfile(name, email) {
   return username;
 }
 
-function normalizeOrigin(origin) {
-  return String(origin || '')
-    .trim()
-    .replace(/\/+$/, '')
-    .toLowerCase();
-}
-
-function isAllowedFrontendOrigin(origin, configuredFrontendOrigin) {
-  if (!origin) return false;
-  if (configuredFrontendOrigin && origin === configuredFrontendOrigin) return true;
-
-  try {
-    const parsed = new URL(origin);
-    if (parsed.protocol !== 'https:') return false;
-    return parsed.hostname === '3dprintings.xyz' || parsed.hostname.endsWith('.3dprintings.xyz');
-  } catch {
-    return false;
-  }
-}
-
 function hashResetToken(token) {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -121,38 +101,11 @@ function validateBody(schema, body) {
   };
 }
 
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function getMailTransporter() {
-  const user = String(process.env.PERSONAL_GMAIL_ADDRESS || '').trim();
-  const pass = String(process.env.GMAIL_APP_PASSWORD || '').trim();
-
-  if (!user || !pass) {
-    throw new Error('Missing PERSONAL_GMAIL_ADDRESS or GMAIL_APP_PASSWORD');
-  }
-
-  if (!mailTransporter) {
-    mailTransporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass },
-    });
-  }
-
-  return mailTransporter;
-}
-
 function buildResetUrl(req, frontendOrigin, token) {
   const requestOrigin = normalizeOrigin(req.headers.origin);
-  let origin = frontendOrigin || 'https://3dprintings.xyz';
+  let origin = frontendOrigin || getFrontendUrl();
 
-  if (requestOrigin && isAllowedFrontendOrigin(requestOrigin, frontendOrigin)) {
+  if (requestOrigin && isAllowedFrontendOrigin(requestOrigin)) {
     origin = requestOrigin;
   }
 
@@ -160,11 +113,13 @@ function buildResetUrl(req, frontendOrigin, token) {
 }
 
 async function sendPasswordResetEmail(userEmail, resetUrl) {
-  const transporter = getMailTransporter();
+  if (!isMailConfigured()) {
+    throw new Error('Email delivery is not configured.');
+  }
+
   const safeResetUrl = escapeHtml(resetUrl);
 
-  await transporter.sendMail({
-    from: '"3D Printings Management" <management@3dprintings.xyz>',
+  await sendEmail({
     to: userEmail,
     subject: 'Reset your 3D Printings password',
     html: `
@@ -453,7 +408,7 @@ module.exports = function authRoutes(deps) {
   app.post('/api/auth/google', authRateLimiter, async (req, res) => {
     try {
       const requestOrigin = normalizeOrigin(req.headers.origin);
-      if (requestOrigin && !isAllowedFrontendOrigin(requestOrigin, frontendOrigin)) {
+      if (requestOrigin && !isAllowedFrontendOrigin(requestOrigin)) {
         return res.status(403).json({ message: 'Blocked origin' });
       }
 

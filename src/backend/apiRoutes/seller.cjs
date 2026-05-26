@@ -53,8 +53,8 @@ function normalizeSellerPreferences(input) {
     supportEmail,
     storeDescription,
     shopLogoUrl: String(payload.shopLogoUrl || "").trim(),
-    notifyNewOrders: Boolean(payload.notifyNewOrders),
-    notifyNewReviews: Boolean(payload.notifyNewReviews),
+    notifyNewOrders: payload.notifyNewOrders !== false,
+    notifyNewReviews: payload.notifyNewReviews !== false,
     notifyPayouts: Boolean(payload.notifyPayouts),
   };
 }

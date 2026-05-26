@@ -10,11 +10,21 @@
   button:active:not(:disabled), .btn:active:not(:disabled) {
     @apply scale-95;
   }
-  input, textarea, select {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select {
     @apply transition-all duration-300 cursor-text;
   }
-  input:focus, textarea:focus, select:focus {
+  input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus {
     @apply ring-4 ring-orange-500/20 shadow-md outline-none;
+  }
+  input[type="checkbox"], input[type="radio"] {
+    @apply h-4 w-4 cursor-pointer rounded border-gray-300 text-gray-900 outline-none ring-0 ring-offset-0 shadow-none;
+    accent-color: #111827;
+  }
+  input[type="checkbox"]:focus,
+  input[type="checkbox"]:focus-visible,
+  input[type="radio"]:focus,
+  input[type="radio"]:focus-visible {
+    @apply outline-none ring-0 ring-offset-0 shadow-none;
   }
   a {
     @apply cursor-pointer transition-all duration-300;
