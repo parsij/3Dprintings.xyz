@@ -60,7 +60,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             <div className="flex items-center flex-1 min-w-0">
               <button
                   onClick={() => setMenuOpen((prev) => !prev)}
-                  className="group flex cursor-pointer flex-col gap-1 shrink-0"
+                  className="group flex cursor-pointer flex-col items-center justify-center gap-1 shrink-0 h-7.5 w-7.5 md:h-9 md:w-9 -m-1"
                   aria-label="Open menu"
               >
                 <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>

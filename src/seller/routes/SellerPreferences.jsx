@@ -143,6 +143,11 @@ export default function SellerPreferences() {
         storeName: preferencesForm.shopName,
         storeDescription: preferencesForm.shopBio,
       });
+      setPreferencesForm((prev) => ({
+        ...prev,
+        ...response.preferences,
+        ...response.sellerProfile,
+      }));
       setPreferencesMessage(response?.message || "Preferences updated.");
     } catch (error) {
       setPreferencesError(error?.response?.data?.message || "Failed to update preferences.");

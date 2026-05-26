@@ -388,7 +388,8 @@ module.exports = function sellerRoutes(deps) {
                 sp.design_software,
                 sp.external_portfolio_link,
                 sp.intellectual_property_certified,
-                sp.terms_of_service_accepted
+                sp.terms_of_service_accepted,
+                sp.sellersaddres
          FROM users u
          LEFT JOIN seller_profiles sp ON sp.seller_user_id = u.id
          WHERE u.id = $1
@@ -531,9 +532,10 @@ module.exports = function sellerRoutes(deps) {
            design_software,
            external_portfolio_link,
            intellectual_property_certified,
-           terms_of_service_accepted
+           terms_of_service_accepted,
+           sellersaddres
          )
-         VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6::text[], NULLIF($7, ''), $8, $9)
+         VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6::text[], NULLIF($7, ''), $8, $9, $10::jsonb)
          ON CONFLICT (seller_user_id) DO UPDATE SET
            shop_name = EXCLUDED.shop_name,
            shop_bio = EXCLUDED.shop_bio,
@@ -543,6 +545,7 @@ module.exports = function sellerRoutes(deps) {
            external_portfolio_link = EXCLUDED.external_portfolio_link,
            intellectual_property_certified = EXCLUDED.intellectual_property_certified,
            terms_of_service_accepted = EXCLUDED.terms_of_service_accepted,
+           sellersaddres = EXCLUDED.sellersaddres,
            updated_at = NOW()`,
         [
           req.user.id,
@@ -554,6 +557,7 @@ module.exports = function sellerRoutes(deps) {
           sellerProfile.externalPortfolioLink,
           sellerProfile.intellectualPropertyCertified,
           sellerProfile.termsOfServiceAccepted,
+          JSON.stringify(sellerProfile.sellerAddress || {}),
         ]
       );
 
