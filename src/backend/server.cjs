@@ -670,16 +670,26 @@ function isAuthenticatedAnIisValid(req, res, type = "cart") {
 }
 
 function clearAuthCookie(res) {
-  const cookieOptions = {
+  const baseOptions = {
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: "lax",
     path: "/",
   };
+
+  res.clearCookie("token", baseOptions);
+
+  const domainVariants = new Set();
   if (AUTH_COOKIE_DOMAIN) {
-    cookieOptions.domain = AUTH_COOKIE_DOMAIN;
+    domainVariants.add(AUTH_COOKIE_DOMAIN);
   }
-  res.clearCookie("token", cookieOptions);
+  if (IS_PRODUCTION) {
+    domainVariants.add(".3dprintings.xyz");
+  }
+
+  for (const domain of domainVariants) {
+    res.clearCookie("token", { ...baseOptions, domain });
+  }
 }
 
 function getCookieValuesFromRequest(req, cookieName) {

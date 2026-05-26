@@ -1,20 +1,18 @@
 import axios from "axios";
-
+import { applyCsrfInterceptor, ensureCsrfToken } from "./csrf.js";
 import { API_BASE } from "../config/api.js";
+
+const apiClient = applyCsrfInterceptor(axios.create({
+  withCredentials: true,
+}));
 
 export async function updateAccountProfile({ username, email, phone_number }) {
   try {
-    const response = await axios.put(
-      `${API_BASE}/api/account/profile`,
-      {
-        username: username.trim(),
-        email: email.trim(),
-        phone_number: phone_number ? phone_number.trim() : null,
-      },
-      {
-        withCredentials: true,
-      }
-    );
+    const response = await apiClient.put(`${API_BASE}/api/account/profile`, {
+      username: username.trim(),
+      email: email.trim(),
+      phone_number: phone_number ? phone_number.trim() : null,
+    });
 
     return response.data;
   } catch (error) {
@@ -27,16 +25,10 @@ export async function updateAccountProfile({ username, email, phone_number }) {
 
 export async function changeAccountPassword({ oldPassword, newPassword }) {
   try {
-    const response = await axios.put(
-      `${API_BASE}/api/account/password`,
-      {
-        oldPassword,
-        newPassword,
-      },
-      {
-        withCredentials: true,
-      }
-    );
+    const response = await apiClient.put(`${API_BASE}/api/account/password`, {
+      oldPassword,
+      newPassword,
+    });
 
     return response.data;
   } catch (error) {
@@ -49,13 +41,8 @@ export async function changeAccountPassword({ oldPassword, newPassword }) {
 
 export async function signOutAccount() {
   try {
-    const response = await axios.post(
-      `${API_BASE}/api/signout`,
-      {},
-      {
-        withCredentials: true,
-      }
-    );
+    await ensureCsrfToken(API_BASE);
+    const response = await apiClient.post(`${API_BASE}/api/signout`, {});
 
     return response.data;
   } catch (error) {
@@ -68,9 +55,7 @@ export async function signOutAccount() {
 
 export async function getAccountAddress() {
   try {
-    const response = await axios.get(`${API_BASE}/api/account/address`, {
-      withCredentials: true,
-    });
+    const response = await apiClient.get(`${API_BASE}/api/account/address`);
 
     return response.data;
   } catch (error) {
@@ -83,9 +68,7 @@ export async function getAccountAddress() {
 
 export async function updateAccountAddress(address) {
   try {
-    const response = await axios.put(`${API_BASE}/api/account/address`, address, {
-      withCredentials: true,
-    });
+    const response = await apiClient.put(`${API_BASE}/api/account/address`, address);
 
     return response.data;
   } catch (error) {
@@ -98,9 +81,8 @@ export async function updateAccountAddress(address) {
 
 export async function suggestAccountAddress(query, { limit = 5, signal } = {}) {
   try {
-    const response = await axios.get(`${API_BASE}/api/address/autocomplete`, {
+    const response = await apiClient.get(`${API_BASE}/api/address/autocomplete`, {
       params: { q: query, limit },
-      withCredentials: true,
       signal,
     });
     return response.data;

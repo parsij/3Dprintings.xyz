@@ -36,18 +36,28 @@ function setCsrfCookie(res, token = generateCsrfToken()) {
 }
 
 function clearCsrfCookie(res) {
-  const options = {
+  const baseOptions = {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
   };
-  const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN
+
+  res.clearCookie(CSRF_COOKIE_NAME, baseOptions);
+
+  const domainVariants = new Set();
+  const authCookieDomain = process.env.AUTH_COOKIE_DOMAIN
     || (process.env.NODE_ENV === "production" ? ".3dprintings.xyz" : "");
-  if (AUTH_COOKIE_DOMAIN) {
-    options.domain = AUTH_COOKIE_DOMAIN;
+  if (authCookieDomain) {
+    domainVariants.add(authCookieDomain);
   }
-  res.clearCookie(CSRF_COOKIE_NAME, options);
+  if (process.env.NODE_ENV === "production") {
+    domainVariants.add(".3dprintings.xyz");
+  }
+
+  for (const domain of domainVariants) {
+    res.clearCookie(CSRF_COOKIE_NAME, { ...baseOptions, domain });
+  }
 }
 
 function tokensMatch(cookieToken, headerToken) {

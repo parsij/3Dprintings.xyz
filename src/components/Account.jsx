@@ -109,34 +109,34 @@ export default function Account({
             {profileMessage}
           </p>
         )}
-
-        <div className="border-t border-orange-100 pt-4 mt-4 hover:border-orange-300 transition-colors duration-300">
-          <button
-            type="button"
-            onClick={onSignOut}
-            disabled={isSigningOut}
-            className={`w-full cursor-pointer rounded-xl py-3 font-semibold text-white transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:scale-100 ${
-              !isSigningOut
-                ? "bg-red-500 hover:bg-red-600 shadow-md hover:shadow-lg"
-                : "cursor-not-allowed bg-gray-400 opacity-50"
-            }`}
-          >
-            {isSigningOut ? (
-              <span className="inline-flex items-center">
-                <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                Signing out...
-              </span>
-            ) : (
-              "Sign out"
-            )}
-          </button>
-          {signOutMessage && (
-            <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 animate-fade-in-up">
-              {signOutMessage}
-            </p>
-          )}
-        </div>
       </form>
+
+      <div className="mt-4 border-t border-orange-100 pt-4 hover:border-orange-300 transition-colors duration-300">
+        <button
+          type="button"
+          onClick={onSignOut}
+          disabled={isSigningOut}
+          className={`w-full cursor-pointer rounded-xl py-3 font-semibold text-white transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:scale-100 ${
+            !isSigningOut
+              ? "bg-red-500 hover:bg-red-600 shadow-md hover:shadow-lg"
+              : "cursor-not-allowed bg-gray-400 opacity-50"
+          }`}
+        >
+          {isSigningOut ? (
+            <span className="inline-flex items-center">
+              <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+              Signing out...
+            </span>
+          ) : (
+            "Sign out"
+          )}
+        </button>
+        {signOutMessage && (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 animate-fade-in-up">
+            {signOutMessage}
+          </p>
+        )}
+      </div>
     </article>
   );
 }

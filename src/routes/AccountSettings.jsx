@@ -386,8 +386,8 @@ export default function AccountSettings({ user, setUser }) {
     try {
       setIsSigningOut(true);
       await signOutAccount();
-      navigate("/home", { replace: true });
       setUser(null);
+      navigate("/signin", { replace: true });
     } catch (error) {
       setSignOutMessage(error.message || "Sign out failed.");
     } finally {
