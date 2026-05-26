@@ -3,10 +3,12 @@ const {
   toggleNumericId,
   ensureLikesColumns,
 } = require('./likesShared.cjs');
+const { resolveShopLogoFromSources } = require('./sellerProfileShared.cjs');
 
 module.exports = function likesSavesRoutes(deps) {
   const { app, pool, getAuthUserFromRequest } = deps;
   const IMAGE_BASE_URL = 'https://3dprintings.xyz/api/imgUploads';
+  const SHOP_LOGO_SQL = `COALESCE(NULLIF(sp.shop_logo_url, ''), NULLIF(u.seller_preferences->>'shopLogoUrl', '')) AS shop_logo_url`;
 
   function mapProductRow(p) {
     const firstImage =
@@ -18,7 +20,7 @@ module.exports = function likesSavesRoutes(deps) {
         : null,
       seller_id: p.user_id,
       shop_name: p.shop_name || p.creator_name || '',
-      shop_logo_url: p.shop_logo_url || null,
+      shop_logo_url: resolveShopLogoFromSources(p.shop_logo_url) || null,
     };
   }
 
@@ -227,7 +229,7 @@ module.exports = function likesSavesRoutes(deps) {
       }
 
       const result = await pool.query(
-        `SELECT p.*, u.username as creator_name, sp.shop_name, sp.shop_logo_url
+        `SELECT p.*, u.username as creator_name, sp.shop_name, ${SHOP_LOGO_SQL}
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
          LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id
@@ -297,7 +299,7 @@ module.exports = function likesSavesRoutes(deps) {
       }
 
       const result = await pool.query(
-        `SELECT p.*, u.username as creator_name, sp.shop_name, sp.shop_logo_url
+        `SELECT p.*, u.username as creator_name, sp.shop_name, ${SHOP_LOGO_SQL}
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
          LEFT JOIN seller_profiles sp ON sp.seller_user_id = p.user_id

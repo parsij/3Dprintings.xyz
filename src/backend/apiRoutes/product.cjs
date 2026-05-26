@@ -1,6 +1,18 @@
 module.exports = function productRoutes(deps) {
   const { app, pool } = deps;
+  const path = require("path");
+  const { resolveShopLogoFromSources } = require("./sellerProfileShared.cjs");
+  const { ensureSellerAvatarIfNeeded } = require("./sellerAvatar.cjs");
   const IMAGE_BASE_URL = 'https://3dprintings.xyz/api/imgUploads';
+  const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
+  const SHOP_LOGO_SQL = `COALESCE(NULLIF(sp.shop_logo_url, ''), NULLIF(u.seller_preferences->>'shopLogoUrl', '')) AS shop_logo_url`;
+
+  const buildImageUrl = (req, fileName) => {
+    if (!fileName) return null;
+    const protocol = req.protocol || "https";
+    const host = req.get("host");
+    return `${protocol}://${host}/api/imgUploads/${fileName}`;
+  };
 
   const normalizeProductRow = (p, includeImages = false) => {
     const images = Array.isArray(p.img_path) && p.img_path.length > 0
@@ -27,7 +39,7 @@ module.exports = function productRoutes(deps) {
       category,
       seller_id: p.user_id,
       shop_name: p.shop_name || p.creator_name || '',
-      shop_logo_url: p.shop_logo_url || null,
+      shop_logo_url: resolveShopLogoFromSources(p.shop_logo_url) || null,
     };
   };
 
@@ -36,7 +48,7 @@ module.exports = function productRoutes(deps) {
     username: row.username || '',
     shopName: row.shop_name || row.username || 'Shop',
     shopBio: row.shop_bio || '',
-    shopLogoUrl: row.shop_logo_url || '',
+    shopLogoUrl: resolveShopLogoFromSources(row.shop_logo_url),
     primaryPrinterSpecialization: row.primary_printer_specialization || '',
     designSoftware: Array.isArray(row.design_software) ? row.design_software : [],
     externalPortfolioLink: row.external_portfolio_link || '',
@@ -65,7 +77,7 @@ module.exports = function productRoutes(deps) {
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
                 sp.shop_name,
-                sp.shop_logo_url,
+                ${SHOP_LOGO_SQL},
                 COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
@@ -110,7 +122,7 @@ module.exports = function productRoutes(deps) {
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
                 sp.shop_name,
-                sp.shop_logo_url,
+                ${SHOP_LOGO_SQL},
                 COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
@@ -149,7 +161,7 @@ module.exports = function productRoutes(deps) {
         `SELECT p.*, u.username as creator_name,
                 sp.shop_name,
                 sp.shop_bio,
-                sp.shop_logo_url,
+                ${SHOP_LOGO_SQL},
                 sp.primary_printer_specialization,
                 sp.design_software,
                 sp.external_portfolio_link,
@@ -192,7 +204,7 @@ module.exports = function productRoutes(deps) {
                 sp.seller_user_id,
                 sp.shop_name,
                 sp.shop_bio,
-                sp.shop_logo_url,
+                ${SHOP_LOGO_SQL},
                 sp.primary_printer_specialization,
                 sp.design_software,
                 sp.external_portfolio_link
@@ -207,10 +219,27 @@ module.exports = function productRoutes(deps) {
         return res.status(404).json({ message: 'Shop not found' });
       }
 
+      const shopRow = shopResult.rows[0];
+      const shopName = shopRow.shop_name || shopRow.username || "";
+      let shopLogoUrl = resolveShopLogoFromSources(shopRow.shop_logo_url);
+
+      if (shopName) {
+        shopLogoUrl = await ensureSellerAvatarIfNeeded({
+          pool,
+          sellerId,
+          shopName,
+          currentLogoUrl: shopLogoUrl,
+          uploadDir: sellerUploadDir,
+          buildImageUrl,
+          req,
+        });
+        shopRow.shop_logo_url = shopLogoUrl;
+      }
+
       const productsResult = await pool.query(
         `SELECT p.*, u.username as creator_name,
                 sp.shop_name,
-                sp.shop_logo_url,
+                ${SHOP_LOGO_SQL},
                 COALESCE(r.review_count, 0)::int AS reviews_count
          FROM products p
          LEFT JOIN users u ON p.user_id = u.id
@@ -226,8 +255,11 @@ module.exports = function productRoutes(deps) {
       );
 
       res.json({
-        shop: mapShopRow(shopResult.rows[0]),
-        products: productsResult.rows.map((p) => normalizeProductRow(p)),
+        shop: mapShopRow(shopRow),
+        products: productsResult.rows.map((p) => normalizeProductRow({
+          ...p,
+          shop_logo_url: shopLogoUrl || p.shop_logo_url,
+        })),
       });
     } catch (err) {
       console.error('Error fetching shop:', err);

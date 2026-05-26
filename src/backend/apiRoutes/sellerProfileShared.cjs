@@ -17,7 +17,30 @@ const PORTFOLIO_HOSTS = [
 const DESIGN_SOFTWARE_ALIASES = {
   Fusion: "Fusion360",
 };
+const DEFAULT_IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
+const DEFAULT_SITE_ORIGIN = process.env.SITE_ORIGIN || "https://3dprintings.xyz";
 const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared.cjs");
+
+function resolveShopLogoUrl(rawUrl, options = {}) {
+  const imageBaseUrl = options.imageBaseUrl || DEFAULT_IMAGE_BASE_URL;
+  const siteOrigin = options.siteOrigin || DEFAULT_SITE_ORIGIN;
+  const url = String(rawUrl || "").trim();
+  if (!url) return "";
+
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("//")) return `https:${url}`;
+  if (url.startsWith("/")) return `${siteOrigin}${url}`;
+  if (/\.(png|jpg|jpeg|webp)(\?.*)?$/i.test(url)) {
+    return `${imageBaseUrl}/${url.replace(/^\/+/, "")}`;
+  }
+
+  return url;
+}
+
+function resolveShopLogoFromSources(profileLogoUrl, preferencesLogoUrl, options = {}) {
+  const rawUrl = String(profileLogoUrl || preferencesLogoUrl || "").trim();
+  return resolveShopLogoUrl(rawUrl, options);
+}
 
 async function ensureSellerProfilesTable(pool) {
   await pool.query(`
@@ -85,7 +108,7 @@ function sellerProfileFromRow(row, fallbackPreferences = {}) {
     return {
       shopName: fallbackPreferences.storeName || "",
       shopBio: fallbackPreferences.storeDescription || "",
-      shopLogoUrl: fallbackPreferences.shopLogoUrl || "",
+      shopLogoUrl: resolveShopLogoFromSources("", fallbackPreferences.shopLogoUrl),
       primaryPrinterSpecialization: "",
       designSoftware: [],
     externalPortfolioLink: "",
@@ -98,7 +121,7 @@ function sellerProfileFromRow(row, fallbackPreferences = {}) {
   return {
     shopName: row.shop_name || "",
     shopBio: row.shop_bio || "",
-    shopLogoUrl: row.shop_logo_url || "",
+    shopLogoUrl: resolveShopLogoFromSources(row.shop_logo_url, fallbackPreferences.shopLogoUrl),
     primaryPrinterSpecialization: row.primary_printer_specialization || "",
     designSoftware: Array.isArray(row.design_software) ? row.design_software : [],
     externalPortfolioLink: row.external_portfolio_link || "",
@@ -163,8 +186,12 @@ function validateSellerProfile(profile) {
 module.exports = {
   DESIGN_SOFTWARE_OPTIONS: [...DESIGN_SOFTWARE_OPTIONS],
   PRINTER_SPECIALIZATIONS: [...PRINTER_SPECIALIZATIONS],
+  DEFAULT_IMAGE_BASE_URL,
+  DEFAULT_SITE_ORIGIN,
   ensureSellerProfilesTable,
   normalizeSellerProfile,
+  resolveShopLogoFromSources,
+  resolveShopLogoUrl,
   sellerProfileFromRow,
   validateSellerProfile,
 };

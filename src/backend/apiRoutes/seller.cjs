@@ -10,11 +10,19 @@ const {
 } = require("./shippingShared.cjs");
 const {
   normalizeSellerProfile,
+  resolveShopLogoUrl,
   sellerProfileFromRow,
   validateSellerProfile,
 } = require("./sellerProfileShared.cjs");
+const {
+  createSellerAvatarLogoUrl,
+  persistSellerLogoUrl,
+  resolveSellerLogoUrlForSave,
+  shouldAutoGenerateSellerAvatar,
+} = require("./sellerAvatar.cjs");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
 
 function normalizeTagList(tags) {
   if (!Array.isArray(tags)) return [];
@@ -394,6 +402,52 @@ module.exports = function sellerRoutes(deps) {
 
       const row = result.rows[0];
       const preferences = normalizeSellerPreferences(row.seller_preferences);
+      let sellerProfile = sellerProfileFromRow(row, preferences);
+
+      if (
+        row.seller_user_id &&
+        !String(row.shop_logo_url || "").trim() &&
+        preferences.shopLogoUrl
+      ) {
+        await pool.query(
+          `UPDATE seller_profiles
+           SET shop_logo_url = $1,
+               updated_at = NOW()
+           WHERE seller_user_id = $2`,
+          [preferences.shopLogoUrl, req.user.id]
+        );
+        sellerProfile = {
+          ...sellerProfile,
+          shopLogoUrl: sellerProfileFromRow(
+            { ...row, shop_logo_url: preferences.shopLogoUrl },
+            preferences
+          ).shopLogoUrl,
+        };
+      }
+
+      if (
+        sellerProfile.shopName &&
+        shouldAutoGenerateSellerAvatar(sellerProfile.shopLogoUrl, {
+          shopName: sellerProfile.shopName,
+          shopNameChanged: false,
+        })
+      ) {
+        const imageUrl = await createSellerAvatarLogoUrl({
+          shopName: sellerProfile.shopName,
+          sellerId: req.user.id,
+          currentLogoUrl: sellerProfile.shopLogoUrl,
+          uploadDir: sellerUploadDir,
+          buildImageUrl,
+          req,
+        });
+        await persistSellerLogoUrl(pool, req.user.id, imageUrl);
+        preferences.shopLogoUrl = imageUrl;
+        sellerProfile = {
+          ...sellerProfile,
+          shopLogoUrl: resolveShopLogoUrl(imageUrl),
+        };
+      }
+
       return res.status(200).json({
         profile: {
           username: row.username,
@@ -401,7 +455,7 @@ module.exports = function sellerRoutes(deps) {
           phoneNumber: row.phone_number || "",
         },
         preferences,
-        sellerProfile: sellerProfileFromRow(row, preferences),
+        sellerProfile: sellerProfile,
       });
     } catch (error) {
       console.error("Error loading seller preferences:", error);
@@ -427,6 +481,38 @@ module.exports = function sellerRoutes(deps) {
       if (sellerProfileError) {
         return res.status(400).json({ message: sellerProfileError });
       }
+
+      const existingResult = await pool.query(
+        `SELECT sp.shop_name,
+                sp.shop_logo_url,
+                COALESCE(u.seller_preferences, '{}'::jsonb) AS seller_preferences
+         FROM users u
+         LEFT JOIN seller_profiles sp ON sp.seller_user_id = u.id
+         WHERE u.id = $1
+         LIMIT 1`,
+        [req.user.id]
+      );
+      const existingRow = existingResult.rows[0] || {};
+      const existingPreferences = normalizeSellerPreferences(existingRow.seller_preferences);
+      const existingShopName = String(existingRow.shop_name || existingPreferences.storeName || "").trim();
+      const existingLogoUrl = String(
+        existingRow.shop_logo_url || existingPreferences.shopLogoUrl || ""
+      ).trim();
+      const shopNameChanged = existingShopName.toLowerCase() !== sellerProfile.shopName.toLowerCase();
+
+      const resolvedLogoUrl = await resolveSellerLogoUrlForSave({
+        sellerId: req.user.id,
+        shopName: sellerProfile.shopName,
+        shopNameChanged,
+        submittedLogoUrl: sellerProfile.shopLogoUrl,
+        existingLogoUrl,
+        uploadDir: sellerUploadDir,
+        buildImageUrl,
+        req,
+      });
+
+      sellerProfile.shopLogoUrl = resolvedLogoUrl;
+      preferences.shopLogoUrl = resolvedLogoUrl;
 
       await pool.query(
         `UPDATE users
