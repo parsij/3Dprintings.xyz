@@ -454,7 +454,7 @@ const Checkout = () => {
 
                             <div
                                 className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                                    showAddressDetails ? 'max-h-[560px] opacity-100' : 'max-h-0 opacity-0'
+                                    showAddressDetails ? 'max-h-140 opacity-100' : 'max-h-0 opacity-0'
                                 }`}
                             >
                                 <div className="space-y-4 pt-1">
@@ -566,7 +566,7 @@ const Checkout = () => {
                                     type="checkbox"
                                     checked={saveAddressForFuture}
                                     onChange={(event) => setSaveAddressForFuture(event.target.checked)}
-                                    className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                                    className="w-4 h-4 rounded border-gray-300 text-orange-500"
                                 />
                                 <span className="text-sm text-gray-700 font-medium">Save this address for future purchases</span>
                             </label>
