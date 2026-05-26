@@ -1,12 +1,12 @@
 import axios from "axios";
+import { applyCsrfInterceptor } from "./csrf.js";
 
 const API_BASE = "https://3dprintings.xyz";
 
-// Create an axios instance with credentials enabled globally
-const axiosWithCredentials = axios.create({
+const axiosWithCredentials = applyCsrfInterceptor(axios.create({
   baseURL: API_BASE,
   withCredentials: true,
-});
+}));
 
 /**
  * Add a product to the user's cart.

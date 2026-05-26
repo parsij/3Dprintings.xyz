@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { applyCsrfInterceptor } from "../services/csrf.js";
 import { isProfane } from "../services/profanityFilter.js";
 
-const axiosWithCredentials = axios.create({
+const axiosWithCredentials = applyCsrfInterceptor(axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "",
   withCredentials: true,
-});
+}));
 
 const Tags = ({ tags, setTags }) => {
   const [text, setText] = useState("");
