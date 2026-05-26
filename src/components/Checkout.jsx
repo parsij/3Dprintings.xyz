@@ -566,7 +566,7 @@ const Checkout = () => {
                                     type="checkbox"
                                     checked={saveAddressForFuture}
                                     onChange={(event) => setSaveAddressForFuture(event.target.checked)}
-                                    className="w-4 h-4 rounded border-gray-300 text-orange-500"
+                                    className="w-4 h-4 rounded border-gray-300 text-orange-500 cursor-pointer outline-none focus:ring-0 focus:shadow-none"
                                 />
                                 <span className="text-sm text-gray-700 font-medium">Save this address for future purchases</span>
                             </label>
