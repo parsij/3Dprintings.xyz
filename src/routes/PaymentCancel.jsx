@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import SmallNavBar from '../components/SmallNavBar';
 import SideMenu from '../components/SideMenu';
@@ -6,23 +6,7 @@ import SideMenu from '../components/SideMenu';
 const PaymentCancel = () => {
     const [searchParams] = useSearchParams();
     const orderId = searchParams.get('order_id');
-
-    useEffect(() => {
-        // Optionally mark order as cancelled in backend
-        if (orderId) {
-            const cancelOrder = async () => {
-                try {
-                    await fetch(`/api/orders/${orderId}/cancel`, {
-                        method: 'POST',
-                        credentials: 'include',
-                    });
-                } catch (error) {
-                    console.error('Error cancelling order:', error);
-                }
-            };
-            cancelOrder();
-        }
-    }, [orderId]);
+    const orderDetailsPath = orderId ? `/account/orders/${encodeURIComponent(orderId)}` : null;
 
     return (
         <>
@@ -45,27 +29,35 @@ const PaymentCancel = () => {
 
                         {orderId && (
                             <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                                <p className="text-sm text-gray-500 mb-1">Order ID (Cancelled)</p>
+                                <p className="text-sm text-gray-500 mb-1">Order ID</p>
                                 <p className="text-lg font-mono font-semibold text-gray-800">{orderId}</p>
                             </div>
                         )}
 
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                             <p className="text-sm text-blue-800">
-                                <strong>Note:</strong> Your cart items are still saved. You can complete your purchase at any time.
+                                <strong>Note:</strong> Your order is still pending. You can return to order details and pay when you are ready.
                             </p>
                         </div>
 
                         <div className="space-y-3 mt-8">
+                            {orderDetailsPath ? (
+                                <Link
+                                    to={orderDetailsPath}
+                                    className="inline-block w-full rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white transition-all duration-300 hover:bg-orange-600 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+                                >
+                                    Return to Order
+                                </Link>
+                            ) : null}
                             <Link
                                 to="/cart"
-                                className="inline-block w-full rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white transition-all duration-300 hover:bg-orange-600 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+                                className="inline-block w-full rounded-xl border-2 border-orange-500 px-6 py-3 font-semibold text-orange-500 transition-all duration-300 hover:bg-orange-50 hover:scale-105 active:scale-95"
                             >
                                 Return to Cart
                             </Link>
                             <Link
                                 to="/home"
-                                className="inline-block w-full rounded-xl border-2 border-orange-500 px-6 py-3 font-semibold text-orange-500 transition-all duration-300 hover:bg-orange-50 hover:scale-105 active:scale-95"
+                                className="inline-block w-full rounded-xl border-2 border-gray-300 px-6 py-3 font-semibold text-gray-700 transition-all duration-300 hover:bg-gray-50 hover:scale-105 active:scale-95"
                             >
                                 Continue Shopping
                             </Link>

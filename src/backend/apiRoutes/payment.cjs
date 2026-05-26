@@ -15,6 +15,7 @@ module.exports = function paymentController(deps) {
     } = require("./orderPaymentPolling.cjs");
     const { getFrontendUrl } = require("../envShared.cjs");
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
     const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
     const parseIntInRange = (value, field, min, max) => {
         const parsed = Number.parseInt(value, 10);
@@ -112,6 +113,104 @@ module.exports = function paymentController(deps) {
         }
 
         return normalizedItems;
+    };
+
+    const getOrderItemsPayload = (order) => {
+        if (!order?.items || typeof order.items !== "object" || Array.isArray(order.items)) {
+            return { items: [] };
+        }
+        return order.items;
+    };
+
+    const buildStripeLineItemsFromOrderPayload = (itemsPayload) => {
+        const orderItems = Array.isArray(itemsPayload.items) ? itemsPayload.items : [];
+        const line_items = orderItems.map((item) => {
+            const product_data = {
+                name: item.name || "Item",
+                images: item.image_url ? [item.image_url] : [],
+            };
+
+            if (item.description) {
+                product_data.description = item.description;
+            }
+
+            return {
+                price_data: {
+                    currency: "usd",
+                    product_data,
+                    unit_amount: Math.round(Number(item.current_price || 0) * 100),
+                },
+                quantity: Number(item.quantity || 1),
+            };
+        });
+
+        const taxCents = Math.round(Number(itemsPayload.tax || 0) * 100);
+        const shippingCents = Math.round(
+            Number(itemsPayload.shipping || itemsPayload.shippingAndHandling || 0) * 100
+        );
+
+        if (taxCents > 0) {
+            line_items.push({
+                price_data: {
+                    currency: "usd",
+                    product_data: {
+                        name: "Sales Tax",
+                    },
+                    unit_amount: taxCents,
+                },
+                quantity: 1,
+            });
+        }
+
+        line_items.push({
+            price_data: {
+                currency: "usd",
+                product_data: {
+                    name: "Shipping and handling",
+                },
+                unit_amount: shippingCents,
+            },
+            quantity: 1,
+        });
+
+        return { line_items, orderItems, taxCents, shippingCents };
+    };
+
+    const createCheckoutSessionForOrder = async ({ orderId, userId, itemsPayload, userEmail }) => {
+        const { line_items, orderItems } = buildStripeLineItemsFromOrderPayload(itemsPayload);
+        if (orderItems.length === 0) {
+            const error = new Error("Order has no items.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        await normalizeCheckoutItemsFromDatabase(
+            orderItems.map((item) => ({
+                id: item.id || item.productId || item.product_id,
+                quantity: item.quantity,
+            }))
+        );
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            line_items,
+            mode: "payment",
+            success_url: `${getFrontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
+            cancel_url: `${getFrontendUrl()}/cancel?order_id=${orderId}`,
+            ...(userEmail ? { customer_email: userEmail } : {}),
+            metadata: {
+                orderId,
+                userId: String(userId),
+            },
+        });
+
+        await pool.query(
+            `UPDATE orders SET stripe_session_id = $1, updated_at = NOW() WHERE id = $2`,
+            [session.id, orderId]
+        );
+        scheduleOrderPaymentPoll(enqueueWrite, orderId);
+
+        return session;
     };
 
     const calculateCheckoutAmounts = async ({ items, address }) => {
@@ -289,6 +388,79 @@ module.exports = function paymentController(deps) {
         } catch (error) {
             console.error('Error cancelling order:', error);
             res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+
+    // Resume payment for an existing pending order
+    app.post("/api/orders/:orderId/pay", async (req, res) => {
+        try {
+            const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+            if (!auth?.userId) return;
+
+            const { orderId } = req.params;
+            if (!UUID_REGEX.test(orderId)) {
+                return res.status(400).json({ error: "Invalid order id" });
+            }
+
+            const orderResult = await pool.query(
+                `SELECT id, customer_id, status, total_amount, items, stripe_session_id, created_at
+                 FROM orders
+                 WHERE id = $1 AND customer_id = $2`,
+                [orderId, auth.userId]
+            );
+
+            if (orderResult.rows.length === 0) {
+                return res.status(404).json({ error: "Order not found" });
+            }
+
+            const order = orderResult.rows[0];
+            if (order.status !== "pending") {
+                return res.status(400).json({ error: "Order is not pending payment." });
+            }
+
+            const createdAtMs = new Date(order.created_at).getTime();
+            if (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs >= ORDER_PAYMENT_TIMEOUT_MS) {
+                await pool.query(
+                    `UPDATE orders
+                     SET status = 'cancelled',
+                         updated_at = NOW()
+                     WHERE id = $1 AND status = 'pending'`,
+                    [orderId]
+                );
+                return res.status(400).json({ error: "This order has expired. Please place a new order." });
+            }
+
+            if (order.stripe_session_id) {
+                try {
+                    const existingSession = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+                    if (existingSession.payment_status === "paid") {
+                        return res.status(400).json({ error: "This order has already been paid." });
+                    }
+                    if (existingSession.status === "open" && existingSession.url) {
+                        scheduleOrderPaymentPoll(enqueueWrite, orderId);
+                        return res.json({ checkout_url: existingSession.url });
+                    }
+                } catch (sessionError) {
+                    console.warn(`Could not reuse Stripe session for order ${orderId}:`, sessionError.message || sessionError);
+                }
+            }
+
+            const userResult = await pool.query(`SELECT email FROM users WHERE id = $1`, [auth.userId]);
+            const userEmail = userResult.rows[0]?.email;
+            const itemsPayload = getOrderItemsPayload(order);
+            const session = await createCheckoutSessionForOrder({
+                orderId,
+                userId: auth.userId,
+                itemsPayload,
+                userEmail,
+            });
+
+            return res.json({ checkout_url: session.url });
+        } catch (error) {
+            console.error("Error processing order payment:", error);
+            return res.status(error.statusCode || 500).json({
+                error: error.message || "Failed to process payment.",
+            });
         }
     });
 
