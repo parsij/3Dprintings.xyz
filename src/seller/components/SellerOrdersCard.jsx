@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { Download, X } from "lucide-react";
 import TrackingSection from "../../components/TrackingSection.jsx";
-import { addSellerOrderTracking } from "../services/sellerPortalService.js";
+import {
+  downloadSellerOrderLabel,
+  getSellerOrderLabelViewUrl,
+} from "../services/sellerPortalService.js";
 
 const currencyFormatter = new Intl.NumberFormat(undefined, {
   style: "currency",
@@ -39,194 +43,223 @@ function getMarketplaceProductUrl(productId) {
   return `${MARKETPLACE_ORIGIN}/product/${encodeURIComponent(String(productId))}`;
 }
 
-export default function SellerOrdersCard({ order, onTrackingSaved }) {
-  const existingShipment = Array.isArray(order.tracking?.shipments) ? order.tracking.shipments[0] : null;
-  const [trackingCode, setTrackingCode] = useState(existingShipment?.trackingCode || "");
-  const [carrier, setCarrier] = useState(existingShipment?.carrier || "");
-  const [trackingSaving, setTrackingSaving] = useState(false);
-  const [trackingMessage, setTrackingMessage] = useState("");
-  const [trackingError, setTrackingError] = useState("");
-  const { shippingAddress } = order;
-  const addressLines = [];
-  if (shippingAddress) {
-    if (shippingAddress.street) addressLines.push(shippingAddress.street);
-    if (shippingAddress.street2) addressLines.push(shippingAddress.street2);
-    const line2 = [shippingAddress.city, shippingAddress.state, shippingAddress.postalCode].filter(Boolean).join(", ");
-    if (line2) addressLines.push(line2);
-    if (shippingAddress.country) addressLines.push(shippingAddress.country);
+function formatShippingAddress(shippingAddress) {
+  if (!shippingAddress || typeof shippingAddress !== "object") return [];
+
+  const lines = [];
+  const line1 = shippingAddress.line1 || shippingAddress.street;
+  const line2 = shippingAddress.line2 || shippingAddress.street2;
+  const city = shippingAddress.city;
+  const state = shippingAddress.state;
+  const postalCode = shippingAddress.postalCode || shippingAddress.zip;
+  const country = shippingAddress.country;
+
+  if (line1) lines.push(line1);
+  if (line2) lines.push(line2);
+
+  const cityLine = [city, state, postalCode].filter(Boolean).join(", ");
+  if (cityLine) lines.push(cityLine);
+  if (country) lines.push(country);
+
+  return lines;
+}
+
+export default function SellerOrdersCard({ order }) {
+  const [labelLoading, setLabelLoading] = useState(false);
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [labelError, setLabelError] = useState("");
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [labelViewUrl, setLabelViewUrl] = useState("");
+
+  const addressLines = useMemo(
+    () => formatShippingAddress(order.shippingAddress),
+    [order.shippingAddress]
+  );
+  const items = Array.isArray(order.items) ? order.items : [];
+  const canManageLabel = String(order.status || "").toLowerCase() === "completed";
+
+  async function handleViewLabel() {
+    setLabelError("");
+    setLabelLoading(true);
+    try {
+      const viewUrl = await getSellerOrderLabelViewUrl(order.id);
+      setLabelViewUrl(viewUrl);
+      setShowLabelModal(true);
+    } catch (error) {
+      setLabelError(error?.response?.data?.message || "Failed to load shipping label.");
+    } finally {
+      setLabelLoading(false);
+    }
   }
 
-  const items = Array.isArray(order.items) ? order.items : [];
-
-  useEffect(() => {
-    setTrackingCode(existingShipment?.trackingCode || "");
-    setCarrier(existingShipment?.carrier || "");
-  }, [existingShipment?.trackingCode, existingShipment?.carrier]);
-
-  async function handleTrackingSubmit(event) {
-    event.preventDefault();
-    setTrackingMessage("");
-    setTrackingError("");
-
-    if (!trackingCode.trim()) {
-      setTrackingError("Enter a tracking number.");
-      return;
-    }
-
+  async function handleDownloadLabel() {
+    setLabelError("");
+    setDownloadLoading(true);
     try {
-      setTrackingSaving(true);
-      const response = await addSellerOrderTracking(order.id, {
-        trackingCode: trackingCode.trim(),
-        carrier: carrier.trim(),
-      });
-      setTrackingMessage(response?.message || "Tracking saved.");
-      await onTrackingSaved?.();
+      await downloadSellerOrderLabel(order.id);
     } catch (error) {
-      setTrackingError(error?.response?.data?.message || "Failed to save tracking.");
+      setLabelError(error?.response?.data?.message || "Failed to download shipping label.");
     } finally {
-      setTrackingSaving(false);
+      setDownloadLoading(false);
     }
+  }
+
+  function closeLabelModal() {
+    setShowLabelModal(false);
+    setLabelViewUrl("");
   }
 
   return (
-    <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
-      <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-xs text-gray-500">Order ID</p>
-          <h2 className="break-all font-mono text-sm font-semibold text-gray-900">{order.id}</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {order.customerUsername || "Customer"}
-          </p>
-          <div className="mt-2">
-            <p className="text-xs font-semibold uppercase text-gray-500">Shipping Address</p>
-            {addressLines.length > 0 ? (
-              <div className="text-sm text-gray-700 mt-1">
-                {addressLines.map((line, idx) => (
-                  <p key={idx}>{line}</p>
-                ))}
+    <>
+      <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+        <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500">Order ID</p>
+            <h2 className="break-all font-mono text-sm font-semibold text-gray-900">{order.id}</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {order.customerUsername || "Customer"}
+            </p>
+            <div className="mt-2">
+              <p className="text-xs font-semibold uppercase text-gray-500">Shipping Address</p>
+              {addressLines.length > 0 ? (
+                <div className="text-sm text-gray-700 mt-1">
+                  {addressLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-1">No shipping address provided</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-start gap-3 sm:items-end">
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${getStatusStyles(order.status)}`}>
+                {getStatusLabel(order.status)}
+              </span>
+              <p className="text-xs text-gray-500">{formatDate(order.createdAt)}</p>
+            </div>
+
+            {canManageLabel ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleViewLabel}
+                  disabled={labelLoading || downloadLoading}
+                  className="rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
+                >
+                  {labelLoading ? "Loading..." : "View Label"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadLabel}
+                  disabled={labelLoading || downloadLoading}
+                  aria-label="Download shipping label"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
               </div>
-            ) : (
-              <p className="text-sm text-gray-500 mt-1">No shipping address provided</p>
-            )}
+            ) : null}
           </div>
         </div>
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${getStatusStyles(order.status)}`}>
-            {getStatusLabel(order.status)}
-          </span>
-          <p className="text-xs text-gray-500">{formatDate(order.createdAt)}</p>
+
+        {labelError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{labelError}</p>
+        ) : null}
+
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-gray-900">Items</p>
+          {items.length === 0 ? (
+            <p className="text-sm text-gray-600">No items in this order.</p>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item, index) => {
+                const quantity = Number(item.quantity) || 0;
+                const unitPrice = Number(item.unitPrice) || 0;
+                const lineTotal = Number(item.lineTotal) || 0;
+                const productId = item.productId;
+                const productUrl = getMarketplaceProductUrl(productId);
+                const hasProductLink = Boolean(productUrl);
+
+                return (
+                  <div key={`${order.id}-${productId}-${index}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        {item.imageUrl ? (
+                          hasProductLink ? (
+                            <a href={productUrl} target="_self" className="block shrink-0">
+                              <img
+                                src={item.imageUrl}
+                                alt={item.productName}
+                                className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
+                                loading="lazy"
+                              />
+                            </a>
+                          ) : (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.productName}
+                              className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
+                              loading="lazy"
+                            />
+                          )
+                        ) : (
+                          <div className="h-14 w-14 rounded-md bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200 text-xs text-gray-400">
+                            No Img
+                          </div>
+                        )}
+
+                        <div className="min-w-0">
+                          {hasProductLink ? (
+                            <a href={productUrl} target="_self" className="font-medium text-gray-900 hover:text-orange-600 transition-colors duration-250">
+                              {item.productName}
+                            </a>
+                          ) : (
+                            <p className="font-medium text-gray-900">{item.productName}</p>
+                          )}
+                          <p className="text-xs text-gray-600 mt-1">
+                            Quantity: {quantity} x {formatCurrency(unitPrice)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(lineTotal)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </div>
 
-      <div className="space-y-3">
-        <p className="text-sm font-semibold text-gray-900">Items</p>
-        {items.length === 0 ? (
-          <p className="text-sm text-gray-600">No items in this order.</p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((item, index) => {
-               const quantity = Number(item.quantity) || 0;
-               const unitPrice = Number(item.unitPrice) || 0;
-               const lineTotal = Number(item.lineTotal) || 0;
-               const productId = item.productId;
-               const productUrl = getMarketplaceProductUrl(productId);
-               const hasProductLink = Boolean(productUrl);
+        <div className="border-t border-gray-100 pt-4">
+          <TrackingSection tracking={order.tracking} title="Tracking" />
+        </div>
+      </article>
 
-               return (
-                 <div key={`${order.id}-${item.productId}-${index}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                   <div className="flex items-start justify-between gap-3">
-                     <div className="flex items-start gap-3 min-w-0">
-                       {item.imageUrl ? (
-                         hasProductLink ? (
-                           <a href={productUrl} target="_self" className="block shrink-0">
-                             <img
-                               src={item.imageUrl}
-                               alt={item.productName}
-                               className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
-                               loading="lazy"
-                             />
-                           </a>
-                         ) : (
-                           <img
-                             src={item.imageUrl}
-                             alt={item.productName}
-                             className="h-14 w-14 rounded-md object-cover border border-gray-200 shrink-0 hover:scale-115 transition-transform transform-gpu backface-hidden"
-                             loading="lazy"
-                           />
-                         )
-                       ) : (
-                         <div className="h-14 w-14 rounded-md bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200 text-xs text-gray-400">
-                           No Img
-                         </div>
-                       )}
-
-                       <div className="min-w-0">
-                         {hasProductLink ? (
-                           <a href={productUrl} target="_self" className="font-medium text-gray-900 hover:text-orange-600 transition-colors duration-250">
-                             {item.productName}
-                           </a>
-                         ) : (
-                           <p className="font-medium text-gray-900">{item.productName}</p>
-                         )}
-                         <p className="text-xs text-gray-600 mt-1">
-                           Quantity: {quantity} x {formatCurrency(unitPrice)}
-                         </p>
-                       </div>
-                     </div>
-                     <p className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(lineTotal)}</p>
-                   </div>
-                 </div>
-               );
-             })}
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-gray-100 pt-4">
-        <TrackingSection tracking={order.tracking} title="Tracking" />
-
-        <form className="mt-3 grid gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={handleTrackingSubmit}>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Carrier</label>
-            <input
-              type="text"
-              value={carrier}
-              onChange={(event) => setCarrier(event.target.value)}
-              placeholder="USPS, UPS, FedEx"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+      {showLabelModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">Shipping Label</h3>
+              <button
+                type="button"
+                onClick={closeLabelModal}
+                aria-label="Close label preview"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <iframe
+              title={`Shipping label for order ${order.id}`}
+              src={labelViewUrl}
+              className="h-full w-full flex-1 bg-gray-100"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Tracking Number</label>
-            <input
-              type="text"
-              value={trackingCode}
-              onChange={(event) => setTrackingCode(event.target.value)}
-              placeholder="Tracking number"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-              required
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={trackingSaving}
-              className="w-full rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60 md:w-auto"
-            >
-              {trackingSaving ? "Saving..." : "Save Tracking"}
-            </button>
-          </div>
-          {trackingMessage ? <p className="text-sm text-green-700 md:col-span-3">{trackingMessage}</p> : null}
-          {trackingError ? <p className="text-sm text-red-600 md:col-span-3">{trackingError}</p> : null}
-        </form>
-      </div>
-
-      <div className="mt-4 flex justify-end border-t border-gray-100 pt-4">
-        <div className="text-right">
-          <p className="text-xs font-semibold uppercase text-gray-500">Total Amount</p>
-          <p className="text-lg font-bold text-gray-900">{formatCurrency(order.totalAmount)}</p>
         </div>
-      </div>
-    </article>
+      ) : null}
+    </>
   );
 }

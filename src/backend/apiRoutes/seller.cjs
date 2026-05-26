@@ -3,10 +3,18 @@ const path = require("path");
 const { refreshSellerDashboard } = require("./sellerShared.cjs");
 const { ensureLikesColumns, normalizeNumericArray } = require("./likesShared.cjs");
 const {
+  ensureSellerOrderLabel,
+  extractShippingAddressFromOrderItems,
+  fetchLabelBinary,
+  filterTrackingForSeller,
+} = require("./shippingShared.cjs");
+const {
   normalizeSellerProfile,
   sellerProfileFromRow,
   validateSellerProfile,
 } = require("./sellerProfileShared.cjs");
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeTagList(tags) {
   if (!Array.isArray(tags)) return [];
@@ -214,9 +222,9 @@ module.exports = function sellerRoutes(deps) {
               o.id AS order_id,
               o.customer_id,
               o.status,
-              o.total_amount,
               o.created_at,
               o.updated_at,
+              o.items,
               o.tracking,
               item,
               CASE
@@ -240,9 +248,9 @@ module.exports = function sellerRoutes(deps) {
             e.order_id,
             e.customer_id,
             e.status,
-            e.total_amount,
             e.created_at,
             e.updated_at,
+            e.items,
             e.tracking,
             p.id AS product_id,
             p.name AS product_name,
@@ -251,12 +259,7 @@ module.exports = function sellerRoutes(deps) {
             COALESCE(e.unit_price, p.current_price, 0)::numeric(12,2) AS unit_price,
             (COALESCE(e.quantity, 0) * COALESCE(e.unit_price, p.current_price, 0))::numeric(12,2) AS line_total,
             u.username AS customer_username,
-            u.email AS customer_email,
-            u.street_address,
-            u.city,
-            u.state_province,
-            u.postal_code,
-            u.country_code
+            u.email AS customer_email
           FROM expanded_items e
           JOIN products p ON p.id = e.product_id
           LEFT JOIN users u ON u.id = e.customer_id
@@ -271,30 +274,19 @@ module.exports = function sellerRoutes(deps) {
       for (const row of ordersResult.rows) {
         const key = String(row.order_id);
         if (!ordersMap.has(key)) {
-          let sellerTracking = null;
-          if (row.tracking && Array.isArray(row.tracking.shipments)) {
-            const sellerShipments = row.tracking.shipments.filter(s => Number(s.sellerId) === sellerId);
-            sellerTracking = { ...row.tracking, shipments: sellerShipments };
-          }
+          const itemsPayload = row.items && typeof row.items === "object" ? row.items : {};
+          const sellerTracking = filterTrackingForSeller(row.tracking, sellerId);
 
           ordersMap.set(key, {
             id: row.order_id,
             customerId: Number(row.customer_id),
             customerUsername: row.customer_username || null,
             customerEmail: row.customer_email || null,
-            shippingAddress: {
-              street: row.street_address || null,
-              city: row.city || null,
-              state: row.state_province || null,
-              postalCode: row.postal_code || null,
-              country: row.country_code || null,
-            },
+            shippingAddress: extractShippingAddressFromOrderItems(itemsPayload),
             status: row.status,
-            totalAmount: Number(row.total_amount || 0),
             createdAt: row.created_at,
             updatedAt: row.updated_at,
-            tracking: sellerTracking || row.tracking,
-            sellerSubtotal: 0,
+            tracking: sellerTracking,
             items: [],
           });
         }
@@ -304,13 +296,13 @@ module.exports = function sellerRoutes(deps) {
         const firstImage = Array.isArray(row.img_path) && row.img_path.length > 0 ? row.img_path[0] : null;
         const imageUrl = firstImage ? buildImageUrl(req, firstImage) : null;
         order.items.push({
+          productId: Number(row.product_id),
           productName: row.product_name,
           quantity: Number(row.quantity || 0),
           unitPrice: Number(row.unit_price || 0),
           lineTotal,
           imageUrl,
         });
-        order.sellerSubtotal += lineTotal;
       }
 
       return res.status(200).json({
@@ -319,6 +311,57 @@ module.exports = function sellerRoutes(deps) {
     } catch (error) {
       console.error("Error loading seller orders:", error);
       return res.status(500).json({ message: "Failed to load seller orders." });
+    }
+  });
+
+  app.get("/api/seller/orders/:orderId/label", attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      if (!UUID_REGEX.test(orderId)) {
+        return res.status(400).json({ message: "Invalid order id." });
+      }
+
+      const label = await ensureSellerOrderLabel(pool, orderId, req.user.id);
+      return res.status(200).json({
+        orderId,
+        trackingCode: label.trackingCode || null,
+        carrier: label.carrier || null,
+        hasLabel: Boolean(label.labelPdfUrl || label.labelUrl),
+        viewUrl: `/api/seller/orders/${encodeURIComponent(orderId)}/label/file`,
+        downloadUrl: `/api/seller/orders/${encodeURIComponent(orderId)}/label/file?download=1`,
+      });
+    } catch (error) {
+      console.error("Error preparing seller order label:", error);
+      return res.status(error.statusCode || 500).json({
+        message: error.message || "Failed to prepare shipping label.",
+      });
+    }
+  });
+
+  app.get("/api/seller/orders/:orderId/label/file", attachAuthenticatedUser, isSeller, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      if (!UUID_REGEX.test(orderId)) {
+        return res.status(400).json({ message: "Invalid order id." });
+      }
+
+      const label = await ensureSellerOrderLabel(pool, orderId, req.user.id);
+      const labelUrl = label.labelPdfUrl || label.labelUrl;
+      const { buffer, contentType } = await fetchLabelBinary(labelUrl);
+      const shouldDownload = String(req.query.download || "") === "1";
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader(
+        "Content-Disposition",
+        `${shouldDownload ? "attachment" : "inline"}; filename="shipping-label-${orderId}.pdf"`
+      );
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.send(buffer);
+    } catch (error) {
+      console.error("Error streaming seller order label:", error);
+      return res.status(error.statusCode || 500).json({
+        message: error.message || "Failed to retrieve shipping label.",
+      });
     }
   });
 

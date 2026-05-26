@@ -58,19 +58,12 @@ export default function TrackingSection({ tracking, compact = false, title = "Tr
               return rightTime - leftTime;
             });
             const displayedEvents = compact ? events.slice(0, 2) : events;
-            const productNames = Array.isArray(shipment.productNames) ? shipment.productNames.filter(Boolean) : [];
 
             return (
               <div key={`${shipment.trackerId || shipment.sellerId || shipmentIndex}-${shipmentIndex}`} className="rounded-lg border border-gray-200 bg-white p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase text-gray-500">
-                      {shipment.sellerName || shipment.carrier || "Shipment"}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">{formatStatus(shipment.status)}</p>
-                    {productNames.length > 0 ? (
-                      <p className="mt-1 text-xs text-gray-600">{productNames.join(", ")}</p>
-                    ) : null}
+                    <p className="text-sm font-semibold text-gray-900">{formatStatus(shipment.status)}</p>
                   </div>
                   <div className="text-left sm:text-right">
                     {shipment.carrier || shipment.service ? (

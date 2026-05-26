@@ -678,6 +678,199 @@ function filterTrackingForSeller(tracking, sellerId) {
   };
 }
 
+function extractShippingAddressFromOrderItems(itemsPayload) {
+  if (!itemsPayload || typeof itemsPayload !== "object") return null;
+  const normalized = normalizeAddressPayload(itemsPayload.shippingAddress);
+  if (!normalized.line1) return null;
+
+  return {
+    line1: normalized.line1,
+    line2: normalized.line2 || null,
+    city: normalized.city || null,
+    state: normalized.state || null,
+    postalCode: normalized.zip || null,
+    country: normalized.country || "US",
+  };
+}
+
+function getSellerShipmentFromTracking(tracking, sellerId) {
+  const normalized = normalizeTrackingPayload(tracking);
+  return normalized.shipments.find((shipment) => Number(shipment.sellerId) === Number(sellerId)) || null;
+}
+
+function applyLabelToSellerShipment(tracking, sellerId, labelData, nowIso = new Date().toISOString()) {
+  const normalized = normalizeTrackingPayload(tracking);
+  const normalizedSellerId = Number(sellerId);
+  const shipmentIndex = normalized.shipments.findIndex(
+    (shipment) => Number(shipment.sellerId) === normalizedSellerId
+  );
+  if (shipmentIndex < 0) return null;
+
+  const shipment = normalized.shipments[shipmentIndex];
+  const nextShipment = {
+    ...shipment,
+    labelUrl: labelData.labelUrl || shipment.labelUrl || null,
+    labelPdfUrl: labelData.labelPdfUrl || shipment.labelPdfUrl || null,
+    trackingCode: labelData.trackingCode || shipment.trackingCode || null,
+    carrier: labelData.carrier || shipment.carrier || null,
+    status: labelData.trackingCode ? "pre_transit" : shipment.status,
+    statusDetail: labelData.trackingCode ? "label_created" : shipment.statusDetail,
+    purchasedAt: shipment.purchasedAt || nowIso,
+    updatedAt: nowIso,
+  };
+
+  const nextShipments = [...normalized.shipments];
+  nextShipments[shipmentIndex] = nextShipment;
+  return {
+    ...normalized,
+    shipments: nextShipments,
+    lastUpdatedAt: nowIso,
+  };
+}
+
+async function buyEasyPostShipmentLabel(easypostShipmentId, rateId) {
+  const shipmentId = normalizeText(easypostShipmentId);
+  const normalizedRateId = normalizeText(rateId);
+  if (!shipmentId || !normalizedRateId) {
+    const error = new Error("Shipment is missing EasyPost identifiers.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const client = getEasyPostClient();
+  try {
+    const bought = await client.Shipment.buy(shipmentId, normalizedRateId);
+    const postageLabel = bought?.postage_label && typeof bought.postage_label === "object"
+      ? bought.postage_label
+      : {};
+
+    return {
+      labelUrl: postageLabel.label_url || null,
+      labelPdfUrl: postageLabel.label_pdf_url || postageLabel.label_url || null,
+      trackingCode: bought.tracking_code || null,
+      carrier: bought.selected_rate?.carrier || bought.tracker?.carrier || null,
+    };
+  } catch (error) {
+    const nextError = new Error(error?.message || "Failed to purchase shipping label.");
+    nextError.statusCode = Number(error?.statusCode) || Number(error?.status) || 502;
+    throw nextError;
+  }
+}
+
+async function ensureSellerOrderLabel(pool, orderId, sellerId) {
+  const orderResult = await pool.query(
+    `SELECT id, status, tracking
+     FROM orders
+     WHERE id = $1`,
+    [orderId]
+  );
+
+  if (orderResult.rows.length === 0) {
+    const error = new Error("Order not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const order = orderResult.rows[0];
+  if (String(order.status).toLowerCase() !== "completed") {
+    const error = new Error("Shipping labels are available for completed orders only.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const ownershipResult = await pool.query(
+    `
+      SELECT 1
+      FROM orders o
+      JOIN LATERAL jsonb_array_elements(COALESCE(o.items->'items', '[]'::jsonb)) AS item ON TRUE
+      JOIN products p ON p.id = CASE
+        WHEN COALESCE(item->>'id', '') ~ '^\\d+$' THEN (item->>'id')::int
+        WHEN COALESCE(item->>'productId', '') ~ '^\\d+$' THEN (item->>'productId')::int
+        ELSE NULL
+      END
+      WHERE o.id = $1 AND p.user_id = $2
+      LIMIT 1
+    `,
+    [orderId, sellerId]
+  );
+
+  if (ownershipResult.rows.length === 0) {
+    const error = new Error("You do not have access to this order.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const shipment = getSellerShipmentFromTracking(order.tracking, sellerId);
+  if (!shipment) {
+    const error = new Error("No shipment found for this seller on the order.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const cachedLabelUrl = normalizeText(shipment.labelPdfUrl || shipment.labelUrl);
+  if (cachedLabelUrl) {
+    return {
+      labelUrl: shipment.labelUrl || cachedLabelUrl,
+      labelPdfUrl: shipment.labelPdfUrl || cachedLabelUrl,
+      trackingCode: shipment.trackingCode || null,
+      carrier: shipment.carrier || null,
+      tracking: order.tracking,
+    };
+  }
+
+  const easypostShipmentId = normalizeText(shipment.easypostShipmentId);
+  const rateId = normalizeText(shipment.rateId);
+  if (!easypostShipmentId || !rateId) {
+    const error = new Error("This order is not ready for label generation yet.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const labelData = await buyEasyPostShipmentLabel(easypostShipmentId, rateId);
+  const nextTracking = applyLabelToSellerShipment(order.tracking, sellerId, labelData);
+  if (!nextTracking) {
+    const error = new Error("Failed to update order tracking with label details.");
+    error.statusCode = 500;
+    throw error;
+  }
+
+  await pool.query(
+    `UPDATE orders SET tracking = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+    [JSON.stringify(nextTracking), orderId]
+  );
+
+  return {
+    ...labelData,
+    tracking: nextTracking,
+  };
+}
+
+async function fetchLabelBinary(labelUrl) {
+  const normalizedUrl = normalizeText(labelUrl);
+  if (!normalizedUrl || !/^https?:\/\//i.test(normalizedUrl)) {
+    const error = new Error("Shipping label URL is unavailable.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const response = await fetch(normalizedUrl);
+  if (!response.ok) {
+    const error = new Error("Failed to retrieve shipping label.");
+    error.statusCode = 502;
+    throw error;
+  }
+
+  const contentType = normalizeText(response.headers.get("content-type")) || "application/pdf";
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length) {
+    const error = new Error("Shipping label file is empty.");
+    error.statusCode = 502;
+    throw error;
+  }
+
+  return { buffer, contentType };
+}
+
 function validateEasyPostWebhookSignature({ headers, method, rawBody }) {
   const secret = normalizeText(process.env.EASYPOST_WEBHOOK_SECRET);
   if (!secret) {
@@ -717,6 +910,8 @@ async function ensureSellerAddressColumn(pool) {
 module.exports = {
   SHIPPING_MARKUP_RATE,
   addOrUpdateSellerTracker,
+  applyLabelToSellerShipment,
+  buyEasyPostShipmentLabel,
   calculateEasyPostShippingQuote,
   centsFromDollars,
   createEasyPostTracker,
@@ -724,7 +919,11 @@ module.exports = {
   dollarsFromCents,
   ensureOrderTrackingColumn,
   ensureSellerAddressColumn,
+  ensureSellerOrderLabel,
+  extractShippingAddressFromOrderItems,
+  fetchLabelBinary,
   filterTrackingForSeller,
+  getSellerShipmentFromTracking,
   mergeTrackerWebhookIntoOrders,
   normalizeAddressPayload,
   normalizeSellerAddressFromRow,
