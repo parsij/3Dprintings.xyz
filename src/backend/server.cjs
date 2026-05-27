@@ -18,10 +18,7 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
-const { ensureSellerProfilesTable } = require("./apiRoutes/sellerProfileShared.cjs");
-const { ensureSellerBoxesTable } = require("./apiRoutes/sellerBoxesShared.cjs");
-const { ensureSellerPayoutSchedulesTable } = require("./apiRoutes/sellerBalanceShared.cjs");
-const { ensureSellerTransfersColumn } = require("./apiRoutes/sellerOrderTransfers.cjs");
+const { ensureSellerMarketplaceSchema } = require("./apiRoutes/sellerMarketplaceSchema.cjs");
 const { ensureInventoryDeductedColumn } = require("./apiRoutes/orderFulfillment.cjs");
 const { initWorkerQueue, startWorkerRunner, shutdownWorkerQueue } = require("./worker/queue.cjs");
 const { csrfProtection, setCsrfCookie, clearCsrfCookie } = require("./csrf.cjs");
@@ -911,12 +908,9 @@ async function initializeDatabase() {
      `);
      console.log("Password reset token table ensured.");
 
-     await ensureSellerProfilesTable(pool);
-     await ensureSellerBoxesTable(pool);
-     await ensureSellerPayoutSchedulesTable(pool);
-     await ensureSellerTransfersColumn(pool);
+     await ensureSellerMarketplaceSchema(pool);
      await ensureSellerAddressColumn(pool);
-     console.log("seller profiles table ensured.");
+     console.log("Seller marketplace schema ensured.");
 
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`
