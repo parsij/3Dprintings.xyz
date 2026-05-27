@@ -124,6 +124,10 @@ const defaultForm = {
   category: "",
   tags: [],
   quantity: "1",
+  modelWeight: "",
+  modelHeight: "",
+  modelWidth: "",
+  modelLength: "",
 };
 
 const MAX_PHOTOS = 10;
@@ -199,6 +203,19 @@ export default function SubmitModel({ onSubmissionSuccess }) {
       nextErrors.quantity = "Enter a valid quantity greater than 0.";
     }
 
+    const dimensionFields = [
+      ["modelWeight", "Model weight"],
+      ["modelHeight", "Height"],
+      ["modelWidth", "Width"],
+      ["modelLength", "Length"],
+    ];
+    dimensionFields.forEach(([field, label]) => {
+      const parsed = Number(form[field]);
+      if (!form[field] || Number.isNaN(parsed) || parsed <= 0) {
+        nextErrors[field] = `${label} is required and must be greater than 0.`;
+      }
+    });
+
     return nextErrors;
   }, [form, photos]);
 
@@ -255,6 +272,10 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         category: form.category,
         tags: form.tags,
         quantity: Number(form.quantity),
+        modelWeight: Number(form.modelWeight),
+        modelHeight: Number(form.modelHeight),
+        modelWidth: Number(form.modelWidth),
+        modelLength: Number(form.modelLength),
         photos,
       });
 
@@ -419,6 +440,57 @@ export default function SubmitModel({ onSubmissionSuccess }) {
               {submitted && errors.description && (
                   <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.description}</p>
               )}
+            </div>
+
+            <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+              <h3 className="text-sm font-semibold text-gray-800">Model weight *</h3>
+              <input
+                id="modelWeight"
+                name="modelWeight"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.modelWeight}
+                onChange={handleChange}
+                placeholder="Weight in grams"
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
+              />
+              {submitted && errors.modelWeight && (
+                <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelWeight}</p>
+              )}
+            </div>
+
+            <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+              <h3 className="text-sm font-semibold text-gray-800">Model dimensions (mm) *</h3>
+              <p className="mt-1 text-xs text-gray-600">
+                It is important to make sure these values are correct to avoid extra charges.
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {[
+                  ["modelHeight", "Height"],
+                  ["modelWidth", "Width"],
+                  ["modelLength", "Length"],
+                ].map(([field, label]) => (
+                  <div key={field}>
+                    <label htmlFor={field} className="mb-1 block text-xs font-semibold text-gray-700">
+                      {label}
+                    </label>
+                    <input
+                      id={field}
+                      name={field}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={form[field]}
+                      onChange={handleChange}
+                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
+                    />
+                    {submitted && errors[field] && (
+                      <p className="mt-1 text-xs text-red-500 animate-pulse">{errors[field]}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <Tags

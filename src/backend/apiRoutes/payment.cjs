@@ -13,6 +13,12 @@ module.exports = function paymentController(deps) {
         getPaymentTypeFromSession,
         scheduleOrderPaymentPoll,
     } = require("./orderPaymentPolling.cjs");
+    const {
+        assertCheckoutTotalsAreValid,
+        assertSellerCanReceivePayments,
+        buildCheckoutPaymentIntentData,
+        calculatePlatformFeeCents,
+    } = require("./sellerStripeShared.cjs");
     const { getFrontendUrl } = require("../envShared.cjs");
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -115,6 +121,21 @@ module.exports = function paymentController(deps) {
         return normalizedItems;
     };
 
+    const loadSellerStripeAccounts = async (orderItems) => {
+        const sellerIds = [...new Set(
+            orderItems
+                .map((item) => Number(item.sellerId || item.seller_id))
+                .filter((sellerId) => Number.isInteger(sellerId) && sellerId > 0)
+        )];
+
+        const sellerAccountById = new Map();
+        for (const sellerId of sellerIds) {
+            const accountId = await assertSellerCanReceivePayments(pool, stripe, sellerId);
+            sellerAccountById.set(sellerId, accountId);
+        }
+        return sellerAccountById;
+    };
+
     const getOrderItemsPayload = (order) => {
         if (!order?.items || typeof order.items !== "object" || Array.isArray(order.items)) {
             return { items: [] };
@@ -184,14 +205,30 @@ module.exports = function paymentController(deps) {
             throw error;
         }
 
-        await normalizeCheckoutItemsFromDatabase(
+        const validatedItems = await normalizeCheckoutItemsFromDatabase(
             orderItems.map((item) => ({
                 id: item.id || item.productId || item.product_id,
                 quantity: item.quantity,
             }))
         );
 
-        const session = await stripe.checkout.sessions.create({
+        const totalCents = Math.round(Number(itemsPayload.total || 0) * 100)
+            || validatedItems.reduce(
+                (sum, item) => sum + Math.round(Number(item.current_price || 0) * 100) * Number(item.quantity || 1),
+                0
+            )
+            + Math.round(Number(itemsPayload.tax || 0) * 100)
+            + Math.round(Number(itemsPayload.shipping || itemsPayload.shippingAndHandling || 0) * 100);
+
+        assertCheckoutTotalsAreValid(totalCents);
+        const sellerAccountById = await loadSellerStripeAccounts(validatedItems);
+        const connectConfig = buildCheckoutPaymentIntentData({
+            totalCents,
+            orderItems: validatedItems,
+            sellerAccountById,
+        });
+
+        const sessionPayload = {
             payment_method_types: ["card"],
             line_items,
             mode: "payment",
@@ -201,8 +238,16 @@ module.exports = function paymentController(deps) {
             metadata: {
                 orderId,
                 userId: String(userId),
+                multiSeller: connectConfig.multiSeller ? "1" : "0",
+                platformFeeCents: String(connectConfig.platformFeeCents),
             },
-        });
+        };
+
+        if (!connectConfig.multiSeller && connectConfig.payment_intent_data) {
+            sessionPayload.payment_intent_data = connectConfig.payment_intent_data;
+        }
+
+        const session = await stripe.checkout.sessions.create(sessionPayload);
 
         await pool.query(
             `UPDATE orders SET stripe_session_id = $1, updated_at = NOW() WHERE id = $2`,
@@ -476,6 +521,10 @@ module.exports = function paymentController(deps) {
             }
 
             const totals = await calculateCheckoutAmounts({ items, address });
+            assertCheckoutTotalsAreValid(totals.totalCents);
+            const validatedItems = await normalizeCheckoutItemsFromDatabase(items);
+            await loadSellerStripeAccounts(validatedItems);
+
             res.json({
                 subtotal: totals.subtotalCents / 100,
                 tax: totals.taxCents / 100,
@@ -597,8 +646,15 @@ module.exports = function paymentController(deps) {
 
             const orderId = orderInsert.rows[0].id;
 
-            // Create Stripe checkout session
-            const session = await stripe.checkout.sessions.create({
+            assertCheckoutTotalsAreValid(totalCents);
+            const sellerAccountById = await loadSellerStripeAccounts(normalizedItems);
+            const connectConfig = buildCheckoutPaymentIntentData({
+                totalCents,
+                orderItems: normalizedItems,
+                sellerAccountById,
+            });
+
+            const sessionPayload = {
                 payment_method_types: ['card'],
                 line_items,
                 mode: 'payment',
@@ -607,9 +663,17 @@ module.exports = function paymentController(deps) {
                 ...(userEmail ? { customer_email: userEmail } : {}),
                 metadata: {
                     orderId,
-                    userId: authUser.id,
+                    userId: String(authUser.id),
+                    multiSeller: connectConfig.multiSeller ? '1' : '0',
+                    platformFeeCents: String(connectConfig.platformFeeCents),
                 },
-            });
+            };
+
+            if (!connectConfig.multiSeller && connectConfig.payment_intent_data) {
+                sessionPayload.payment_intent_data = connectConfig.payment_intent_data;
+            }
+
+            const session = await stripe.checkout.sessions.create(sessionPayload);
 
             await pool.query(
                 `UPDATE orders SET stripe_session_id = $1, updated_at = NOW() WHERE id = $2`,

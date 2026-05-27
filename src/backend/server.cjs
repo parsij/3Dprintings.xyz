@@ -19,6 +19,9 @@ const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
 const { ensureSellerProfilesTable } = require("./apiRoutes/sellerProfileShared.cjs");
+const { ensureSellerBoxesTable } = require("./apiRoutes/sellerBoxesShared.cjs");
+const { ensureSellerPayoutSchedulesTable } = require("./apiRoutes/sellerBalanceShared.cjs");
+const { ensureSellerTransfersColumn } = require("./apiRoutes/sellerOrderTransfers.cjs");
 const { ensureInventoryDeductedColumn } = require("./apiRoutes/orderFulfillment.cjs");
 const { initWorkerQueue, startWorkerRunner, shutdownWorkerQueue } = require("./worker/queue.cjs");
 const { csrfProtection, setCsrfCookie, clearCsrfCookie } = require("./csrf.cjs");
@@ -457,11 +460,44 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
   }
 
   try {
+      if (event.type === 'account.updated') {
+          const account = event.data.object;
+          if (account.details_submitted && account.charges_enabled && account.payouts_enabled) {
+              await pool.query(
+                  `UPDATE seller_profiles
+                   SET completions = CASE
+                     WHEN completions = 'stripe_connect' THEN 'shipping_origin'
+                     ELSE completions
+                   END,
+                   updated_at = NOW()
+                   WHERE stripe_connect_account_id = $1`,
+                  [account.id]
+              );
+          }
+      }
+
       if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           const orderId = session.metadata?.orderId;
 
           if (orderId) {
+              if (session.payment_intent) {
+                  await pool.query(
+                      `UPDATE orders
+                       SET stripe_payment_intent_id = $1,
+                           updated_at = NOW()
+                       WHERE id = $2`,
+                      [String(session.payment_intent), orderId]
+                  );
+              }
+
+              if (session.metadata?.multiSeller === '1' && session.payment_intent) {
+                  await enqueueWrite(
+                      'orders.transferSellers',
+                      { orderId, paymentIntentId: String(session.payment_intent) },
+                      { jobKey: `transfer:${orderId}` }
+                  );
+              }
               let paymentType = 'card';
               if (session.payment_method) {
                   const paymentMethod = await stripe.paymentMethods.retrieve(session.payment_method);
@@ -876,6 +912,9 @@ async function initializeDatabase() {
      console.log("Password reset token table ensured.");
 
      await ensureSellerProfilesTable(pool);
+     await ensureSellerBoxesTable(pool);
+     await ensureSellerPayoutSchedulesTable(pool);
+     await ensureSellerTransfersColumn(pool);
      await ensureSellerAddressColumn(pool);
      console.log("seller profiles table ensured.");
 

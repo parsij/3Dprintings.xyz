@@ -76,6 +76,16 @@ async function ensureSellerProfilesTable(pool) {
     ALTER TABLE seller_profiles
     ADD COLUMN IF NOT EXISTS sellersaddres JSONB NOT NULL DEFAULT '{}'::jsonb
   `);
+
+  await pool.query(`
+    ALTER TABLE seller_profiles
+    ADD COLUMN IF NOT EXISTS completions VARCHAR(32) NOT NULL DEFAULT 'shop_url'
+  `);
+
+  await pool.query(`
+    ALTER TABLE seller_profiles
+    ADD COLUMN IF NOT EXISTS stripe_connect_account_id TEXT
+  `);
 }
 
 function normalizeSellerProfile(input = {}) {

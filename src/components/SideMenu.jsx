@@ -16,7 +16,9 @@ const main = [
 
 const seller = [
   { label: "Dashboard", to: "/dashboard" },
+  { label: "Balance", to: "/balance" },
   { label: "Manage Products", to: "/inventory" },
+  { label: "Boxes", to: "/boxes" },
   { label: "Orders", to: "/orders" },
   { label: "Reviews", to: "/reviews" },
   { label: "Preferences", to: "/preferences" },

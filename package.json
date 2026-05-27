@@ -12,7 +12,8 @@
     "start:worker": "node src/backend/worker/runWorker.cjs",
     "dev:server": "nodemon --watch src/backend --ext cjs,js,json,env --exec \"node src/backend/server.cjs\"",
     "seller:setup": "node src/backend/scripts/setupSellerDashboard.cjs",
-    "seller:address-column": "node src/backend/scripts/ensureSellerAddressColumn.cjs"
+    "seller:address-column": "node src/backend/scripts/ensureSellerAddressColumn.cjs",
+    "seller:marketplace-setup": "node src/backend/scripts/ensureSellerMarketplaceColumns.cjs"
   },
   "dependencies": {
     "@easypost/api": "^8.8.0",

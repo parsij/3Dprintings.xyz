@@ -6,6 +6,12 @@ const {
 } = require("../../apiRoutes/orderPaymentPolling.cjs");
 const { mergeTrackerWebhookIntoOrders } = require("../../apiRoutes/shippingShared.cjs");
 const { refreshSellerDashboard } = require("../../apiRoutes/sellerShared.cjs");
+const { processMultiSellerTransfers } = require("../../apiRoutes/sellerOrderTransfers.cjs");
+const {
+  getSellerPayoutSchedule,
+  resolvePayoutAmountCents,
+} = require("../../apiRoutes/sellerBalanceShared.cjs");
+const { getSellerStripeAccountId } = require("../../apiRoutes/sellerStripeShared.cjs");
 const { enqueueWrite } = require("../../worker/queue.cjs");
 const appPool = require("../../db.cjs");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -83,6 +89,12 @@ const taskList = {
     await fulfillPaidOrder(appPool, orderId, paymentType);
   },
 
+  "orders.transferSellers": async (payload) => {
+    const { orderId, paymentIntentId } = payload;
+    if (!orderId || !paymentIntentId) return;
+    await processMultiSellerTransfers(stripe, appPool, orderId, paymentIntentId);
+  },
+
   "orders.pollPayment": async (payload) => {
     const { orderId } = payload;
     if (!orderId) return;
@@ -108,6 +120,31 @@ const taskList = {
   "seller.refreshDashboard": async (payload, helpers) => {
     const { sellerId } = payload;
     await withPool(helpers, (client) => refreshSellerDashboard(client, sellerId));
+  },
+
+  "seller.scheduledPayout": async (payload) => {
+    const { sellerId } = payload;
+    if (!sellerId) return;
+
+    const schedule = await getSellerPayoutSchedule(appPool, sellerId);
+    if (!schedule.enabled) return;
+
+    const today = new Date();
+    if (today.getDate() !== Number(schedule.dayOfMonth)) return;
+
+    const accountId = await getSellerStripeAccountId(appPool, sellerId);
+    if (!accountId) return;
+
+    const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
+    const availableEntry = (balance.available || []).find((entry) => entry.currency === "usd");
+    const availableCents = availableEntry?.amount || 0;
+    const payoutCents = resolvePayoutAmountCents(availableCents, schedule);
+    if (payoutCents <= 0) return;
+
+    await stripe.payouts.create(
+      { amount: payoutCents, currency: "usd" },
+      { stripeAccount: accountId }
+    );
   },
 
 };

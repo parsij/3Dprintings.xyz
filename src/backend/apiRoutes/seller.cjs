@@ -20,6 +20,10 @@ const {
   resolveSellerLogoUrlForSave,
   shouldAutoGenerateSellerAvatar,
 } = require("./sellerAvatar.cjs");
+const {
+  getSellerOnboardingState,
+  isSellerOnboardingComplete,
+} = require("./sellerOnboardingShared.cjs");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
@@ -116,6 +120,22 @@ module.exports = function sellerRoutes(deps) {
     return res.status(403).json({ message: "Access denied. Sellers only." });
   };
 
+  const requireCompletedOnboarding = async (req, res, next) => {
+    try {
+      const state = await getSellerOnboardingState(pool, req.user.id);
+      if (!isSellerOnboardingComplete(state.completionStep)) {
+        return res.status(403).json({
+          message: "Complete seller onboarding to access this area.",
+          completionStep: state.completionStep,
+        });
+      }
+      return next();
+    } catch (error) {
+      console.error("Failed onboarding gate check:", error);
+      return res.status(500).json({ message: "Server error" });
+    }
+  };
+
   const ensureSellerWriteAuth = (req, res, next) => {
     const auth = isAuthenticatedAnIisValid(req, res, "nothing");
     if (!auth?.userId) return;
@@ -136,46 +156,29 @@ module.exports = function sellerRoutes(deps) {
 
   app.post("/api/seller/become", attachAuthenticatedUser, async (req, res) => {
     try {
+      const onboarding = await getSellerOnboardingState(pool, req.user.id);
       if (req.user.role === "seller") {
         setAuthCookie(res, createAuthToken(req.user));
         return res.status(200).json({
-          message: "You already have seller access.",
+          message: "Continue seller onboarding.",
           user: { ...req.user, role: "seller" },
+          completionStep: onboarding.completionStep,
+          isComplete: isSellerOnboardingComplete(onboarding.completionStep),
         });
       }
 
-      const updatedUserResult = await pool.query(
-        `UPDATE users
-         SET role = 'seller'
-         WHERE id = $1
-         RETURNING id, username, email, role`,
-        [req.user.id]
-      );
-
-      if (updatedUserResult.rows.length === 0) {
-        return res.status(404).json({ message: "User not found." });
-      }
-
-      const updatedUser = updatedUserResult.rows[0];
-      const responseUser = {
-        id: Number(updatedUser.id),
-        username: updatedUser.username,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      };
-      setAuthCookie(res, createAuthToken(responseUser));
-
       return res.status(200).json({
-        message: "seller access granted.",
-        user: responseUser,
+        message: "Start seller onboarding.",
+        completionStep: onboarding.completionStep || "shop_url",
+        isComplete: false,
       });
     } catch (error) {
-      console.error("Failed to promote user to seller:", error);
-      return res.status(500).json({ message: "Failed to grant seller access." });
+      console.error("Failed to start seller onboarding:", error);
+      return res.status(500).json({ message: "Failed to start seller onboarding." });
     }
   });
 
-  app.get("/api/seller/dashboard", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.get("/api/seller/dashboard", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const snapshot = await refreshSellerDashboard(pool, req.user.id);
       return res.status(200).json({
@@ -198,7 +201,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.post("/api/seller/dashboard/refresh", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.post("/api/seller/dashboard/refresh", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       await enqueueWrite('seller.refreshDashboard', { sellerId: req.user.id }, {
         jobKey: `seller-dashboard:${req.user.id}`,
@@ -213,7 +216,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.get("/api/seller/orders", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.get("/api/seller/orders", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const auth = isAuthenticatedAnIisValid(req, res, "nothing");
       if (!auth?.userId) return;
@@ -322,7 +325,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.get("/api/seller/orders/:orderId/label", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.get("/api/seller/orders/:orderId/label", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const { orderId } = req.params;
       if (!UUID_REGEX.test(orderId)) {
@@ -346,7 +349,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.get("/api/seller/orders/:orderId/label/file", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.get("/api/seller/orders/:orderId/label/file", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const { orderId } = req.params;
       if (!UUID_REGEX.test(orderId)) {
@@ -373,7 +376,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.get("/api/seller/preferences", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.get("/api/seller/preferences", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const result = await pool.query(
         `SELECT u.username,
@@ -464,7 +467,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.put("/api/seller/preferences", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.put("/api/seller/preferences", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const preferences = normalizeSellerPreferences(req.body);
       const sellerProfile = normalizeSellerProfile(req.body);
@@ -580,6 +583,7 @@ module.exports = function sellerRoutes(deps) {
     ensureSellerWriteAuth,
     attachAuthenticatedUser,
     isSeller,
+    requireCompletedOnboarding,
     upload.single("profileImage"),
     async (req, res) => {
       const uploadedFile = req.file;
@@ -640,7 +644,7 @@ module.exports = function sellerRoutes(deps) {
     }
   );
 
-  app.get("/api/seller/products", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.get("/api/seller/products", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const result = await pool.query(
         `SELECT p.*,
@@ -673,7 +677,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.put("/api/seller/products/:productId", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.put("/api/seller/products/:productId", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const productId = Number.parseInt(req.params.productId, 10);
       if (!Number.isInteger(productId) || productId <= 0) {
@@ -759,7 +763,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.get("/api/seller/reviews", attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.get("/api/seller/reviews", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       await ensureLikesColumns(pool);
       const likedResult = await pool.query(
@@ -818,7 +822,7 @@ module.exports = function sellerRoutes(deps) {
     }
   });
 
-  app.put("/api/seller/reviews/:reviewId/reply", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, async (req, res) => {
+  app.put("/api/seller/reviews/:reviewId/reply", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
     try {
       const reviewId = Number.parseInt(req.params.reviewId, 10);
       if (!Number.isInteger(reviewId) || reviewId <= 0) {

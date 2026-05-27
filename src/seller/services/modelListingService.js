@@ -9,6 +9,10 @@ export async function submitModelListing({
   category,
   tags,
   quantity,
+  modelWeight,
+  modelHeight,
+  modelWidth,
+  modelLength,
   photos,
 }) {
   const formData = new FormData();
@@ -17,6 +21,10 @@ export async function submitModelListing({
   formData.append("description", description.trim());
   formData.append("price", String(price));
   formData.append("quantity", String(quantity));
+  formData.append("modelWeight", String(modelWeight));
+  formData.append("modelHeight", String(modelHeight));
+  formData.append("modelWidth", String(modelWidth));
+  formData.append("modelLength", String(modelLength));
 
   if (category?.trim()) {
     formData.append("category", category.trim());
@@ -42,8 +50,13 @@ export async function submitModelListing({
 
     return response.data;
   } catch (error) {
+    const data = error?.response?.data;
+    if (data?.boxesUrl) {
+      throw new Error(`${data.message} Visit ${data.boxesUrl} to add a fitting box.`);
+    }
     const message =
-      error?.response?.data?.message ||
+      data?.message ||
+      data?.errors?.dimensions ||
       "Failed to prepare listing. Please check your input and try again.";
     throw new Error(message);
   }

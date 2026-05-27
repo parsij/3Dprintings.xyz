@@ -2,6 +2,27 @@ const fs = require('fs');
 const path = require('path');
 
 
+const {
+  listSellerBoxes,
+  productFitsInAnyBox,
+  productDimensionsAreValid,
+} = require('./sellerBoxesShared.cjs');
+const { isSellerOnboardingComplete, getSellerOnboardingState } = require('./sellerOnboardingShared.cjs');
+
+function parseProductDimensions(body = {}) {
+  const modelWeightG = Number(body.modelWeight ?? body.modelWeightG ?? body.model_weight_g);
+  const modelHeightMm = Number(body.modelHeight ?? body.modelHeightMm ?? body.model_height_mm);
+  const modelWidthMm = Number(body.modelWidth ?? body.modelWidthMm ?? body.model_width_mm);
+  const modelLengthMm = Number(body.modelLength ?? body.modelLengthMm ?? body.model_length_mm);
+
+  return {
+    modelWeightG,
+    modelHeightMm,
+    modelWidthMm,
+    modelLengthMm,
+  };
+}
+
 module.exports = function createRoutes(deps) {
   const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, isAuthenticatedAnIisValid, enqueueWrite } = deps;
 
@@ -28,7 +49,17 @@ module.exports = function createRoutes(deps) {
         return res.status(403).json({ message: 'Seller access is required to list products.' });
       }
 
+      const onboarding = await getSellerOnboardingState(pool, userId);
+      if (!isSellerOnboardingComplete(onboarding.completionStep)) {
+        await cleanupUploadedFiles(photos);
+        return res.status(403).json({
+          message: 'Complete seller onboarding before listing products.',
+          completionStep: onboarding.completionStep,
+        });
+      }
+
       const { modelName = '', description = '', price, category = '', tags, quantity } = req.body;
+      const dimensions = parseProductDimensions(req.body);
       const parsedPrice = Number(price);
       const parsedQuantity = Math.max(1, Number(quantity) || 1);
 
@@ -66,6 +97,10 @@ module.exports = function createRoutes(deps) {
         fieldErrors.general = 'Explicit content or bad words are not allowed in the title, description, or tags.';
       }
 
+      if (!productDimensionsAreValid(dimensions)) {
+        fieldErrors.dimensions = 'Model weight, height, width, and length are required and must be positive numbers.';
+      }
+
       if (Object.keys(fieldErrors).length > 0) {
         await cleanupUploadedFiles(photos);
         return res.status(400).json({
@@ -73,6 +108,35 @@ module.exports = function createRoutes(deps) {
           errors: fieldErrors,
         });
       }
+
+      const sellerBoxes = await listSellerBoxes(pool, userId);
+      if (sellerBoxes.length === 0) {
+        await cleanupUploadedFiles(photos);
+        return res.status(400).json({
+          message: 'You must add at least one shipping box before listing products.',
+          boxesUrl: '/boxes',
+        });
+      }
+
+      const fitResult = productFitsInAnyBox(
+        {
+          name: modelName,
+          model_weight_g: dimensions.modelWeightG,
+          model_height_mm: dimensions.modelHeightMm,
+          model_width_mm: dimensions.modelWidthMm,
+          model_length_mm: dimensions.modelLengthMm,
+        },
+        sellerBoxes
+      );
+
+      if (!fitResult.fits) {
+        await cleanupUploadedFiles(photos);
+        return res.status(400).json({
+          message: 'You need a box that fits this product. Add it to your boxes.',
+          boxesUrl: '/boxes',
+        });
+      }
+
       const insertProductQuery = `
         INSERT INTO products (
           name,
@@ -83,10 +147,15 @@ module.exports = function createRoutes(deps) {
           user_id,
           category,
           tags,
-          quantity
+          quantity,
+          model_weight_g,
+          model_height_mm,
+          model_width_mm,
+          model_length_mm
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
-        RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags, quantity
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
+        RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags, quantity,
+                  model_weight_g, model_height_mm, model_width_mm, model_length_mm
       `;
       // Persist tags as explicit JSON for jsonb columns.
       const normalizedCategory = category ? category.trim() : null;
@@ -101,6 +170,10 @@ module.exports = function createRoutes(deps) {
         normalizedCategory,
         tagsJson,
         parsedQuantity,
+        dimensions.modelWeightG,
+        dimensions.modelHeightMm,
+        dimensions.modelWidthMm,
+        dimensions.modelLengthMm,
       ];
       const productResult = await pool.query(insertProductQuery, productValues);
       const product = productResult.rows[0];

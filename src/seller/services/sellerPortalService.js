@@ -80,3 +80,43 @@ export async function updateSellerReviewReply(reviewId, reply) {
   );
   return response.data;
 }
+
+export async function getSellerBalance() {
+  const response = await apiClient.get("/api/seller/balance");
+  return response.data;
+}
+
+export async function cashOutSellerBalance(payload = {}) {
+  const response = await apiClient.post("/api/seller/balance/cashout", payload);
+  return response.data;
+}
+
+export async function getSellerRecurringPayout() {
+  const response = await apiClient.get("/api/seller/balance/recurring");
+  return response.data;
+}
+
+export async function updateSellerRecurringPayout(payload) {
+  const response = await apiClient.put("/api/seller/balance/recurring", payload);
+  return response.data;
+}
+
+export async function getSellerBoxes() {
+  const response = await apiClient.get("/api/seller/boxes");
+  return response.data;
+}
+
+export async function createSellerBox(payload) {
+  const response = await apiClient.post("/api/seller/boxes", payload);
+  return response.data;
+}
+
+export async function updateSellerBox(boxId, payload) {
+  const response = await apiClient.put(`/api/seller/boxes/${boxId}`, payload);
+  return response.data;
+}
+
+export async function deleteSellerBox(boxId) {
+  const response = await apiClient.delete(`/api/seller/boxes/${boxId}`);
+  return response.data;
+}
