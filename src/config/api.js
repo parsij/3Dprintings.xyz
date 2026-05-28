@@ -66,18 +66,25 @@ function resolveSellerSiteOrigin() {
 }
 
 function resolveApiBaseUrl() {
+  if (typeof window !== "undefined") {
+    if (isLocalDevRuntime()) {
+      const configured = import.meta.env.VITE_API_BASE_URL;
+      return configured != null && String(configured).trim() !== ""
+        ? String(configured).replace(/\/+$/, "")
+        : "";
+    }
+
+    // Seller subdomain should call /api on the same origin to avoid cross-origin cookies/CORS.
+    if (isSellerHostname(window.location.hostname)) {
+      return "";
+    }
+
+    return window.location.origin;
+  }
+
   const configured = import.meta.env.VITE_API_BASE_URL;
   if (configured != null && String(configured).trim() !== "") {
     return String(configured).replace(/\/+$/, "");
-  }
-
-  if (typeof window !== "undefined") {
-    if (isLocalDevRuntime()) {
-      return "";
-    }
-    if (isSellerHostname(window.location.hostname)) {
-      return resolveMarketplaceOrigin();
-    }
   }
 
   return "";

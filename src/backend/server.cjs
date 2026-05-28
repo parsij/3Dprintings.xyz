@@ -417,18 +417,38 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
 
+function applyCorsHeaders(req, res) {
+  const origin = normalizeOrigin(req.headers.origin);
+  if (!origin || !isAllowedOrigin(origin)) {
+    return;
+  }
+
+  res.header("Access-Control-Allow-Origin", origin);
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Vary", "Origin");
+}
+
 app.use(cors({
   origin(origin, callback) {
     if (!origin) {
       return callback(null, true);
     }
+
     if (isAllowedOrigin(origin)) {
-      return callback(null, true);
+      return callback(null, origin);
     }
+
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-Request-Id"],
 }));
+
+app.use((req, res, next) => {
+  applyCorsHeaders(req, res);
+  next();
+});
 
 // We must apply the webhook route BEFORE express.json() because Stripe needs the raw body
 app.post('/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
@@ -836,6 +856,15 @@ app.use((error, req, res, next) => {
     return next(error);
   }
 
+  if (String(error?.message || "").startsWith("CORS blocked for origin:")) {
+    applyCorsHeaders(req, res);
+    return res.status(403).json({
+      message: "Origin not allowed.",
+      requestId: req.id,
+    });
+  }
+
+  applyCorsHeaders(req, res);
   const { statusCode, message } = getClientErrorResponse(error);
   logUnhandledError(error, req, statusCode);
   return res.status(statusCode).json({
