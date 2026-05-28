@@ -194,18 +194,42 @@ module.exports = function sellerOnboardingRoutes(deps) {
   app.post("/api/seller/onboarding/stripe-verify", attachAuthenticatedUser, requireSellerRole, async (req, res) => {
     try {
       const state = await getSellerOnboardingState(pool, req.user.id);
-      if (normalizeCompletionStep(state.completionStep) !== "stripe_connect") {
-        return res.status(409).json({ message: "Stripe Connect is not the current onboarding step." });
+      const currentStep = normalizeCompletionStep(state.completionStep);
+      const accountId = state.stripeConnectAccountId;
+
+      if (!accountId) {
+        return res.status(400).json({
+          message: "Stripe Connect account has not been created yet.",
+          stripeReady: false,
+        });
       }
 
-      const accountId = state.stripeConnectAccountId;
       await assertStripeAccountOwnedBySeller(stripe, pool, req.user.id, accountId);
 
       const ready = await isStripeConnectReady(stripe, accountId);
       if (!ready) {
-        return res.status(400).json({
+        return res.status(409).json({
           message: "Stripe Connect onboarding is not complete yet. Finish setup in Stripe first.",
           stripeReady: false,
+          completionStep: currentStep,
+        });
+      }
+
+      if (currentStep !== "stripe_connect") {
+        if (currentStep === "shop_url") {
+          return res.status(409).json({
+            message: "Complete the previous onboarding step first.",
+            stripeReady: true,
+            completionStep: currentStep,
+          });
+        }
+
+        return res.status(200).json({
+          message: "Stripe Connect already verified.",
+          stripeReady: true,
+          completionStep: currentStep,
+          isComplete: isSellerOnboardingComplete(currentStep),
+          alreadyVerified: true,
         });
       }
 

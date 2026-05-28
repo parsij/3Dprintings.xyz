@@ -28,6 +28,37 @@ export async function verifyStripeConnectOnboarding() {
   return response.data;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+export async function verifyStripeConnectOnboardingWithRetry(options = {}) {
+  const maxAttempts = Number(options.maxAttempts) || 8;
+  const initialDelayMs = Number(options.initialDelayMs) || 750;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await verifyStripeConnectOnboarding();
+    } catch (err) {
+      lastError = err;
+      const statusCode = Number(err?.response?.status || 0);
+      const stripeReady = err?.response?.data?.stripeReady;
+      const retryable = statusCode === 409 && stripeReady === false;
+
+      if (!retryable || attempt >= maxAttempts) {
+        throw err;
+      }
+
+      await sleep(initialDelayMs * attempt);
+    }
+  }
+
+  throw lastError || new Error("Failed to verify Stripe Connect onboarding.");
+}
+
 export async function saveSellerShippingOrigin(payload) {
   const response = await apiClient.post("/api/seller/onboarding/shipping", payload);
   return response.data;

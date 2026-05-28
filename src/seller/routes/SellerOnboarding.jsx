@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import SellerNavBar from "../components/SellerNavBar.jsx";
@@ -7,7 +7,7 @@ import {
   getSellerOnboardingStatus,
   saveSellerFirstBox,
   saveSellerShippingOrigin,
-  verifyStripeConnectOnboarding,
+  verifyStripeConnectOnboardingWithRetry,
 } from "../services/sellerOnboardingService.js";
 
 const EMPTY_ADDRESS = {
@@ -20,11 +20,25 @@ const EMPTY_ADDRESS = {
   residential: true,
 };
 
+const ONBOARDING_ROUTE_BY_STEP = {
+  stripe_connect: "/onboarding/stripe",
+  shipping_origin: "/onboarding/shipping",
+  first_box: "/onboarding/box",
+  completed: "/inventory",
+};
+
+function resolveOnboardingRoute(completionStep) {
+  return ONBOARDING_ROUTE_BY_STEP[completionStep] || "/onboarding/stripe";
+}
+
 export default function SellerOnboarding({ step }) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stripeReturnHandledRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [verifyingStripeReturn, setVerifyingStripeReturn] = useState(false);
+  const [showStripeRefreshNotice, setShowStripeRefreshNotice] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState(null);
   const [shippingAddress, setShippingAddress] = useState(EMPTY_ADDRESS);
@@ -36,10 +50,23 @@ export default function SellerOnboarding({ step }) {
     maxWeight: "",
   });
 
+  const stripeReturnMode = searchParams.get("return") === "1"
+    ? "return"
+    : searchParams.get("refresh") === "1"
+      ? "refresh"
+      : null;
+
   const activeStep = useMemo(() => {
     if (step) return step;
     return status?.completionStep || "stripe_connect";
   }, [step, status?.completionStep]);
+
+  const clearStripeReturnParams = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("return");
+    nextParams.delete("refresh");
+    setSearchParams(nextParams, { replace: true });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -51,8 +78,19 @@ export default function SellerOnboarding({ step }) {
         const data = await getSellerOnboardingStatus();
         if (cancelled) return;
         setStatus(data);
+
         if (data.isComplete) {
           navigate("/inventory", { replace: true });
+          return;
+        }
+
+        if (
+          step === "stripe_connect"
+          && stripeReturnMode !== "return"
+          && data.completionStep
+          && data.completionStep !== "stripe_connect"
+        ) {
+          navigate(resolveOnboardingRoute(data.completionStep), { replace: true });
         }
       } catch (err) {
         if (!cancelled) {
@@ -67,27 +105,52 @@ export default function SellerOnboarding({ step }) {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, step, stripeReturnMode]);
 
   useEffect(() => {
-    if (activeStep !== "stripe_connect") return undefined;
-    if (!searchParams.get("return") && !searchParams.get("refresh")) return undefined;
+    if (stripeReturnMode !== "refresh") return undefined;
+    setShowStripeRefreshNotice(true);
+    clearStripeReturnParams();
+    return undefined;
+  }, [stripeReturnMode]);
 
+  useEffect(() => {
+    if (step !== "stripe_connect") return undefined;
+    if (stripeReturnMode !== "return") return undefined;
+    if (loading) return undefined;
+    if (stripeReturnHandledRef.current) return undefined;
+
+    stripeReturnHandledRef.current = true;
     let cancelled = false;
+
     async function verifyStripeReturn() {
+      setVerifyingStripeReturn(true);
       setSubmitting(true);
       setError("");
+
       try {
-        const result = await verifyStripeConnectOnboarding();
+        const result = await verifyStripeConnectOnboardingWithRetry();
         if (cancelled) return;
+
+        clearStripeReturnParams();
         setStatus((prev) => ({ ...prev, ...result }));
-        navigate("/onboarding/shipping", { replace: true });
+
+        if (result.isComplete) {
+          navigate("/inventory", { replace: true });
+          return;
+        }
+
+        navigate(resolveOnboardingRoute(result.completionStep || "shipping_origin"), { replace: true });
       } catch (err) {
         if (!cancelled) {
-          setError(err?.response?.data?.message || "Stripe Connect is not complete yet.");
+          clearStripeReturnParams();
+          setError(err?.response?.data?.message || "Stripe Connect is not complete yet. Try again in a moment.");
         }
       } finally {
-        if (!cancelled) setSubmitting(false);
+        if (!cancelled) {
+          setVerifyingStripeReturn(false);
+          setSubmitting(false);
+        }
       }
     }
 
@@ -95,7 +158,7 @@ export default function SellerOnboarding({ step }) {
     return () => {
       cancelled = true;
     };
-  }, [activeStep, navigate, searchParams]);
+  }, [loading, navigate, searchParams, setSearchParams, step, stripeReturnMode]);
 
   const handleStripeConnect = async () => {
     setSubmitting(true);
@@ -143,10 +206,15 @@ export default function SellerOnboarding({ step }) {
     }
   };
 
-  if (loading) {
+  if (loading || verifyingStripeReturn) {
     return (
       <div className="min-h-screen bg-[#f2f2f2] flex items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
+        <div className="text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
+          <p className="mt-4 text-sm text-gray-600">
+            {verifyingStripeReturn ? "Confirming your Stripe Connect setup..." : "Loading seller setup..."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -166,6 +234,11 @@ export default function SellerOnboarding({ step }) {
               We preset your shop URL for Stripe:{" "}
               <span className="font-medium text-gray-800">{status?.shopUrl}</span>
             </p>
+            {showStripeRefreshNotice ? (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Your Stripe session expired. Continue below to open a fresh Stripe Connect link.
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={handleStripeConnect}
