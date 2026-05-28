@@ -40,6 +40,8 @@ export default function SellerOnboarding({ step }) {
   const [verifyingStripeReturn, setVerifyingStripeReturn] = useState(false);
   const [showStripeRefreshNotice, setShowStripeRefreshNotice] = useState(false);
   const [error, setError] = useState("");
+  const [stripeActionUrl, setStripeActionUrl] = useState("");
+  const [stripeNotice, setStripeNotice] = useState("");
   const [status, setStatus] = useState(null);
   const [shippingAddress, setShippingAddress] = useState(EMPTY_ADDRESS);
   const [boxForm, setBoxForm] = useState({
@@ -127,6 +129,8 @@ export default function SellerOnboarding({ step }) {
       setVerifyingStripeReturn(true);
       setSubmitting(true);
       setError("");
+      setStripeActionUrl("");
+      setStripeNotice("");
 
       try {
         const result = await verifyStripeConnectOnboardingWithRetry();
@@ -134,6 +138,9 @@ export default function SellerOnboarding({ step }) {
 
         clearStripeReturnParams();
         setStatus((prev) => ({ ...prev, ...result }));
+        if (result.stripePendingReview) {
+          setStripeNotice("Stripe is reviewing your account. You can continue setup now; payouts activate once Stripe finishes review.");
+        }
 
         if (result.isComplete) {
           navigate("/inventory", { replace: true });
@@ -144,7 +151,11 @@ export default function SellerOnboarding({ step }) {
       } catch (err) {
         if (!cancelled) {
           clearStripeReturnParams();
-          setError(err?.response?.data?.message || "Stripe Connect is not complete yet. Try again in a moment.");
+          const data = err?.response?.data || {};
+          setError(data.message || "Stripe Connect is not complete yet. Try again in a moment.");
+          if (data.actionUrl) {
+            setStripeActionUrl(data.actionUrl);
+          }
         }
       } finally {
         if (!cancelled) {
@@ -163,6 +174,8 @@ export default function SellerOnboarding({ step }) {
   const handleStripeConnect = async () => {
     setSubmitting(true);
     setError("");
+    setStripeActionUrl("");
+    setStripeNotice("");
     try {
       const result = await createStripeConnectLink();
       if (result?.url) {
@@ -174,6 +187,12 @@ export default function SellerOnboarding({ step }) {
       setError(err?.response?.data?.message || "Failed to start Stripe Connect.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStripeRemediation = () => {
+    if (stripeActionUrl) {
+      window.location.assign(stripeActionUrl);
     }
   };
 
@@ -224,7 +243,24 @@ export default function SellerOnboarding({ step }) {
       <SellerNavBar pageName="Seller Setup" />
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-28">
         {error ? (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <p>{error}</p>
+            {stripeActionUrl ? (
+              <button
+                type="button"
+                onClick={handleStripeRemediation}
+                className="mt-3 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-500"
+              >
+                Continue in Stripe
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {stripeNotice ? (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            {stripeNotice}
+          </div>
         ) : null}
 
         {activeStep === "stripe_connect" ? (

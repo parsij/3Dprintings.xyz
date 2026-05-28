@@ -9,8 +9,10 @@ const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared
 const {
   assertStripeAccountOwnedBySeller,
   createStripeConnectOnboardingLink,
+  createStripeConnectRemediationLink,
+  evaluateStripeConnectReadiness,
   getStripeConnectReadiness,
-  isStripeConnectReady,
+  syncStripeConnectAccountSettings,
 } = require("./sellerStripeShared.cjs");
 const { listSellerBoxes, parseBoxPayload, sellerBoxesCoverLargestProduct } = require("./sellerBoxesShared.cjs");
 const { getSellerFrontendUrl } = require("../envShared.cjs");
@@ -64,9 +66,9 @@ module.exports = function sellerOnboardingRoutes(deps) {
     try {
       const state = await getSellerOnboardingState(pool, req.user.id);
       const boxes = await listSellerBoxes(pool, req.user.id);
-      let stripeReady = false;
+      let stripeReadiness = evaluateStripeConnectReadiness(null);
       if (state.stripeConnectAccountId) {
-        stripeReady = await isStripeConnectReady(stripe, state.stripeConnectAccountId);
+        stripeReadiness = await getStripeConnectReadiness(stripe, state.stripeConnectAccountId);
       }
 
       return res.status(200).json({
@@ -74,7 +76,8 @@ module.exports = function sellerOnboardingRoutes(deps) {
         isComplete: state.isComplete,
         shopName: state.shopName,
         shopUrl: buildSellerShopUrl(req.user.id),
-        stripeReady,
+        stripeReady: stripeReadiness.paymentReady,
+        stripeReadiness,
         boxCount: boxes.length,
       });
     } catch (error) {
@@ -197,6 +200,9 @@ module.exports = function sellerOnboardingRoutes(deps) {
       const state = await getSellerOnboardingState(pool, req.user.id);
       const currentStep = normalizeCompletionStep(state.completionStep);
       const accountId = state.stripeConnectAccountId;
+      const sellerOrigin = getSellerFrontendUrl();
+      const returnUrl = `${sellerOrigin}/onboarding/stripe?return=1`;
+      const refreshUrl = `${sellerOrigin}/onboarding/stripe?refresh=1`;
 
       if (!accountId) {
         return res.status(400).json({
@@ -205,11 +211,37 @@ module.exports = function sellerOnboardingRoutes(deps) {
         });
       }
 
-      await assertStripeAccountOwnedBySeller(stripe, pool, req.user.id, accountId);
+      await syncStripeConnectAccountSettings(stripe, accountId, req.user.id);
+      const account = await assertStripeAccountOwnedBySeller(stripe, pool, req.user.id, accountId);
+      const readiness = evaluateStripeConnectReadiness(account);
 
-      const readiness = await getStripeConnectReadiness(stripe, accountId);
-      if (!readiness.ready) {
-        console.warn("Stripe Connect not ready after onboarding return", {
+      if (readiness.needsAccountUpdate) {
+        const remediationLink = await createStripeConnectRemediationLink(
+          stripe,
+          accountId,
+          returnUrl,
+          refreshUrl
+        );
+
+        console.warn("Stripe Connect needs account update", {
+          sellerUserId: req.user.id,
+          accountId,
+          currentlyDue: readiness.currentlyDue,
+          pastDue: readiness.pastDue,
+        });
+
+        return res.status(409).json({
+          message: "Stripe needs additional information before payouts can be enabled.",
+          stripeReady: false,
+          needsAccountUpdate: true,
+          actionUrl: remediationLink.url,
+          stripeReadiness: readiness,
+          completionStep: currentStep,
+        });
+      }
+
+      if (!readiness.onboardingComplete) {
+        console.warn("Stripe Connect onboarding incomplete", {
           sellerUserId: req.user.id,
           accountId,
           ...readiness,
@@ -217,6 +249,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
         return res.status(409).json({
           message: "Stripe Connect onboarding is not complete yet. Finish setup in Stripe first.",
           stripeReady: false,
+          stripeReadiness: readiness,
           completionStep: currentStep,
         });
       }
@@ -225,14 +258,16 @@ module.exports = function sellerOnboardingRoutes(deps) {
         if (currentStep === "shop_url") {
           return res.status(409).json({
             message: "Complete the previous onboarding step first.",
-            stripeReady: true,
+            stripeReady: readiness.paymentReady,
+            stripeReadiness: readiness,
             completionStep: currentStep,
           });
         }
 
         return res.status(200).json({
           message: "Stripe Connect already verified.",
-          stripeReady: true,
+          stripeReady: readiness.paymentReady,
+          stripeReadiness: readiness,
           completionStep: currentStep,
           isComplete: isSellerOnboardingComplete(currentStep),
           alreadyVerified: true,
@@ -241,8 +276,12 @@ module.exports = function sellerOnboardingRoutes(deps) {
 
       const advanced = await advanceSellerCompletion(pool, req.user.id, "stripe_connect");
       return res.status(200).json({
-        message: "Stripe Connect verified.",
-        stripeReady: true,
+        message: readiness.pendingReview
+          ? "Stripe Connect saved. Stripe is still reviewing your account before payouts go live."
+          : "Stripe Connect verified.",
+        stripeReady: readiness.paymentReady,
+        stripePendingReview: readiness.pendingReview,
+        stripeReadiness: readiness,
         completionStep: advanced.completionStep,
         isComplete: advanced.isComplete,
       });

@@ -163,58 +163,153 @@ async function ensureStripeConnectAccount(stripe, pool, sellerUserId) {
   return account.id;
 }
 
-async function createStripeConnectOnboardingLink(stripe, pool, sellerUserId, returnUrl, refreshUrl) {
-  const accountId = await ensureStripeConnectAccount(stripe, pool, sellerUserId);
+async function syncStripeConnectAccountSettings(stripe, accountId, sellerUserId) {
   const shopUrl = buildSellerShopUrl(sellerUserId);
-
   await stripe.accounts.update(accountId, {
     business_profile: { url: shopUrl },
+    capabilities: {
+      card_payments: { requested: true },
+      transfers: { requested: true },
+    },
+    metadata: {
+      sellerUserId: String(sellerUserId),
+    },
   });
+}
 
-  const accountLink = await stripe.accountLinks.create({
+function getRequirementList(requirements, key) {
+  const value = requirements?.[key];
+  return Array.isArray(value) ? value.filter(Boolean) : [];
+}
+
+function evaluateStripeConnectReadiness(account) {
+  if (!account) {
+    return {
+      ready: false,
+      paymentReady: false,
+      onboardingComplete: false,
+      needsAccountUpdate: false,
+      pendingReview: false,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      cardPaymentsStatus: "inactive",
+      transfersStatus: "inactive",
+      currentlyDue: [],
+      pastDue: [],
+      pendingVerification: [],
+      disabledReason: null,
+    };
+  }
+
+  const requirements = account.requirements || {};
+  const currentlyDue = getRequirementList(requirements, "currently_due");
+  const pastDue = getRequirementList(requirements, "past_due");
+  const pendingVerification = getRequirementList(requirements, "pending_verification");
+  const disabledReason = requirements.disabled_reason || null;
+
+  const cardPaymentsStatus = account?.capabilities?.card_payments || "inactive";
+  const transfersStatus = account?.capabilities?.transfers || "inactive";
+
+  const detailsSubmitted = Boolean(account?.details_submitted);
+  const chargesEnabled = Boolean(account?.charges_enabled);
+  const payoutsEnabled = Boolean(account?.payouts_enabled);
+
+  const capabilitiesActive = cardPaymentsStatus === "active" && transfersStatus === "active";
+  const needsAccountUpdate = currentlyDue.length > 0 || pastDue.length > 0;
+
+  const paymentReady = Boolean(
+    detailsSubmitted
+    && chargesEnabled
+    && payoutsEnabled
+    && capabilitiesActive
+    && !needsAccountUpdate
+    && !disabledReason
+  );
+
+  const onboardingComplete = Boolean(
+    detailsSubmitted
+    && !needsAccountUpdate
+    && !disabledReason
+  );
+
+  const pendingReview = Boolean(
+    onboardingComplete
+    && !paymentReady
+    && (pendingVerification.length > 0 || !chargesEnabled || !payoutsEnabled)
+  );
+
+  return {
+    ready: paymentReady,
+    paymentReady,
+    onboardingComplete,
+    needsAccountUpdate,
+    pendingReview,
+    detailsSubmitted,
+    chargesEnabled,
+    payoutsEnabled,
+    cardPaymentsStatus,
+    transfersStatus,
+    currentlyDue,
+    pastDue,
+    pendingVerification,
+    disabledReason,
+  };
+}
+
+async function createStripeConnectAccountLink(stripe, accountId, { returnUrl, refreshUrl, linkType }) {
+  return stripe.accountLinks.create({
     account: accountId,
     refresh_url: refreshUrl,
     return_url: returnUrl,
-    type: "account_onboarding",
+    type: linkType,
+  });
+}
+
+async function createStripeConnectRemediationLink(stripe, accountId, returnUrl, refreshUrl) {
+  return createStripeConnectAccountLink(stripe, accountId, {
+    returnUrl,
+    refreshUrl,
+    linkType: "account_update",
+  });
+}
+
+async function createStripeConnectOnboardingLink(stripe, pool, sellerUserId, returnUrl, refreshUrl) {
+  const accountId = await ensureStripeConnectAccount(stripe, pool, sellerUserId);
+  await syncStripeConnectAccountSettings(stripe, accountId, sellerUserId);
+
+  const account = await stripe.accounts.retrieve(accountId);
+  const readiness = evaluateStripeConnectReadiness(account);
+  const linkType = readiness.detailsSubmitted || readiness.needsAccountUpdate
+    ? "account_update"
+    : "account_onboarding";
+
+  const accountLink = await createStripeConnectAccountLink(stripe, accountId, {
+    returnUrl,
+    refreshUrl,
+    linkType,
   });
 
   return {
     accountId,
     url: accountLink.url,
+    linkType,
   };
 }
 
 async function isStripeConnectReady(stripe, accountId) {
   if (!accountId) return false;
   const account = await stripe.accounts.retrieve(accountId);
-  return Boolean(
-    account.details_submitted
-    && account.charges_enabled
-    && account.payouts_enabled
-  );
+  return evaluateStripeConnectReadiness(account).paymentReady;
 }
 
 async function getStripeConnectReadiness(stripe, accountId) {
   if (!accountId) {
-    return {
-      ready: false,
-      detailsSubmitted: false,
-      chargesEnabled: false,
-      payoutsEnabled: false,
-    };
+    return evaluateStripeConnectReadiness(null);
   }
 
   const account = await stripe.accounts.retrieve(accountId);
-  const detailsSubmitted = Boolean(account.details_submitted);
-  const chargesEnabled = Boolean(account.charges_enabled);
-  const payoutsEnabled = Boolean(account.payouts_enabled);
-
-  return {
-    ready: detailsSubmitted && chargesEnabled && payoutsEnabled,
-    detailsSubmitted,
-    chargesEnabled,
-    payoutsEnabled,
-  };
+  return evaluateStripeConnectReadiness(account);
 }
 
 async function assertStripeAccountOwnedBySeller(stripe, pool, sellerUserId, accountId) {
@@ -339,9 +434,12 @@ module.exports = {
   buildCheckoutPaymentIntentData,
   calculatePlatformFeeCents,
   createStripeConnectOnboardingLink,
+  createStripeConnectRemediationLink,
   distributeOrderTransfers,
   ensureStripeConnectAccount,
+  evaluateStripeConnectReadiness,
   getSellerStripeAccountId,
-  isStripeConnectReady,
   getStripeConnectReadiness,
+  isStripeConnectReady,
+  syncStripeConnectAccountSettings,
 };

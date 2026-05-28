@@ -34,8 +34,8 @@ function sleep(ms) {
 }
 
 export async function verifyStripeConnectOnboardingWithRetry(options = {}) {
-  const maxAttempts = Number(options.maxAttempts) || 8;
-  const initialDelayMs = Number(options.initialDelayMs) || 750;
+  const maxAttempts = Number(options.maxAttempts) || 12;
+  const initialDelayMs = Number(options.initialDelayMs) || 1000;
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -44,8 +44,14 @@ export async function verifyStripeConnectOnboardingWithRetry(options = {}) {
     } catch (err) {
       lastError = err;
       const statusCode = Number(err?.response?.status || 0);
-      const stripeReady = err?.response?.data?.stripeReady;
-      const retryable = statusCode === 409 && stripeReady === false;
+      const data = err?.response?.data || {};
+      const stripeReady = data.stripeReady;
+      const needsAccountUpdate = Boolean(data.needsAccountUpdate);
+      const pendingReview = Boolean(data.stripeReadiness?.pendingReview);
+      const retryable = statusCode === 409
+        && stripeReady === false
+        && !needsAccountUpdate
+        && pendingReview;
 
       if (!retryable || attempt >= maxAttempts) {
         throw err;

@@ -19,6 +19,7 @@ const fs = require("fs");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
 const { ensureSellerMarketplaceSchema } = require("./apiRoutes/sellerMarketplaceSchema.cjs");
+const { evaluateStripeConnectReadiness } = require("./apiRoutes/sellerStripeShared.cjs");
 const { ensureInventoryDeductedColumn } = require("./apiRoutes/orderFulfillment.cjs");
 const { initWorkerQueue, startWorkerRunner, shutdownWorkerQueue } = require("./worker/queue.cjs");
 const { csrfProtection, setCsrfCookie, clearCsrfCookie } = require("./csrf.cjs");
@@ -478,8 +479,8 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
 
   try {
       if (event.type === 'account.updated') {
-          const account = event.data.object;
-          if (account.details_submitted && account.charges_enabled && account.payouts_enabled) {
+          const readiness = evaluateStripeConnectReadiness(event.data.object);
+          if (readiness.onboardingComplete) {
               await pool.query(
                   `UPDATE seller_profiles
                    SET completions = CASE
@@ -488,7 +489,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
                    END,
                    updated_at = NOW()
                    WHERE stripe_connect_account_id = $1`,
-                  [account.id]
+                  [event.data.object.id]
               );
           }
       }
