@@ -257,6 +257,19 @@ function evaluateStripeConnectReadiness(account) {
   };
 }
 
+function resolveStripeConnectLinkType(readiness) {
+  if (readiness.paymentReady && readiness.needsAccountUpdate) {
+    return "account_update";
+  }
+  return "account_onboarding";
+}
+
+function shouldFallbackToOnboardingLink(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("account_onboarding")
+    && message.includes("account_update");
+}
+
 async function createStripeConnectAccountLink(stripe, accountId, { returnUrl, refreshUrl, linkType }) {
   return stripe.accountLinks.create({
     account: accountId,
@@ -266,12 +279,43 @@ async function createStripeConnectAccountLink(stripe, accountId, { returnUrl, re
   });
 }
 
+async function createStripeConnectAccountLinkWithFallback(stripe, accountId, options) {
+  const { returnUrl, refreshUrl, preferredLinkType } = options;
+  const linkTypes = preferredLinkType === "account_update"
+    ? ["account_update", "account_onboarding"]
+    : ["account_onboarding"];
+
+  let lastError = null;
+  for (const linkType of linkTypes) {
+    try {
+      const link = await createStripeConnectAccountLink(stripe, accountId, {
+        returnUrl,
+        refreshUrl,
+        linkType,
+      });
+      return { link, linkType };
+    } catch (error) {
+      lastError = error;
+      if (linkType === "account_update" && shouldFallbackToOnboardingLink(error)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError || new Error("Failed to create Stripe Connect account link.");
+}
+
 async function createStripeConnectRemediationLink(stripe, accountId, returnUrl, refreshUrl) {
-  return createStripeConnectAccountLink(stripe, accountId, {
+  const { link, linkType } = await createStripeConnectAccountLinkWithFallback(stripe, accountId, {
     returnUrl,
     refreshUrl,
-    linkType: "account_update",
+    preferredLinkType: "account_update",
   });
+  return {
+    url: link.url,
+    linkType,
+  };
 }
 
 async function createStripeConnectOnboardingLink(stripe, pool, sellerUserId, returnUrl, refreshUrl) {
@@ -280,15 +324,16 @@ async function createStripeConnectOnboardingLink(stripe, pool, sellerUserId, ret
 
   const account = await stripe.accounts.retrieve(accountId);
   const readiness = evaluateStripeConnectReadiness(account);
-  const linkType = readiness.detailsSubmitted || readiness.needsAccountUpdate
-    ? "account_update"
-    : "account_onboarding";
-
-  const accountLink = await createStripeConnectAccountLink(stripe, accountId, {
-    returnUrl,
-    refreshUrl,
-    linkType,
-  });
+  const preferredLinkType = resolveStripeConnectLinkType(readiness);
+  const { link: accountLink, linkType } = await createStripeConnectAccountLinkWithFallback(
+    stripe,
+    accountId,
+    {
+      returnUrl,
+      refreshUrl,
+      preferredLinkType,
+    }
+  );
 
   return {
     accountId,
