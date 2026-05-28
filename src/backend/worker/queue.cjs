@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 const { run, makeWorkerUtils } = require("graphile-worker");
 const { buildConnectionString } = require("./connectionString.cjs");
@@ -41,7 +42,11 @@ async function startWorkerRunner() {
   }).then((runner) => {
     workerRunnerRelease = runner;
     console.log("Graphile Worker started");
-    console.log(`Graphile Worker crontab loaded from ${crontabFile}`);
+    if (fs.existsSync(crontabFile)) {
+      console.log(`Graphile Worker crontab enabled (${crontabFile})`);
+    } else {
+      console.warn(`Graphile Worker crontab missing at ${crontabFile}; recurring jobs disabled.`);
+    }
     return runner;
   });
 
