@@ -10,6 +10,7 @@ const {
   assertStripeAccountOwnedBySeller,
   createStripeConnectOnboardingLink,
   createStripeConnectRemediationLink,
+  describeStripeRequirements,
   evaluateStripeConnectReadiness,
   getStripeConnectReadiness,
   syncStripeConnectAccountSettings,
@@ -71,6 +72,11 @@ module.exports = function sellerOnboardingRoutes(deps) {
         stripeReadiness = await getStripeConnectReadiness(stripe, state.stripeConnectAccountId);
       }
 
+      const stripeRequirementSummary = describeStripeRequirements(
+        stripeReadiness.currentlyDue,
+        stripeReadiness.pastDue
+      );
+
       return res.status(200).json({
         completionStep: state.completionStep,
         isComplete: state.isComplete,
@@ -78,6 +84,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
         shopUrl: buildSellerShopUrl(req.user.id),
         stripeReady: stripeReadiness.paymentReady,
         stripeReadiness,
+        stripeRequirementSummary,
         boxCount: boxes.length,
       });
     } catch (error) {
@@ -230,11 +237,19 @@ module.exports = function sellerOnboardingRoutes(deps) {
           pastDue: readiness.pastDue,
         });
 
+        const requirementSummary = describeStripeRequirements(
+          readiness.currentlyDue,
+          readiness.pastDue
+        );
+
         return res.status(409).json({
-          message: "Stripe needs additional information before payouts can be enabled.",
+          message: requirementSummary
+            ? `${requirementSummary}. Continue in Stripe to finish this step.`
+            : "Stripe needs additional information before payouts can be enabled.",
           stripeReady: false,
           needsAccountUpdate: true,
           actionUrl: remediationLink.url,
+          stripeRequirementSummary: requirementSummary,
           stripeReadiness: readiness,
           completionStep: currentStep,
         });

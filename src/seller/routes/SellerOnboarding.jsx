@@ -41,6 +41,7 @@ export default function SellerOnboarding({ step }) {
   const [showStripeRefreshNotice, setShowStripeRefreshNotice] = useState(false);
   const [error, setError] = useState("");
   const [stripeActionUrl, setStripeActionUrl] = useState("");
+  const [stripeRequiresAction, setStripeRequiresAction] = useState(null);
   const [stripeNotice, setStripeNotice] = useState("");
   const [status, setStatus] = useState(null);
   const [shippingAddress, setShippingAddress] = useState(EMPTY_ADDRESS);
@@ -80,6 +81,16 @@ export default function SellerOnboarding({ step }) {
         const data = await getSellerOnboardingStatus();
         if (cancelled) return;
         setStatus(data);
+
+        if (data.stripeReadiness?.needsAccountUpdate) {
+          setStripeRequiresAction({
+            message: data.stripeRequirementSummary
+              || "Stripe needs additional information before payouts can be enabled.",
+            actionUrl: "",
+          });
+        } else {
+          setStripeRequiresAction(null);
+        }
 
         if (data.isComplete) {
           navigate("/inventory", { replace: true });
@@ -130,6 +141,7 @@ export default function SellerOnboarding({ step }) {
       setSubmitting(true);
       setError("");
       setStripeActionUrl("");
+      setStripeRequiresAction(null);
       setStripeNotice("");
 
       try {
@@ -152,9 +164,17 @@ export default function SellerOnboarding({ step }) {
         if (!cancelled) {
           clearStripeReturnParams();
           const data = err?.response?.data || {};
-          setError(data.message || "Stripe Connect is not complete yet. Try again in a moment.");
-          if (data.actionUrl) {
-            setStripeActionUrl(data.actionUrl);
+          if (data.needsAccountUpdate) {
+            setStripeRequiresAction({
+              message: data.message || data.stripeRequirementSummary || "Stripe needs additional information.",
+              actionUrl: data.actionUrl || "",
+            });
+            setError("");
+          } else {
+            setError(data.message || "Stripe Connect is not complete yet. Try again in a moment.");
+            if (data.actionUrl) {
+              setStripeActionUrl(data.actionUrl);
+            }
           }
         }
       } finally {
@@ -171,7 +191,19 @@ export default function SellerOnboarding({ step }) {
     };
   }, [loading, navigate, searchParams, setSearchParams, step, stripeReturnMode]);
 
+  const handleStripeRemediation = () => {
+    const actionUrl = stripeRequiresAction?.actionUrl || stripeActionUrl;
+    if (actionUrl) {
+      window.location.assign(actionUrl);
+    }
+  };
+
   const handleStripeConnect = async () => {
+    if (stripeRequiresAction?.actionUrl) {
+      handleStripeRemediation();
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     setStripeActionUrl("");
@@ -187,12 +219,6 @@ export default function SellerOnboarding({ step }) {
       setError(err?.response?.data?.message || "Failed to start Stripe Connect.");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleStripeRemediation = () => {
-    if (stripeActionUrl) {
-      window.location.assign(stripeActionUrl);
     }
   };
 
@@ -257,6 +283,25 @@ export default function SellerOnboarding({ step }) {
           </div>
         ) : null}
 
+        {stripeRequiresAction ? (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold">One more step in Stripe</p>
+            <p className="mt-1">{stripeRequiresAction.message}</p>
+            <button
+              type="button"
+              onClick={stripeRequiresAction.actionUrl ? handleStripeRemediation : handleStripeConnect}
+              disabled={!stripeRequiresAction.actionUrl && submitting}
+              className="mt-3 rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500 disabled:opacity-60"
+            >
+              {stripeRequiresAction.actionUrl
+                ? "Upload documents in Stripe"
+                : submitting
+                  ? "Opening Stripe..."
+                  : "Continue in Stripe"}
+            </button>
+          </div>
+        ) : null}
+
         {stripeNotice ? (
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
             {stripeNotice}
@@ -275,14 +320,16 @@ export default function SellerOnboarding({ step }) {
                 Your Stripe session expired. Continue below to open a fresh Stripe Connect link.
               </p>
             ) : null}
-            <button
-              type="button"
-              onClick={handleStripeConnect}
-              disabled={submitting}
-              className="mt-6 w-full rounded-xl bg-orange-500 py-3 font-semibold text-white hover:bg-orange-400 disabled:opacity-60"
-            >
-              {submitting ? "Opening Stripe..." : "Continue with Stripe Connect"}
-            </button>
+            {!stripeRequiresAction ? (
+              <button
+                type="button"
+                onClick={handleStripeConnect}
+                disabled={submitting}
+                className="mt-6 w-full rounded-xl bg-orange-500 py-3 font-semibold text-white hover:bg-orange-400 disabled:opacity-60"
+              >
+                {submitting ? "Opening Stripe..." : "Continue with Stripe Connect"}
+              </button>
+            ) : null}
           </section>
         ) : null}
 

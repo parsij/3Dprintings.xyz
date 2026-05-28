@@ -182,6 +182,43 @@ function getRequirementList(requirements, key) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
 }
 
+const STRIPE_REQUIREMENT_LABELS = {
+  "individual.verification.document": "Upload a government-issued photo ID",
+  "individual.verification.additional_document": "Upload an additional identity document",
+  "individual.id_number": "Provide your tax ID or Social Security number",
+  "individual.dob.day": "Provide your date of birth",
+  "individual.dob.month": "Provide your date of birth",
+  "individual.dob.year": "Provide your date of birth",
+  "individual.address.line1": "Provide your home address",
+  "individual.address.city": "Provide your home address",
+  "individual.address.state": "Provide your home address",
+  "individual.address.postal_code": "Provide your home address",
+  "individual.first_name": "Provide your legal first name",
+  "individual.last_name": "Provide your legal last name",
+  "individual.email": "Provide your email address",
+  "individual.phone": "Provide your phone number",
+  "external_account": "Add a bank account for payouts",
+  "business_profile.url": "Confirm your shop URL",
+  "tos_acceptance.date": "Accept Stripe's terms of service",
+  "tos_acceptance.ip": "Accept Stripe's terms of service",
+};
+
+function describeStripeRequirements(currentlyDue = [], pastDue = []) {
+  const codes = [...new Set([...currentlyDue, ...pastDue].filter(Boolean))];
+  if (codes.length === 0) {
+    return null;
+  }
+
+  const labels = codes.map((code) => STRIPE_REQUIREMENT_LABELS[code] || code.replaceAll(".", " "));
+  const uniqueLabels = [...new Set(labels)];
+
+  if (uniqueLabels.length === 1) {
+    return uniqueLabels[0];
+  }
+
+  return `Complete the following in Stripe: ${uniqueLabels.join(", ")}`;
+}
+
 function evaluateStripeConnectReadiness(account) {
   if (!account) {
     return {
@@ -480,6 +517,7 @@ module.exports = {
   calculatePlatformFeeCents,
   createStripeConnectOnboardingLink,
   createStripeConnectRemediationLink,
+  describeStripeRequirements,
   distributeOrderTransfers,
   ensureStripeConnectAccount,
   evaluateStripeConnectReadiness,
