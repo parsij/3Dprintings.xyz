@@ -20,6 +20,29 @@ async function withPool(helpers, fn) {
   return helpers.withPgClient((client) => fn(client));
 }
 
+async function runScheduledPayoutsTask() {
+  const payoutDateKey = getUtcPayoutDateKey();
+  const sellerIds = await listScheduledPayoutSellerIds(appPool);
+
+  if (sellerIds.length === 0) {
+    console.log(`No recurring seller payouts due on ${payoutDateKey} (UTC).`);
+    return;
+  }
+
+  for (const sellerId of sellerIds) {
+    await enqueueWrite(
+      "seller.scheduledPayout",
+      { sellerId, payoutDateKey },
+      {
+        jobKey: `seller-scheduled-payout:${sellerId}:${payoutDateKey}`,
+        maxAttempts: 5,
+      }
+    );
+  }
+
+  console.log(`Queued ${sellerIds.length} recurring seller payout job(s) for ${payoutDateKey} (UTC).`);
+}
+
 const taskList = {
   "users.clearCart": async (payload, helpers) => {
     const { userId } = payload;
@@ -122,28 +145,9 @@ const taskList = {
     await withPool(helpers, (client) => refreshSellerDashboard(client, sellerId));
   },
 
-  "seller.runScheduledPayouts": async () => {
-    const payoutDateKey = getUtcPayoutDateKey();
-    const sellerIds = await listScheduledPayoutSellerIds(appPool);
-
-    if (sellerIds.length === 0) {
-      console.log(`No recurring seller payouts due on ${payoutDateKey} (UTC).`);
-      return;
-    }
-
-    for (const sellerId of sellerIds) {
-      await enqueueWrite(
-        "seller.scheduledPayout",
-        { sellerId, payoutDateKey },
-        {
-          jobKey: `seller-scheduled-payout:${sellerId}:${payoutDateKey}`,
-          maxAttempts: 5,
-        }
-      );
-    }
-
-    console.log(`Queued ${sellerIds.length} recurring seller payout job(s) for ${payoutDateKey} (UTC).`);
-  },
+  "seller.runScheduledPayouts": runScheduledPayoutsTask,
+  // Crontab task names cannot contain dots; this alias is used by worker/crontab.
+  seller_runScheduledPayouts: runScheduledPayoutsTask,
 
   "seller.scheduledPayout": async (payload) => {
     const sellerId = Number(payload?.sellerId);

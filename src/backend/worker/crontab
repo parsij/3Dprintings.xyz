@@ -1,4 +1,4 @@
 # Graphile Worker recurring tasks (all times UTC)
 #
 # Daily at 06:00 UTC: queue recurring Stripe payouts for sellers due today.
-0 6 * * * seller.runScheduledPayouts ?fill=1d&max=3&jobKey=run-scheduled-payouts&jobKeyMode=preserve_run_at
+0 6 * * * seller_runScheduledPayouts ?fill=1d&max=3&jobKey=run-scheduled-payouts&jobKeyMode=preserve_run_at
