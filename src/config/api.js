@@ -65,7 +65,25 @@ function resolveSellerSiteOrigin() {
   return DEFAULT_SELLER_ORIGIN;
 }
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+function resolveApiBaseUrl() {
+  const configured = import.meta.env.VITE_API_BASE_URL;
+  if (configured != null && String(configured).trim() !== "") {
+    return String(configured).replace(/\/+$/, "");
+  }
+
+  if (typeof window !== "undefined") {
+    if (isLocalDevRuntime()) {
+      return "";
+    }
+    if (isSellerHostname(window.location.hostname)) {
+      return resolveMarketplaceOrigin();
+    }
+  }
+
+  return "";
+}
+
+export const API_BASE = resolveApiBaseUrl();
 export const IS_LOCAL_DEV = isLocalDevRuntime();
 export const MARKETPLACE_ORIGIN = resolveMarketplaceOrigin();
 export const SELLER_SITE_ORIGIN = resolveSellerSiteOrigin();

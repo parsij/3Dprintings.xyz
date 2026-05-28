@@ -1,7 +1,6 @@
 import axios from "axios";
 import { applyCsrfInterceptor } from "../../services/csrf.js";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE } from "../../config/api.js";
 
 const apiClient = applyCsrfInterceptor(axios.create({
   baseURL: API_BASE,

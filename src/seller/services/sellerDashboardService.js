@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE } from "../../config/api.js";
 
 export async function getSellerDashboard() {
   const response = await axios.get(`${API_BASE}/api/seller/dashboard`, {

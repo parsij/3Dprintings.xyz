@@ -9,6 +9,7 @@ const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared
 const {
   assertStripeAccountOwnedBySeller,
   createStripeConnectOnboardingLink,
+  getStripeConnectReadiness,
   isStripeConnectReady,
 } = require("./sellerStripeShared.cjs");
 const { listSellerBoxes, parseBoxPayload, sellerBoxesCoverLargestProduct } = require("./sellerBoxesShared.cjs");
@@ -206,8 +207,13 @@ module.exports = function sellerOnboardingRoutes(deps) {
 
       await assertStripeAccountOwnedBySeller(stripe, pool, req.user.id, accountId);
 
-      const ready = await isStripeConnectReady(stripe, accountId);
-      if (!ready) {
+      const readiness = await getStripeConnectReadiness(stripe, accountId);
+      if (!readiness.ready) {
+        console.warn("Stripe Connect not ready after onboarding return", {
+          sellerUserId: req.user.id,
+          accountId,
+          ...readiness,
+        });
         return res.status(409).json({
           message: "Stripe Connect onboarding is not complete yet. Finish setup in Stripe first.",
           stripeReady: false,

@@ -1,4 +1,5 @@
 const PAYOUT_TYPES = new Set(["full", "half", "custom"]);
+const { getSellerStripeAccountId } = require("./sellerStripeShared.cjs");
 
 function normalizePayoutSchedule(input = {}) {
   const payoutType = String(input.payoutType || input.payout_type || "full").trim().toLowerCase();
@@ -99,9 +100,77 @@ function resolvePayoutAmountCents(availableCents, schedule) {
   return available;
 }
 
+function getUtcPayoutDateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getUtcDayOfMonth(date = new Date()) {
+  return date.getUTCDate();
+}
+
+async function listScheduledPayoutSellerIds(pool, utcDayOfMonth = getUtcDayOfMonth()) {
+  const result = await pool.query(
+    `SELECT seller_user_id
+     FROM seller_payout_schedules
+     WHERE enabled = TRUE
+       AND day_of_month = $1`,
+    [utcDayOfMonth]
+  );
+
+  return result.rows
+    .map((row) => Number(row.seller_user_id))
+    .filter((sellerId) => Number.isInteger(sellerId) && sellerId > 0);
+}
+
+async function executeScheduledSellerPayout(pool, stripe, sellerId, options = {}) {
+  const payoutDateKey = options.payoutDateKey || getUtcPayoutDateKey();
+  const schedule = await getSellerPayoutSchedule(pool, sellerId);
+
+  if (!schedule.enabled) {
+    return { skipped: true, reason: "schedule_disabled" };
+  }
+
+  if (getUtcDayOfMonth() !== Number(schedule.dayOfMonth)) {
+    return { skipped: true, reason: "wrong_day" };
+  }
+
+  const accountId = await getSellerStripeAccountId(pool, sellerId);
+  if (!accountId) {
+    return { skipped: true, reason: "missing_stripe_account" };
+  }
+
+  const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
+  const availableEntry = (balance.available || []).find((entry) => entry.currency === "usd");
+  const availableCents = availableEntry?.amount || 0;
+  const payoutCents = resolvePayoutAmountCents(availableCents, schedule);
+  if (payoutCents <= 0) {
+    return { skipped: true, reason: "no_available_balance" };
+  }
+
+  const payout = await stripe.payouts.create(
+    { amount: payoutCents, currency: "usd" },
+    {
+      stripeAccount: accountId,
+      idempotencyKey: `scheduled-payout-${sellerId}-${payoutDateKey}`,
+    }
+  );
+
+  return {
+    skipped: false,
+    sellerId,
+    payoutCents,
+    payoutId: payout.id,
+    status: payout.status,
+  };
+}
+
 module.exports = {
   ensureSellerPayoutSchedulesTable,
+  executeScheduledSellerPayout,
   getSellerPayoutSchedule,
+  getUtcDayOfMonth,
+  getUtcPayoutDateKey,
+  listScheduledPayoutSellerIds,
   normalizePayoutSchedule,
   resolvePayoutAmountCents,
   upsertSellerPayoutSchedule,

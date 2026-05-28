@@ -1,6 +1,9 @@
+const path = require("path");
 const { run, makeWorkerUtils } = require("graphile-worker");
 const { buildConnectionString } = require("./connectionString.cjs");
 const taskList = require("./tasks/index.cjs");
+
+const crontabFile = path.join(__dirname, "crontab");
 
 let workerUtils = null;
 let workerRunnerPromise = null;
@@ -33,10 +36,12 @@ async function startWorkerRunner() {
     connectionString,
     concurrency: Number(process.env.WORKER_CONCURRENCY || 5),
     taskList,
+    crontabFile,
     noHandleSignals: true,
   }).then((runner) => {
     workerRunnerRelease = runner;
     console.log("Graphile Worker started");
+    console.log(`Graphile Worker crontab loaded from ${crontabFile}`);
     return runner;
   });
 

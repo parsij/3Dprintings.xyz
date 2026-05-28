@@ -194,6 +194,29 @@ async function isStripeConnectReady(stripe, accountId) {
   );
 }
 
+async function getStripeConnectReadiness(stripe, accountId) {
+  if (!accountId) {
+    return {
+      ready: false,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+    };
+  }
+
+  const account = await stripe.accounts.retrieve(accountId);
+  const detailsSubmitted = Boolean(account.details_submitted);
+  const chargesEnabled = Boolean(account.charges_enabled);
+  const payoutsEnabled = Boolean(account.payouts_enabled);
+
+  return {
+    ready: detailsSubmitted && chargesEnabled && payoutsEnabled,
+    detailsSubmitted,
+    chargesEnabled,
+    payoutsEnabled,
+  };
+}
+
 async function assertStripeAccountOwnedBySeller(stripe, pool, sellerUserId, accountId) {
   if (!accountId) {
     const error = new Error("Stripe Connect account has not been created yet.");
@@ -217,7 +240,18 @@ async function assertStripeAccountOwnedBySeller(stripe, pool, sellerUserId, acco
   }
 
   const account = await stripe.accounts.retrieve(accountId);
-  if (String(account.metadata?.sellerUserId || "") !== String(sellerUserId)) {
+  const metadataSellerId = String(account.metadata?.sellerUserId || "");
+  if (metadataSellerId !== String(sellerUserId)) {
+    if (!metadataSellerId && storedAccountId === accountId) {
+      await stripe.accounts.update(accountId, {
+        metadata: {
+          ...(account.metadata || {}),
+          sellerUserId: String(sellerUserId),
+        },
+      });
+      return stripe.accounts.retrieve(accountId);
+    }
+
     const error = new Error("Stripe account metadata does not match this seller.");
     error.statusCode = 403;
     throw error;
@@ -309,4 +343,5 @@ module.exports = {
   ensureStripeConnectAccount,
   getSellerStripeAccountId,
   isStripeConnectReady,
+  getStripeConnectReadiness,
 };

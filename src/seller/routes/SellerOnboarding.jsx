@@ -84,13 +84,13 @@ export default function SellerOnboarding({ step }) {
           return;
         }
 
-        if (
-          step === "stripe_connect"
-          && stripeReturnMode !== "return"
-          && data.completionStep
-          && data.completionStep !== "stripe_connect"
-        ) {
+        if (step === "stripe_connect" && data.completionStep && data.completionStep !== "stripe_connect") {
+          if (stripeReturnMode === "return") {
+            stripeReturnHandledRef.current = true;
+            clearStripeReturnParams();
+          }
           navigate(resolveOnboardingRoute(data.completionStep), { replace: true });
+          return;
         }
       } catch (err) {
         if (!cancelled) {

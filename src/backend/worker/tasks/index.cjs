@@ -8,10 +8,10 @@ const { mergeTrackerWebhookIntoOrders } = require("../../apiRoutes/shippingShare
 const { refreshSellerDashboard } = require("../../apiRoutes/sellerShared.cjs");
 const { processMultiSellerTransfers } = require("../../apiRoutes/sellerOrderTransfers.cjs");
 const {
-  getSellerPayoutSchedule,
-  resolvePayoutAmountCents,
+  executeScheduledSellerPayout,
+  getUtcPayoutDateKey,
+  listScheduledPayoutSellerIds,
 } = require("../../apiRoutes/sellerBalanceShared.cjs");
-const { getSellerStripeAccountId } = require("../../apiRoutes/sellerStripeShared.cjs");
 const { enqueueWrite } = require("../../worker/queue.cjs");
 const appPool = require("../../db.cjs");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -122,29 +122,49 @@ const taskList = {
     await withPool(helpers, (client) => refreshSellerDashboard(client, sellerId));
   },
 
+  "seller.runScheduledPayouts": async () => {
+    const payoutDateKey = getUtcPayoutDateKey();
+    const sellerIds = await listScheduledPayoutSellerIds(appPool);
+
+    if (sellerIds.length === 0) {
+      console.log(`No recurring seller payouts due on ${payoutDateKey} (UTC).`);
+      return;
+    }
+
+    for (const sellerId of sellerIds) {
+      await enqueueWrite(
+        "seller.scheduledPayout",
+        { sellerId, payoutDateKey },
+        {
+          jobKey: `seller-scheduled-payout:${sellerId}:${payoutDateKey}`,
+          maxAttempts: 5,
+        }
+      );
+    }
+
+    console.log(`Queued ${sellerIds.length} recurring seller payout job(s) for ${payoutDateKey} (UTC).`);
+  },
+
   "seller.scheduledPayout": async (payload) => {
-    const { sellerId } = payload;
-    if (!sellerId) return;
+    const sellerId = Number(payload?.sellerId);
+    if (!Number.isInteger(sellerId) || sellerId <= 0) return;
 
-    const schedule = await getSellerPayoutSchedule(appPool, sellerId);
-    if (!schedule.enabled) return;
+    try {
+      const result = await executeScheduledSellerPayout(appPool, stripe, sellerId, {
+        payoutDateKey: payload?.payoutDateKey,
+      });
 
-    const today = new Date();
-    if (today.getDate() !== Number(schedule.dayOfMonth)) return;
+      if (result.skipped) return;
 
-    const accountId = await getSellerStripeAccountId(appPool, sellerId);
-    if (!accountId) return;
-
-    const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
-    const availableEntry = (balance.available || []).find((entry) => entry.currency === "usd");
-    const availableCents = availableEntry?.amount || 0;
-    const payoutCents = resolvePayoutAmountCents(availableCents, schedule);
-    if (payoutCents <= 0) return;
-
-    await stripe.payouts.create(
-      { amount: payoutCents, currency: "usd" },
-      { stripeAccount: accountId }
-    );
+      console.log(`Scheduled payout created for seller ${sellerId}:`, {
+        payoutId: result.payoutId,
+        amountCents: result.payoutCents,
+        status: result.status,
+      });
+    } catch (error) {
+      console.error(`Scheduled payout failed for seller ${sellerId}:`, error);
+      throw error;
+    }
   },
 
 };
