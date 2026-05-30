@@ -343,7 +343,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 onChange={handlePhotoChange}
                 className="hidden"
             />
-            {submitted && errors.photos && <p className="mt-2 text-xs text-red-500 animate-pulse">{errors.photos}</p>}
+            {submitted && errors.photos && <p className="mt-2 text-xs text-red-500">{errors.photos}</p>}
 
             {previewUrls.length > 0 && (
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -377,7 +377,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   placeholder="Model's name"
                   className={FIELD_CLASS}
               />
-              {submitted && errors.modelName && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelName}</p>}
+              {submitted && errors.modelName && <p className="mt-1 text-xs text-red-500">{errors.modelName}</p>}
             </div>
 
             <div className="group transition-all duration-300 hover:translate-x-1">
@@ -391,7 +391,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   placeholder="19.99"
                   className={FIELD_CLASS}
               />
-              {submitted && errors.price && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.price}</p>}
+              {submitted && errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
             </div>
 
             <div className="group transition-all duration-300 hover:translate-x-1">
@@ -407,7 +407,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   placeholder="10"
                   className={`${FIELD_CLASS} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
               />
-              {submitted && errors.quantity && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.quantity}</p>}
+              {submitted && errors.quantity && <p className="mt-1 text-xs text-red-500">{errors.quantity}</p>}
             </div>
 
             {/* FIXED: Dropdown Select implementation with strict optgroup nesting */}
@@ -422,7 +422,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 ariaLabel="Category"
                 groups={categoryGroups}
               />
-              {submitted && errors.category && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.category}</p>}
+              {submitted && errors.category && <p className="mt-1 text-xs text-red-500">{errors.category}</p>}
               {form.category === "Other" && (
                 <p className="mt-2 text-xs text-red-600 font-semibold">Setting your product category as "Other" makes your products have less sales compared to others.</p>
               )}
@@ -440,7 +440,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   className={`${FIELD_CLASS} resize-none`}
               />
               {submitted && errors.description && (
-                  <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.description}</p>
+                  <p className="mt-1 text-xs text-red-500">{errors.description}</p>
               )}
             </div>
 

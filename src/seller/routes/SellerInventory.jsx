@@ -394,7 +394,7 @@ export default function SellerInventory() {
                     className={FIELD_CLASS}
                   />
                   {editSubmitted && editingErrors.modelName ? (
-                    <p className="mt-1 text-xs text-red-500 animate-pulse">{editingErrors.modelName}</p>
+                    <p className="mt-1 text-xs text-red-500">{editingErrors.modelName}</p>
                   ) : null}
                 </div>
 
@@ -408,7 +408,7 @@ export default function SellerInventory() {
                     className={FIELD_CLASS}
                   />
                   {editSubmitted && editingErrors.price ? (
-                    <p className="mt-1 text-xs text-red-500 animate-pulse">{editingErrors.price}</p>
+                    <p className="mt-1 text-xs text-red-500">{editingErrors.price}</p>
                   ) : null}
                 </div>
 
@@ -424,7 +424,7 @@ export default function SellerInventory() {
                     className={`${FIELD_CLASS} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                   />
                   {editSubmitted && editingErrors.quantity ? (
-                    <p className="mt-1 text-xs text-red-500 animate-pulse">{editingErrors.quantity}</p>
+                    <p className="mt-1 text-xs text-red-500">{editingErrors.quantity}</p>
                   ) : null}
                 </div>
 
@@ -440,7 +440,7 @@ export default function SellerInventory() {
                     groups={categoryGroups}
                   />
                   {editSubmitted && editingErrors.category ? (
-                    <p className="mt-1 text-xs text-red-500 animate-pulse">{editingErrors.category}</p>
+                    <p className="mt-1 text-xs text-red-500">{editingErrors.category}</p>
                   ) : null}
                   {editingForm.category === "Other" ? (
                     <p className="mt-2 text-xs text-red-600 font-semibold">
@@ -459,7 +459,7 @@ export default function SellerInventory() {
                     className={`${FIELD_CLASS} resize-none`}
                   />
                   {editSubmitted && editingErrors.description ? (
-                    <p className="mt-1 text-xs text-red-500 animate-pulse">{editingErrors.description}</p>
+                    <p className="mt-1 text-xs text-red-500">{editingErrors.description}</p>
                   ) : null}
                 </div>
 

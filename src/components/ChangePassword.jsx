@@ -55,7 +55,7 @@ export default function ChangePassword({
             </button>
           </div>
           {passwordErrors.oldPassword && (
-            <p className="mt-1 text-xs text-red-500 animate-pulse">{passwordErrors.oldPassword}</p>
+            <p className="mt-1 text-xs text-red-500">{passwordErrors.oldPassword}</p>
           )}
         </div>
 
@@ -90,7 +90,7 @@ export default function ChangePassword({
             </button>
           </div>
           {passwordErrors.newPassword && (
-            <p className="mt-1 text-xs text-red-500 animate-pulse">{passwordErrors.newPassword}</p>
+            <p className="mt-1 text-xs text-red-500">{passwordErrors.newPassword}</p>
           )}
         </div>
 
@@ -125,7 +125,7 @@ export default function ChangePassword({
             </button>
           </div>
           {passwordErrors.confirmNewPassword && (
-            <p className="mt-1 text-xs text-red-500 animate-pulse">{passwordErrors.confirmNewPassword}</p>
+            <p className="mt-1 text-xs text-red-500">{passwordErrors.confirmNewPassword}</p>
           )}
         </div>
 

@@ -90,7 +90,7 @@ export default function CartPage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-100 border border-red-400 p-4 text-red-700 animate-pulse shadow-lg transition-all duration-300 hover:shadow-xl">
+          <div className="mb-4 rounded-lg bg-red-100 border border-red-400 p-4 text-red-700 shadow-lg transition-all duration-300 hover:shadow-xl">
             {error}
           </div>
         )}

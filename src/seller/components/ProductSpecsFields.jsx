@@ -68,7 +68,7 @@ export default function ProductSpecsFields({
           />
         </div>
         {showErrors && errors.modelWeight ? (
-          <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelWeight}</p>
+          <p className="mt-1 text-xs text-red-500">{errors.modelWeight}</p>
         ) : null}
       </div>
 
@@ -98,7 +98,7 @@ export default function ProductSpecsFields({
                 placeholder={label}
               />
               {showErrors && errors[field] ? (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{errors[field]}</p>
+                <p className="mt-1 text-xs text-red-500">{errors[field]}</p>
               ) : null}
             </div>
           ))}
@@ -119,7 +119,7 @@ export default function ProductSpecsFields({
           />
         </div>
         {showErrors && errors.daysToPrepare ? (
-          <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.daysToPrepare}</p>
+          <p className="mt-1 text-xs text-red-500">{errors.daysToPrepare}</p>
         ) : null}
       </div>
     </>

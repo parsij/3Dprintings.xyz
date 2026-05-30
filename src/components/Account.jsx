@@ -37,7 +37,7 @@ export default function Account({
             placeholder="yourname"
           />
           {profileErrors.username && (
-            <p className="mt-1 text-xs text-red-500 animate-pulse">{profileErrors.username}</p>
+            <p className="mt-1 text-xs text-red-500">{profileErrors.username}</p>
           )}
         </div>
 
@@ -58,7 +58,7 @@ export default function Account({
              placeholder="you@example.com"
            />
            {profileErrors.email && (
-             <p className="mt-1 text-xs text-red-500 animate-pulse">{profileErrors.email}</p>
+             <p className="mt-1 text-xs text-red-500">{profileErrors.email}</p>
            )}
          </div>
 

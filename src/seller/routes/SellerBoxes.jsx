@@ -208,7 +208,7 @@ export default function SellerBoxes() {
                 required
               />
               {submitted && formErrors.name ? (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{formErrors.name}</p>
+                <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>
               ) : null}
             </div>
 
@@ -239,7 +239,7 @@ export default function SellerBoxes() {
                       placeholder={label}
                     />
                     {submitted && formErrors[field] ? (
-                      <p className="mt-1 text-xs text-red-500 animate-pulse">{formErrors[field]}</p>
+                      <p className="mt-1 text-xs text-red-500">{formErrors[field]}</p>
                     ) : null}
                   </div>
                 ))}
@@ -265,7 +265,7 @@ export default function SellerBoxes() {
                 />
               </div>
               {submitted && formErrors.maxWeight ? (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{formErrors.maxWeight}</p>
+                <p className="mt-1 text-xs text-red-500">{formErrors.maxWeight}</p>
               ) : null}
             </div>
 

@@ -184,7 +184,7 @@ export default function ShippingAddress({
                 placeholder="123 Main St Apt 4B"
               />
               {addressErrors.street_address && (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.street_address}</p>
+                <p className="mt-1 text-xs text-red-500">{addressErrors.street_address}</p>
               )}
             </div>
 
@@ -202,7 +202,7 @@ export default function ShippingAddress({
                 placeholder="San Francisco"
               />
               {addressErrors.city && (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.city}</p>
+                <p className="mt-1 text-xs text-red-500">{addressErrors.city}</p>
               )}
             </div>
 
@@ -228,7 +228,7 @@ export default function ShippingAddress({
                   ))}
                 </select>
                 {addressErrors.state_province && (
-                  <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.state_province}</p>
+                  <p className="mt-1 text-xs text-red-500">{addressErrors.state_province}</p>
                 )}
               </div>
 
@@ -248,7 +248,7 @@ export default function ShippingAddress({
                   placeholder="94107"
                 />
                 {addressErrors.postal_code && (
-                  <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.postal_code}</p>
+                  <p className="mt-1 text-xs text-red-500">{addressErrors.postal_code}</p>
                 )}
               </div>
             </div>
@@ -267,7 +267,7 @@ export default function ShippingAddress({
                 placeholder="US"
               />
               {addressErrors.country_code && (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{addressErrors.country_code}</p>
+                <p className="mt-1 text-xs text-red-500">{addressErrors.country_code}</p>
               )}
             </div>
           </>
