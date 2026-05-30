@@ -183,7 +183,7 @@ export default function SellerBoxes() {
           <p className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{message}</p>
         ) : null}
 
-        <section className="mt-6 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-lg">
+        <section className="mt-6 rounded-2xl border border-orange-100 bg-white shadow-lg">
           <div className="border-b border-orange-100 bg-gradient-to-r from-orange-50 to-white px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500 text-white shadow-sm">

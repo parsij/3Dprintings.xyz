@@ -5,7 +5,7 @@ function sanitizeNaturalNumberInput(value) {
 }
 
 const COMBO_CONTAINER_CLASS =
-  "flex overflow-hidden rounded-xl border border-gray-300 bg-white shadow-none transition-colors duration-200 focus-within:border-orange-500 focus-within:shadow-none";
+  "flex rounded-xl border border-gray-300 bg-white shadow-none transition-colors duration-200 focus-within:border-orange-500 focus-within:shadow-none";
 const COMBO_INPUT_CLASS =
   "min-w-0 flex-1 border-0 bg-transparent px-4 py-3 outline-none shadow-none focus:ring-0 focus:shadow-none";
 
@@ -34,13 +34,15 @@ export default function UnitNumberInput({
         placeholder={placeholder}
         className={COMBO_INPUT_CLASS}
       />
-      <CustomSelect
-        ariaLabel={`${name} unit`}
-        compact
-        value={unit}
-        onChange={onUnitChange}
-        options={units}
-      />
+      <div className="border-l border-gray-200">
+        <CustomSelect
+          ariaLabel={`${name} unit`}
+          compact
+          value={unit}
+          onChange={onUnitChange}
+          options={units}
+        />
+      </div>
     </div>
   );
 }
