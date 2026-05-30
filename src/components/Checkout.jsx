@@ -51,6 +51,18 @@ function isAddressComplete(address) {
     );
 }
 
+function addressSignature(address) {
+    const normalized = normalizeAddress(address);
+    return [
+        normalized.line1,
+        normalized.line2,
+        normalized.city,
+        normalized.state,
+        normalized.zip,
+        normalized.country,
+    ].join('|');
+}
+
 function PriceSkeleton({ className = 'h-4 w-16' }) {
     return <div className={`animate-pulse rounded bg-gray-300 ${className}`} aria-hidden="true" />;
 }
@@ -89,6 +101,11 @@ const Checkout = () => {
 
     const normalizedShippingAddress = useMemo(
         () => normalizeAddress(shippingAddress),
+        [shippingAddress]
+    );
+
+    const shippingAddressSignature = useMemo(
+        () => addressSignature(shippingAddress),
         [shippingAddress]
     );
 
@@ -219,11 +236,13 @@ const Checkout = () => {
                 });
                 if (data.verifiedShippingAddress && typeof data.verifiedShippingAddress === 'object') {
                     const verified = normalizeAddress(data.verifiedShippingAddress);
-                    setShippingAddress(verified);
-                    setAddressLine(formatAddressSummary(verified));
+                    if (addressSignature(verified) !== shippingAddressSignature) {
+                        setShippingAddress(verified);
+                        setAddressLine(formatAddressSummary(verified));
+                    }
                 }
                 setShippingOptions(Array.isArray(data.shippingOptions) ? data.shippingOptions : []);
-                if (data.shippingTier) {
+                if (data.shippingTier && data.shippingTier !== shippingTier) {
                     setShippingTier(data.shippingTier);
                 }
             } catch (err) {
@@ -239,7 +258,7 @@ const Checkout = () => {
         }, 400);
 
         return () => window.clearTimeout(timer);
-    }, [cartItems, normalizedShippingAddress, addressComplete, shippingTier]);
+    }, [cartItems, shippingAddressSignature, addressComplete, shippingTier]);
 
     const handleAddressChange = (event) => {
         const { name, value } = event.target;
