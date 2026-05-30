@@ -94,3 +94,36 @@ export function toCanonicalDimensions({
     modelDimensionUnit,
   };
 }
+
+export function fromCanonicalWeight(grams, unit = "lb") {
+  const normalized = Number(grams);
+  if (!Number.isFinite(normalized) || normalized <= 0) return "";
+  if (unit === "kg") {
+    return String(Math.round(normalized / 1000));
+  }
+  return String(Math.round(normalized / LB_TO_G));
+}
+
+export function fromCanonicalDimension(mm, unit = "in") {
+  const normalized = Number(mm);
+  if (!Number.isFinite(normalized) || normalized <= 0) return "";
+  if (unit === "cm") {
+    return String(Math.round(normalized / 10));
+  }
+  return String(Math.round(normalized / IN_TO_MM));
+}
+
+export function productToFormDimensions(product = {}) {
+  const weightUnit = product.model_weight_unit === "kg" ? "kg" : "lb";
+  const dimensionUnit = product.model_dimension_unit === "cm" ? "cm" : "in";
+
+  return {
+    modelWeight: fromCanonicalWeight(product.model_weight_g, weightUnit),
+    modelWeightUnit: weightUnit,
+    modelHeight: fromCanonicalDimension(product.model_height_mm, dimensionUnit),
+    modelWidth: fromCanonicalDimension(product.model_width_mm, dimensionUnit),
+    modelLength: fromCanonicalDimension(product.model_length_mm, dimensionUnit),
+    modelDimensionUnit: dimensionUnit,
+    daysToPrepare: String(product.days_to_prepare ?? 1),
+  };
+}

@@ -24,6 +24,14 @@ const {
   getSellerOnboardingState,
   isSellerOnboardingComplete,
 } = require("./sellerOnboardingShared.cjs");
+const {
+  parseAndValidateProductDimensions,
+  productDimensionsAreValid,
+} = require("./productDimensionsShared.cjs");
+const {
+  listSellerBoxes,
+} = require("./sellerBoxesShared.cjs");
+const { productFitsInAnyBox } = require("./sellerBoxPackingShared.cjs");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
@@ -685,7 +693,9 @@ module.exports = function sellerRoutes(deps) {
       }
 
       const existingProductResult = await pool.query(
-        `SELECT id, user_id, tags, img_path
+        `SELECT id, user_id, tags, img_path,
+                model_weight_g, model_height_mm, model_width_mm, model_length_mm,
+                model_weight_unit, model_dimension_unit, days_to_prepare
          FROM products
          WHERE id = $1
          LIMIT 1`,
@@ -726,6 +736,54 @@ module.exports = function sellerRoutes(deps) {
          return res.status(400).json({ message: "Explicit content is not allowed in title, description, or tags." });
        }
 
+      let dimensions = null;
+      const hasDimensionPayload = [
+        req.body?.modelWeight,
+        req.body?.modelHeight,
+        req.body?.modelWidth,
+        req.body?.modelLength,
+      ].some((value) => value !== undefined && value !== null && String(value).trim() !== "");
+
+      if (hasDimensionPayload) {
+        try {
+          dimensions = parseAndValidateProductDimensions(req.body);
+        } catch (dimensionError) {
+          return res.status(dimensionError.statusCode || 400).json({
+            message: dimensionError.message || "Invalid model dimensions.",
+          });
+        }
+
+        if (!productDimensionsAreValid(dimensions)) {
+          return res.status(400).json({ message: "Model weight, height, width, and length are invalid." });
+        }
+
+        const sellerBoxes = await listSellerBoxes(pool, req.user.id);
+        if (sellerBoxes.length === 0) {
+          return res.status(400).json({
+            message: "You must add at least one shipping box before listing products.",
+            boxesUrl: "/boxes",
+          });
+        }
+
+        const fitResult = await productFitsInAnyBox(
+          {
+            name: modelName,
+            model_weight_g: dimensions.modelWeightG,
+            model_height_mm: dimensions.modelHeightMm,
+            model_width_mm: dimensions.modelWidthMm,
+            model_length_mm: dimensions.modelLengthMm,
+          },
+          sellerBoxes
+        );
+
+        if (!fitResult.fits) {
+          return res.status(400).json({
+            message: "You need a box that fits this product at 95% capacity. Update your boxes or reduce dimensions.",
+            boxesUrl: "/boxes",
+          });
+        }
+      }
+
       const currentTags = parseProductTags(existingProduct.tags);
       await scheduleTagUsageCounts(currentTags, nextTags);
 
@@ -737,10 +795,32 @@ module.exports = function sellerRoutes(deps) {
              current_price = $3,
              category = $4,
              tags = $5::jsonb,
-             quantity = $6
-         WHERE id = $7
+             quantity = $6,
+             model_weight_g = COALESCE($7, model_weight_g),
+             model_height_mm = COALESCE($8, model_height_mm),
+             model_width_mm = COALESCE($9, model_width_mm),
+             model_length_mm = COALESCE($10, model_length_mm),
+             model_weight_unit = COALESCE($11, model_weight_unit),
+             model_dimension_unit = COALESCE($12, model_dimension_unit),
+             days_to_prepare = COALESCE($13, days_to_prepare)
+         WHERE id = $14
          RETURNING *`,
-        [modelName, description, parsedPrice, category || null, JSON.stringify(nextTags), parsedQuantity, productId]
+        [
+          modelName,
+          description,
+          parsedPrice,
+          category || null,
+          JSON.stringify(nextTags),
+          parsedQuantity,
+          dimensions?.modelWeightG ?? null,
+          dimensions?.modelHeightMm ?? null,
+          dimensions?.modelWidthMm ?? null,
+          dimensions?.modelLengthMm ?? null,
+          dimensions?.modelWeightUnit ?? null,
+          dimensions?.modelDimensionUnit ?? null,
+          dimensions?.daysToPrepare ?? null,
+          productId,
+        ]
       );
 
       const updatedProduct = updatedResult.rows[0];

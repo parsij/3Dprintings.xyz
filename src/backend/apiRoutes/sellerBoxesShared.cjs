@@ -154,6 +154,47 @@ async function sellerBoxesCoverLargestProduct(pool, sellerUserId, boxes = null) 
   };
 }
 
+async function countSellerProducts(pool, sellerUserId) {
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS product_count
+     FROM products
+     WHERE user_id = $1`,
+    [sellerUserId]
+  );
+  return Number(result.rows[0]?.product_count || 0);
+}
+
+async function enrichBoxesWithActions(pool, sellerUserId, boxes = []) {
+  const productCount = await countSellerProducts(pool, sellerUserId);
+  const coverage = await sellerBoxesCoverLargestProduct(pool, sellerUserId, boxes);
+  const enriched = [];
+
+  for (const box of boxes) {
+    const remainingBoxes = boxes.filter((entry) => Number(entry.id) !== Number(box.id));
+    const deleteCoverage = await sellerBoxesCoverLargestProduct(pool, sellerUserId, remainingBoxes);
+    const canDelete = boxes.length > 1 && deleteCoverage.ok;
+
+    enriched.push({
+      ...box,
+      canDelete,
+      deleteBlockedReason: canDelete
+        ? null
+        : boxes.length <= 1
+          ? productCount > 0
+            ? "You must keep at least one box while you have listed products."
+            : "You must keep at least one shipping box."
+          : "Removing this box leaves your largest product without a valid 95% fit box.",
+    });
+  }
+
+  return {
+    boxes: enriched,
+    productCount,
+    coversLargestProduct: coverage.ok,
+    largestProduct: coverage.largestProduct,
+  };
+}
+
 async function ensureSellerBoxesTable(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS seller_boxes (
@@ -194,7 +235,9 @@ async function listSellerBoxes(pool, sellerUserId) {
 
 module.exports = {
   BOX_SHRINK_FACTOR,
+  countSellerProducts,
   ensureSellerBoxesTable,
+  enrichBoxesWithActions,
   getEffectiveBoxBin,
   getLargestProductForSeller,
   getProductPackingItem,

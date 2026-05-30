@@ -3,6 +3,8 @@ const {
   normalizeBoxRow,
   parseBoxPayload,
   sellerBoxesCoverLargestProduct,
+  enrichBoxesWithActions,
+  countSellerProducts,
 } = require("./sellerBoxesShared.cjs");
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require("./sellerOnboardingShared.cjs");
 
@@ -43,11 +45,12 @@ module.exports = function sellerBoxesRoutes(deps) {
   app.get("/api/seller/boxes", attachAuthenticatedSeller, async (req, res) => {
     try {
       const boxes = await listSellerBoxes(pool, req.user.id);
-      const coverage = await sellerBoxesCoverLargestProduct(pool, req.user.id, boxes);
+      const enriched = await enrichBoxesWithActions(pool, req.user.id, boxes);
       return res.status(200).json({
-        boxes,
-        largestProduct: coverage.largestProduct,
-        coversLargestProduct: coverage.ok,
+        boxes: enriched.boxes,
+        productCount: enriched.productCount,
+        largestProduct: enriched.largestProduct,
+        coversLargestProduct: enriched.coversLargestProduct,
       });
     } catch (error) {
       console.error("Failed to list seller boxes:", error);
@@ -149,8 +152,12 @@ module.exports = function sellerBoxesRoutes(deps) {
       }
 
       const existingBoxes = await listSellerBoxes(pool, req.user.id);
+      const productCount = await countSellerProducts(pool, req.user.id);
       if (existingBoxes.length <= 1) {
-        return res.status(400).json({ message: "You must keep at least one shipping box." });
+        const message = productCount > 0
+          ? "You must keep at least one box while you have listed products."
+          : "You must keep at least one shipping box.";
+        return res.status(400).json({ message });
       }
 
       const remainingBoxes = existingBoxes.filter((box) => Number(box.id) !== boxId);

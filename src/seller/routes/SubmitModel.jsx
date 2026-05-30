@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
-import UnitNumberInput from "../components/UnitNumberInput.jsx";
-import DaysToPrepareInput from "../components/DaysToPrepareInput.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
-import {
-  validateDaysToPrepare,
-  validateDimensionInput,
-  validateWeightInput,
-} from "../../utils/productDimensions.js";
+import ProductSpecsFields, { validateProductSpecs } from "../components/ProductSpecsFields.jsx";
+import { FieldLabel, FIELD_CLASS, RequiredMark } from "../components/listingFormUi.jsx";
 
 // Your complete, community-specific 3D printing taxonomy
 // eslint-disable-next-line react-refresh/only-export-components
@@ -143,9 +138,6 @@ const defaultForm = {
 
 const MAX_PHOTOS = 10;
 
-const FIELD_CLASS =
-  "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none shadow-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 focus:shadow-none hover:border-orange-200";
-
 const categoryGroups = CATEGORY_DATA.map((group) => ({
   label: group.title,
   options: group.subcategories.map((sub) => ({
@@ -153,26 +145,6 @@ const categoryGroups = CATEGORY_DATA.map((group) => ({
     label: sub.label,
   })),
 }));
-
-function RequiredMark() {
-  return <span className="text-red-500">*</span>;
-}
-
-function FieldLabel({ htmlFor, children, className = "mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600" }) {
-  return (
-    <label htmlFor={htmlFor} className={className}>
-      {children} <RequiredMark />
-    </label>
-  );
-}
-
-function SectionTitle({ children }) {
-  return (
-    <h3 className="text-sm font-semibold text-gray-800">
-      {children} <RequiredMark />
-    </h3>
-  );
-}
 
 function mergePhotos(existingPhotos, incomingPhotos) {
   const unique = [...existingPhotos];
@@ -245,26 +217,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
       nextErrors.quantity = "Enter a valid quantity greater than 0.";
     }
 
-    const weightError = validateWeightInput(form.modelWeight, form.modelWeightUnit);
-    if (weightError) {
-      nextErrors.modelWeight = weightError;
-    }
-
-    [
-      ["modelHeight", "Height"],
-      ["modelWidth", "Width"],
-      ["modelLength", "Length"],
-    ].forEach(([field, label]) => {
-      const dimensionError = validateDimensionInput(form[field], form.modelDimensionUnit, label);
-      if (dimensionError) {
-        nextErrors[field] = dimensionError;
-      }
-    });
-
-    const daysToPrepareError = validateDaysToPrepare(form.daysToPrepare);
-    if (daysToPrepareError) {
-      nextErrors.daysToPrepare = daysToPrepareError;
-    }
+    Object.assign(nextErrors, validateProductSpecs(form));
 
     return nextErrors;
   }, [form, photos]);
@@ -486,84 +439,14 @@ export default function SubmitModel({ onSubmissionSuccess }) {
               )}
             </div>
 
-            <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
-              <SectionTitle>Model weight</SectionTitle>
-              <p className="mt-1 text-xs text-gray-600">
-                Enter a whole number greater than 0. Maximum weight is 50 kg.
-              </p>
-              <div className="mt-2">
-                <UnitNumberInput
-                  id="modelWeight"
-                  name="modelWeight"
-                  value={form.modelWeight}
-                  unit={form.modelWeightUnit}
-                  units={[
-                    { value: "lb", label: "lb" },
-                    { value: "kg", label: "kg" },
-                  ]}
-                  onValueChange={(value) => handleDimensionValueChange("modelWeight", value)}
-                  onUnitChange={(value) => handleUnitChange("modelWeightUnit", value)}
-                  placeholder="Weight"
-                />
-              </div>
-              {submitted && errors.modelWeight && (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelWeight}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
-              <SectionTitle>Model dimensions</SectionTitle>
-              <p className="mt-1 text-xs text-gray-600">
-                Enter whole numbers greater than 0. Each side can be at most 300 cm. Accurate values help avoid shipping adjustment charges.
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {[
-                  ["modelHeight", "Height"],
-                  ["modelWidth", "Width"],
-                  ["modelLength", "Length"],
-                ].map(([field, label]) => (
-                  <div key={field}>
-                    <label htmlFor={field} className="mb-1 block text-xs font-semibold text-gray-700">
-                      {label}
-                    </label>
-                    <UnitNumberInput
-                      id={field}
-                      name={field}
-                      value={form[field]}
-                      unit={form.modelDimensionUnit}
-                      units={[
-                        { value: "in", label: "in" },
-                        { value: "cm", label: "cm" },
-                      ]}
-                      onValueChange={(value) => handleDimensionValueChange(field, value)}
-                      onUnitChange={(value) => handleUnitChange("modelDimensionUnit", value)}
-                      placeholder={label}
-                    />
-                    {submitted && errors[field] && (
-                      <p className="mt-1 text-xs text-red-500 animate-pulse">{errors[field]}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
-              <SectionTitle>Days to prepare</SectionTitle>
-              <p className="mt-1 text-xs text-gray-600">
-                How many days you need to print and pack this item before shipping. Choose 1 to 7 days.
-              </p>
-              <div className="mt-2 max-w-xs">
-                <DaysToPrepareInput
-                  id="daysToPrepare"
-                  name="daysToPrepare"
-                  value={form.daysToPrepare}
-                  onChange={(value) => setForm((prev) => ({ ...prev, daysToPrepare: value }))}
-                />
-              </div>
-              {submitted && errors.daysToPrepare && (
-                <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.daysToPrepare}</p>
-              )}
-            </div>
+            <ProductSpecsFields
+              form={form}
+              onUnitChange={handleUnitChange}
+              onDimensionValueChange={handleDimensionValueChange}
+              onDaysToPrepareChange={(value) => setForm((prev) => ({ ...prev, daysToPrepare: value }))}
+              showErrors={submitted}
+              errors={errors}
+            />
 
             <Tags
                 tags={form.tags}
