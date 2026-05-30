@@ -54,6 +54,45 @@ function buildGeocodioSuggestion(result) {
   };
 }
 
+function extractFormattedStreetLine(formatted, houseNumber) {
+  const firstSegment = normalizeText(formatted).split(',')[0];
+  if (!firstSegment) return '';
+
+  const num = normalizeText(houseNumber);
+  if (num && !firstSegment.startsWith(num)) {
+    return '';
+  }
+
+  return firstSegment;
+}
+
+function pickBestStreetLine(...candidates) {
+  const lines = candidates.map((value) => normalizeText(value)).filter(Boolean);
+  if (lines.length === 0) return '';
+  if (lines.length === 1) return lines[0];
+
+  const suffixPattern = /\b(st|street|ave|avenue|blvd|boulevard|dr|drive|rd|road|ln|lane|ct|court|way|pl|place|cir|circle|trl|trail|pkwy|parkway|hwy|highway)\b\.?$/i;
+
+  let best = lines[0];
+  for (const line of lines.slice(1)) {
+    const bestHasSuffix = suffixPattern.test(best);
+    const lineHasSuffix = suffixPattern.test(line);
+
+    if (lineHasSuffix && !bestHasSuffix) {
+      best = line;
+      continue;
+    }
+    if (bestHasSuffix && !lineHasSuffix) {
+      continue;
+    }
+    if (line.length > best.length) {
+      best = line;
+    }
+  }
+
+  return best;
+}
+
 function buildGeoapifySuggestion(feature) {
   const properties = feature?.properties || {};
   const resultType = normalizeText(properties.result_type).toLowerCase();
@@ -66,9 +105,10 @@ function buildGeoapifySuggestion(feature) {
   const city = normalizeText(properties.city || properties.town || properties.village);
   const state = normalizeText(properties.state_code || properties.state).toUpperCase();
   const postcode = normalizeText(properties.postcode);
-  const addressLine1 = normalizeText(properties.address_line1);
+  const composedLine = [houseNumber, street].filter(Boolean).join(' ');
+  const formattedLine = extractFormattedStreetLine(properties.formatted, houseNumber);
+  const streetLine = pickBestStreetLine(properties.address_line1, composedLine, formattedLine);
 
-  const streetLine = addressLine1 || [houseNumber, street].filter(Boolean).join(' ');
   if (!streetLine || !houseNumber || !street || !city || !state || !postcode) {
     return null;
   }

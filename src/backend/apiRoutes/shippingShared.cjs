@@ -176,9 +176,21 @@ function isDeliverableVerifiedAddress(verifiedAddress) {
   return verifiedAddress?.verifications?.delivery?.success === true;
 }
 
-function shouldLogAddressVerificationVerbose() {
-  const flag = String(process.env.DEBUG_ADDRESS_VERIFY || "").trim().toLowerCase();
-  return flag === "1" || flag === "true" || flag === "yes";
+function getDeliveryVerificationErrors(verifiedAddress) {
+  const delivery = verifiedAddress?.verifications?.delivery;
+  if (!delivery || delivery.success === true) {
+    return [];
+  }
+
+  const messages = (delivery.errors || [])
+    .map((entry) => String(entry?.message || "").trim())
+    .filter(Boolean);
+
+  if (messages.length === 0) {
+    messages.push("Address is not deliverable.");
+  }
+
+  return [...new Set(messages)];
 }
 
 function snapshotAddressForDebug(address) {
@@ -231,21 +243,25 @@ function logAddressVerificationDebug(phase, payload = {}) {
   );
 }
 
-function getDeliveryVerificationErrors(verifiedAddress) {
-  const delivery = verifiedAddress?.verifications?.delivery;
-  if (!delivery || delivery.success === true) {
-    return [];
-  }
-
-  const messages = (delivery.errors || [])
-    .map((entry) => String(entry?.message || "").trim())
+function buildAddressVerificationUserMessage(verifiedAddress) {
+  const deliveryErrors = getDeliveryVerificationErrors(verifiedAddress);
+  const errorCodes = (verifiedAddress?.verifications?.delivery?.errors || [])
+    .map((entry) => String(entry?.code || "").trim())
     .filter(Boolean);
 
-  if (messages.length === 0) {
-    messages.push("Address is not deliverable.");
+  if (
+    errorCodes.includes("E.ADDRESS.NOT_FOUND")
+    || deliveryErrors.some((message) => /not found/i.test(message))
+  ) {
+    return "We couldn't find that street address. Use the full street name including the type (Dr, St, Ave, Blvd, Ct, etc.).";
   }
 
-  return [...new Set(messages)];
+  return "We could not verify that address. Please double-check the street, city, state, and ZIP code.";
+}
+
+function shouldLogAddressVerificationVerbose() {
+  const flag = String(process.env.DEBUG_ADDRESS_VERIFY || "").trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
 }
 
 async function verifyAddressWithEasyPost(address, fallback = {}, label = "address") {
@@ -326,14 +342,11 @@ async function verifyAddressWithEasyPost(address, fallback = {}, label = "addres
       response: snapshotEasyPostAddressResponse(verified),
       deliveryErrors,
     });
-    logInternalError("easypost-address-verify", {
-      label,
-      deliveryErrors,
-      verifications: verified?.verifications,
-    });
-    throw createUserError(
-      "We could not verify that address. Please double-check the street, city, state, and ZIP code."
+    logInternalError(
+      "easypost-address-verify",
+      new Error(deliveryErrors.join("; ") || "Address not deliverable")
     );
+    throw createUserError(buildAddressVerificationUserMessage(verified));
   } catch (error) {
     if (error?.exposeToClient === true) {
       logAddressVerificationDebug("response.rejected-user-error", {

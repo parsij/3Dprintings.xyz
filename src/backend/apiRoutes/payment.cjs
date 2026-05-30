@@ -644,9 +644,11 @@ module.exports = function paymentController(deps) {
 
     // Calculate tax and shipping for checkout
     app.post("/api/payment/calculate-totals", async (req, res) => {
+        let authUserId = null;
         try {
             const auth = isAuthenticatedAnIisValid(req, res, "nothing");
             if (!auth?.userId) return;
+            authUserId = auth.userId;
 
             const { items, address, shippingTier } = parseCheckoutRequestFromBody(req.body);
 
@@ -685,7 +687,7 @@ module.exports = function paymentController(deps) {
             console.error(
                 "[calculate-totals] request failed",
                 JSON.stringify({
-                    userId: auth?.userId || null,
+                    userId: authUserId,
                     shippingTier: req.body?.shippingTier || null,
                     itemCount: Array.isArray(req.body?.items) ? req.body.items.length : 0,
                     items: Array.isArray(req.body?.items) ? req.body.items : null,
