@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
@@ -172,6 +173,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
+  const [boxesUrl, setBoxesUrl] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
 
   useEffect(() => {
@@ -268,6 +270,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     event.preventDefault();
     setSubmitted(true);
     setSubmitMessage("");
+    setBoxesUrl(null);
 
     if (!isFormValid) {
       return;
@@ -294,6 +297,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
       });
 
       setSubmitMessage(response?.message || "Your listing is ready and queued for backend submission.");
+      setBoxesUrl(null);
       setForm(defaultForm);
       setPhotos([]);
       setSubmitted(false);
@@ -302,6 +306,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
       }
     } catch (error) {
       setSubmitMessage(error?.message || "Failed to prepare listing. Please try again.");
+      setBoxesUrl(error?.boxesUrl || null);
     } finally {
       setIsSubmitting(false);
     }
@@ -474,6 +479,19 @@ export default function SubmitModel({ onSubmissionSuccess }) {
           {submitMessage && (
               <p className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-gray-700 animate-fade-in-up transition-all duration-300 hover:shadow-md hover:scale-[1.01]">
                 {submitMessage}
+                {boxesUrl && (
+                  <>
+                    {" "}
+                    Visit{" "}
+                    <Link
+                      to={boxesUrl}
+                      className="text-orange-400 hover:text-orange-500 cursor-pointer hover:scale-105 transform-gpu transition"
+                    >
+                      boxes
+                    </Link>{" "}
+                    to add the right box.
+                  </>
+                )}
               </p>
           )}
         </form>

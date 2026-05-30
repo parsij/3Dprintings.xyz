@@ -2,7 +2,6 @@ import axios from "axios";
 
 import { API_BASE } from "../../config/api.js";
 import { toCanonicalDimensions } from "../../utils/productDimensions.js";
-import {Link} from "react-router-dom";
 
 export async function submitModelListing({
   modelName,
@@ -73,7 +72,11 @@ export async function submitModelListing({
   } catch (error) {
     const data = error?.response?.data;
     if (data?.boxesUrl) {
-      throw new Error(`${data.message} Visit ${<Link className={"text-orange-400 hover:text-orange-500 cursor-pointer hover:scale-105 transform-gpu transition"} to={data.boxesUrl}/>} to add the right box.`);
+      const err = new Error(
+        data.message || "You need to configure shipping boxes before listing products."
+      );
+      err.boxesUrl = data.boxesUrl;
+      throw err;
     }
     const message =
       data?.message ||
