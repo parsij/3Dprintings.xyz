@@ -7,11 +7,11 @@ function sanitizeDaysInput(value) {
 }
 
 const COMBO_CONTAINER_CLASS =
-  "flex overflow-hidden rounded-xl border border-gray-300 bg-white transition-colors duration-200 focus-within:border-orange-500";
+  "flex overflow-hidden rounded-xl border border-gray-300 bg-white shadow-none transition-colors duration-200 focus-within:border-orange-500 focus-within:shadow-none";
 const COMBO_INPUT_CLASS =
-  "min-w-0 flex-1 border-0 bg-transparent px-4 py-3 outline-none focus:ring-0";
+  "min-w-0 flex-1 border-0 bg-transparent px-4 py-3 outline-none shadow-none focus:ring-0 focus:shadow-none";
 const COMBO_SELECT_CLASS =
-  "cursor-pointer appearance-none border-0 bg-transparent py-3 pl-3 pr-9 text-sm font-semibold text-gray-700 outline-none focus:ring-0";
+  "cursor-pointer appearance-none border-0 bg-transparent py-3 pl-3 pr-9 text-sm font-semibold text-gray-700 outline-none shadow-none focus:ring-0 focus:shadow-none";
 
 export default function DaysToPrepareInput({
   id,

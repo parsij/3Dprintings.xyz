@@ -127,7 +127,7 @@ const Tags = ({ tags, setTags }) => {
         Tags
       </label>
 
-      <div className="flex min-h-13 flex-wrap items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/30">
+      <div className="flex min-h-13 flex-wrap items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 shadow-none focus-within:border-orange-500">
         {tags.map((tag) => (
           <div
             key={tag}
@@ -163,7 +163,7 @@ const Tags = ({ tags, setTags }) => {
       </p>
 
       {suggestions.length > 0 && (
-        <ul className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <ul className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-none">
           {suggestions.map((tag, index) => (
             <li
                 ref={(el) => (itemRefs.current[index] = el)}

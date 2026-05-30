@@ -144,10 +144,10 @@ const defaultForm = {
 const MAX_PHOTOS = 10;
 
 const FIELD_CLASS =
-  "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 hover:border-orange-200";
+  "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none shadow-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 focus:shadow-none hover:border-orange-200";
 
 const SELECT_CLASS =
-  "w-full cursor-pointer appearance-none rounded-xl border border-gray-300 bg-white py-3 pl-4 pr-10 outline-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 hover:border-orange-200";
+  "w-full cursor-pointer appearance-none rounded-xl border border-gray-300 bg-white py-3 pl-4 pr-10 outline-none shadow-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 focus:shadow-none hover:border-orange-200";
 
 function RequiredMark() {
   return <span className="text-red-500">*</span>;
@@ -496,7 +496,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
               )}
             </div>
 
-            <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+            <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
               <SectionTitle>Model weight</SectionTitle>
               <p className="mt-1 text-xs text-gray-600">
                 Enter a whole number greater than 0. Maximum weight is 50 kg.
@@ -521,7 +521,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
               )}
             </div>
 
-            <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+            <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
               <SectionTitle>Model dimensions</SectionTitle>
               <p className="mt-1 text-xs text-gray-600">
                 Enter whole numbers greater than 0. Each side can be at most 300 cm. Accurate values help avoid shipping adjustment charges.
@@ -557,7 +557,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
               </div>
             </div>
 
-            <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+            <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
               <SectionTitle>Days to prepare</SectionTitle>
               <p className="mt-1 text-xs text-gray-600">
                 How many days you need to print and pack this item before shipping. Choose 1 to 7 days.
