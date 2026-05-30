@@ -176,6 +176,61 @@ function isDeliverableVerifiedAddress(verifiedAddress) {
   return verifiedAddress?.verifications?.delivery?.success === true;
 }
 
+function shouldLogAddressVerificationVerbose() {
+  const flag = String(process.env.DEBUG_ADDRESS_VERIFY || "").trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+}
+
+function snapshotAddressForDebug(address) {
+  if (!address || typeof address !== "object") return address;
+  return {
+    line1: address.line1 || address.street1 || null,
+    line2: address.line2 || address.street2 || null,
+    city: address.city || null,
+    state: address.state || null,
+    zip: address.zip || null,
+    country: address.country || null,
+    residential: address.residential ?? null,
+    name: address.name || null,
+  };
+}
+
+function snapshotEasyPostAddressResponse(address) {
+  if (!address || typeof address !== "object") return address;
+  return {
+    id: address.id || null,
+    street1: address.street1 || null,
+    street2: address.street2 || null,
+    city: address.city || null,
+    state: address.state || null,
+    zip: address.zip || null,
+    country: address.country || null,
+    residential: address.residential ?? null,
+    verifications: address.verifications || null,
+  };
+}
+
+function snapshotEasyPostErrorForDebug(error) {
+  if (!error || typeof error !== "object") {
+    return { message: String(error || "") };
+  }
+
+  return {
+    message: error.message || null,
+    statusCode: error.statusCode || error.status || null,
+    code: error.code || null,
+    errors: error.errors || null,
+    body: error.body || null,
+  };
+}
+
+function logAddressVerificationDebug(phase, payload = {}) {
+  console.error(
+    `[address-verify-debug] ${phase}`,
+    JSON.stringify(payload, null, 2)
+  );
+}
+
 function getDeliveryVerificationErrors(verifiedAddress) {
   const delivery = verifiedAddress?.verifications?.delivery;
   if (!delivery || delivery.success === true) {
@@ -195,11 +250,25 @@ function getDeliveryVerificationErrors(verifiedAddress) {
 
 async function verifyAddressWithEasyPost(address, fallback = {}, label = "address") {
   const normalized = normalizeAddressPayload(address);
+  const verbose = shouldLogAddressVerificationVerbose();
+
+  if (verbose) {
+    logAddressVerificationDebug("request.input", {
+      label,
+      fallback: snapshotAddressForDebug(fallback),
+      normalized: snapshotAddressForDebug(normalized),
+    });
+  }
 
   let client;
   try {
     client = getEasyPostClient();
   } catch (error) {
+    logAddressVerificationDebug("easypost.client-unavailable", {
+      label,
+      normalized: snapshotAddressForDebug(normalized),
+      error: snapshotEasyPostErrorForDebug(error),
+    });
     logInternalError("easypost-client-unavailable", error);
     return normalized;
   }
@@ -209,13 +278,54 @@ async function verifyAddressWithEasyPost(address, fallback = {}, label = "addres
     verify: true,
   };
 
+  if (verbose) {
+    logAddressVerificationDebug("request.easypost-payload", {
+      label,
+      payload: snapshotAddressForDebug({
+        line1: payload.street1,
+        line2: payload.street2,
+        city: payload.city,
+        state: payload.state,
+        zip: payload.zip,
+        country: payload.country,
+        residential: payload.residential,
+        name: payload.name,
+      }),
+      verify: payload.verify === true,
+    });
+  }
+
   try {
     const verified = await client.Address.create(payload);
+
+    if (verbose) {
+      logAddressVerificationDebug("response.easypost-success", {
+        label,
+        response: snapshotEasyPostAddressResponse(verified),
+      });
+    }
+
     if (isDeliverableVerifiedAddress(verified)) {
       return easyPostAddressToNormalized(verified);
     }
 
     const deliveryErrors = getDeliveryVerificationErrors(verified);
+    logAddressVerificationDebug("response.easypost-not-deliverable", {
+      label,
+      request: snapshotAddressForDebug(normalized),
+      easypostPayload: snapshotAddressForDebug({
+        line1: payload.street1,
+        line2: payload.street2,
+        city: payload.city,
+        state: payload.state,
+        zip: payload.zip,
+        country: payload.country,
+        residential: payload.residential,
+        name: payload.name,
+      }),
+      response: snapshotEasyPostAddressResponse(verified),
+      deliveryErrors,
+    });
     logInternalError("easypost-address-verify", {
       label,
       deliveryErrors,
@@ -226,10 +336,32 @@ async function verifyAddressWithEasyPost(address, fallback = {}, label = "addres
     );
   } catch (error) {
     if (error?.exposeToClient === true) {
+      logAddressVerificationDebug("response.rejected-user-error", {
+        label,
+        request: snapshotAddressForDebug(normalized),
+        clientMessage: error.message,
+      });
       throw error;
     }
 
     const statusCode = Number(error?.statusCode || error?.status);
+    logAddressVerificationDebug("response.easypost-error", {
+      label,
+      request: snapshotAddressForDebug(normalized),
+      easypostPayload: snapshotAddressForDebug({
+        line1: payload.street1,
+        line2: payload.street2,
+        city: payload.city,
+        state: payload.state,
+        zip: payload.zip,
+        country: payload.country,
+        residential: payload.residential,
+        name: payload.name,
+      }),
+      error: snapshotEasyPostErrorForDebug(error),
+      statusCode: Number.isInteger(statusCode) ? statusCode : null,
+    });
+
     if (!Number.isInteger(statusCode) || statusCode >= 500) {
       logInternalError("easypost-address-verify-unavailable", error);
       return normalized;
@@ -246,7 +378,19 @@ async function resolveVerifiedShippingAddress(address, fallback = {}, label = "S
   const normalized = normalizeAddressPayload({ ...address, residential: true });
   const validationError = validateUsAddress(normalized, label, { requireStreetNumber: true });
   if (validationError) {
+    logAddressVerificationDebug("validation.failed", {
+      label,
+      request: snapshotAddressForDebug(normalized),
+      validationError,
+    });
     throw createUserError(validationError);
+  }
+
+  if (shouldLogAddressVerificationVerbose()) {
+    logAddressVerificationDebug("validation.passed", {
+      label,
+      request: snapshotAddressForDebug(normalized),
+    });
   }
 
   return verifyAddressWithEasyPost(normalized, fallback, label);

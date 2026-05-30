@@ -682,6 +682,19 @@ module.exports = function paymentController(deps) {
                 verifiedShippingAddress: totals.safeAddress,
             });
         } catch (error) {
+            console.error(
+                "[calculate-totals] request failed",
+                JSON.stringify({
+                    userId: auth?.userId || null,
+                    shippingTier: req.body?.shippingTier || null,
+                    itemCount: Array.isArray(req.body?.items) ? req.body.items.length : 0,
+                    items: Array.isArray(req.body?.items) ? req.body.items : null,
+                    address: req.body?.address || null,
+                    errorMessage: error?.message || null,
+                    statusCode: error?.statusCode || error?.status || null,
+                    exposeToClient: error?.exposeToClient === true,
+                }, null, 2)
+            );
             return sendJsonError(res, error, "Failed to calculate checkout totals.", {
                 key: "error",
                 context: "payment-calculate-totals",
