@@ -4,8 +4,14 @@
   button, .btn {
     @apply cursor-pointer;
   }
-  input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+  input:not([type="checkbox"]):not([type="radio"]), textarea {
     @apply transition-all duration-300 cursor-text;
+  }
+  select {
+    @apply cursor-pointer transition-all duration-300;
+  }
+  select option {
+    cursor: pointer;
   }
   input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus {
     @apply outline-none ring-0 shadow-none;
