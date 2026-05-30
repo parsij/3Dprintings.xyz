@@ -2,6 +2,7 @@ import axios from "axios";
 
 import { API_BASE } from "../../config/api.js";
 import { toCanonicalDimensions } from "../../utils/productDimensions.js";
+import { getUserFacingError } from "../../utils/userFacingError.js";
 
 export async function submitModelListing({
   modelName,
@@ -73,15 +74,19 @@ export async function submitModelListing({
     const data = error?.response?.data;
     if (data?.boxesUrl) {
       const err = new Error(
-        data.message || "You need to configure shipping boxes before listing products."
+        getUserFacingError(
+          { response: { data } },
+          "You need to configure shipping boxes before listing products."
+        )
       );
       err.boxesUrl = data.boxesUrl;
       throw err;
     }
-    const message =
-      data?.message ||
-      data?.errors?.dimensions ||
-      "Failed to prepare listing. Please check your input and try again.";
-    throw new Error(message);
+    throw new Error(
+      getUserFacingError(
+        { response: { data } },
+        "Failed to prepare listing. Please check your input and try again."
+      )
+    );
   }
 }

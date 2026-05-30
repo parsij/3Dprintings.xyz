@@ -816,6 +816,8 @@ function logUnhandledError(error, req, statusCode) {
   });
 }
 
+const { resolveClientError } = require("./apiErrorShared.cjs");
+
 function getClientErrorResponse(error) {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
@@ -847,12 +849,7 @@ function getClientErrorResponse(error) {
     return { statusCode: 413, message: "Request body is too large." };
   }
 
-  const statusCode = Number(error?.statusCode || error?.status);
-  if (Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 500) {
-    return { statusCode, message: "Invalid request." };
-  }
-
-  return { statusCode: 500, message: "Something went wrong. Please try again later." };
+  return resolveClientError(error, "Something went wrong. Please try again later.");
 }
 
 app.use((error, req, res, next) => {

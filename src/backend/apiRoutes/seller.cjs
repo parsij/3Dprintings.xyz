@@ -14,6 +14,7 @@ const {
   sellerProfileFromRow,
   validateSellerProfile,
 } = require("./sellerProfileShared.cjs");
+const { sendJsonError } = require("../apiErrorShared.cjs");
 const {
   createSellerAvatarLogoUrl,
   persistSellerLogoUrl,
@@ -350,9 +351,8 @@ module.exports = function sellerRoutes(deps) {
         downloadUrl: `/api/seller/orders/${encodeURIComponent(orderId)}/label/file?download=1`,
       });
     } catch (error) {
-      console.error("Error preparing seller order label:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to prepare shipping label.",
+      return sendJsonError(res, error, "Failed to prepare shipping label.", {
+        context: "seller-order-label-prepare",
       });
     }
   });
@@ -377,9 +377,8 @@ module.exports = function sellerRoutes(deps) {
       res.setHeader("Cache-Control", "private, no-store");
       return res.send(buffer);
     } catch (error) {
-      console.error("Error streaming seller order label:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to retrieve shipping label.",
+      return sendJsonError(res, error, "Failed to retrieve shipping label.", {
+        context: "seller-order-label-file",
       });
     }
   });

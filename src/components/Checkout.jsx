@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { getUserFacingError } from '../utils/userFacingError.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
@@ -205,7 +206,7 @@ const Checkout = () => {
 
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                    setError(data.error || 'Failed to calculate totals');
+                    setError(getUserFacingError({ response: { data } }, 'Failed to calculate totals'));
                     setTotals(null);
                     return;
                 }
@@ -216,6 +217,11 @@ const Checkout = () => {
                     shipping: Number(data.shipping) || 0,
                     total: Number(data.total) || 0,
                 });
+                if (data.verifiedShippingAddress && typeof data.verifiedShippingAddress === 'object') {
+                    const verified = normalizeAddress(data.verifiedShippingAddress);
+                    setShippingAddress(verified);
+                    setAddressLine(formatAddressSummary(verified));
+                }
                 setShippingOptions(Array.isArray(data.shippingOptions) ? data.shippingOptions : []);
                 if (data.shippingTier) {
                     setShippingTier(data.shippingTier);
@@ -319,7 +325,7 @@ const Checkout = () => {
 
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                setError(data.error || 'Checkout failed.');
+                setError(getUserFacingError({ response: { data } }, 'Checkout failed.'));
                 return;
             }
 
@@ -328,7 +334,7 @@ const Checkout = () => {
                 return;
             }
 
-            setError(data.error || 'Checkout failed.');
+            setError(getUserFacingError({ response: { data } }, 'Checkout failed.'));
         } catch (checkoutError) {
             console.error('Checkout error:', checkoutError);
             setError('Something went wrong during checkout.');

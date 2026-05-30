@@ -6,8 +6,10 @@ module.exports = function paymentController(deps) {
         calculateEasyPostShippingQuote,
         createInitialTrackingPayload,
         DEFAULT_SHIPPING_TIER,
+        extractShippingAddressFromOrderItems,
         normalizeAddressPayload,
         normalizeSellerAddressFromRow,
+        resolveVerifiedShippingAddress,
     } = require("./shippingShared.cjs");
     const {
         bootstrapPendingOrderPolling,
@@ -22,9 +24,29 @@ module.exports = function paymentController(deps) {
         calculatePlatformFeeCents,
     } = require("./sellerStripeShared.cjs");
     const { getFrontendUrl } = require("../envShared.cjs");
+    const { createUserError, sendJsonError } = require("../apiErrorShared.cjs");
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
     const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
+    const CHECKOUT_ITEM_KEYS = new Set(["id", "productId", "product_id", "quantity"]);
+    const FORBIDDEN_CHECKOUT_BODY_KEYS = new Set([
+        "subtotal",
+        "subtotalCents",
+        "tax",
+        "taxCents",
+        "shipping",
+        "shippingCents",
+        "shippingAndHandling",
+        "total",
+        "totalCents",
+        "shippingQuote",
+        "unit_amount",
+        "current_price",
+        "price",
+        "originalShipping",
+        "originalShippingCents",
+        "markupRate",
+    ]);
     const parseIntInRange = (value, field, min, max) => {
         const parsed = Number.parseInt(value, 10);
         if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
@@ -163,9 +185,44 @@ module.exports = function paymentController(deps) {
         return order.items;
     };
 
-    const buildStripeLineItemsFromOrderPayload = (itemsPayload) => {
-        const orderItems = Array.isArray(itemsPayload.items) ? itemsPayload.items : [];
-        const line_items = orderItems.map((item) => {
+    const assertCheckoutRequestHasNoClientPricing = (body = {}) => {
+        const forbidden = Object.keys(body).filter((key) => FORBIDDEN_CHECKOUT_BODY_KEYS.has(key));
+        if (forbidden.length > 0) {
+            throw createUserError("Checkout totals must be calculated server-side.");
+        }
+    };
+
+    const pickCheckoutItemsFromRequest = (items = []) => {
+        if (!Array.isArray(items) || items.length === 0) {
+            throw createUserError("No items provided");
+        }
+
+        return items.map((item, index) => {
+            const extraKeys = Object.keys(item || {}).filter((key) => !CHECKOUT_ITEM_KEYS.has(key));
+            if (extraKeys.length > 0) {
+                throw createUserError(
+                    `Checkout item ${index + 1} includes unsupported fields. Prices are calculated server-side.`
+                );
+            }
+
+            return {
+                id: item.id || item.productId || item.product_id,
+                quantity: item.quantity,
+            };
+        });
+    };
+
+    const parseCheckoutRequestFromBody = (body = {}) => {
+        assertCheckoutRequestHasNoClientPricing(body);
+        return {
+            items: pickCheckoutItemsFromRequest(body.items),
+            address: body.address,
+            shippingTier: body.shippingTier,
+        };
+    };
+
+    const buildStripeLineItemsFromTotals = ({ normalizedItems, taxCents, shippingCents }) => {
+        const line_items = normalizedItems.map((item) => {
             const product_data = {
                 name: item.name || "Item",
                 images: item.image_url ? [item.image_url] : [],
@@ -185,19 +242,17 @@ module.exports = function paymentController(deps) {
             };
         });
 
-        const taxCents = Math.round(Number(itemsPayload.tax || 0) * 100);
-        const shippingCents = Math.round(
-            Number(itemsPayload.shipping || itemsPayload.shippingAndHandling || 0) * 100
-        );
+        const normalizedTaxCents = Math.max(0, Math.round(Number(taxCents) || 0));
+        const normalizedShippingCents = Math.max(0, Math.round(Number(shippingCents) || 0));
 
-        if (taxCents > 0) {
+        if (normalizedTaxCents > 0) {
             line_items.push({
                 price_data: {
                     currency: "usd",
                     product_data: {
                         name: "Sales Tax",
                     },
-                    unit_amount: taxCents,
+                    unit_amount: normalizedTaxCents,
                 },
                 quantity: 1,
             });
@@ -209,42 +264,99 @@ module.exports = function paymentController(deps) {
                 product_data: {
                     name: "Shipping and handling",
                 },
-                unit_amount: shippingCents,
+                unit_amount: normalizedShippingCents,
             },
             quantity: 1,
         });
 
-        return { line_items, orderItems, taxCents, shippingCents };
+        return line_items;
+    };
+
+    const assertStripeLineItemsMatchTotal = (line_items, totalCents) => {
+        const lineItemsTotal = line_items.reduce((sum, item) => {
+            return sum + Math.round(Number(item.price_data?.unit_amount || 0) * Number(item.quantity || 1));
+        }, 0);
+
+        if (lineItemsTotal !== Math.round(Number(totalCents))) {
+            const error = new Error("Checkout total mismatch. Please refresh and try again.");
+            error.statusCode = 500;
+            throw error;
+        }
+    };
+
+    const buildOrderItemsSnapshot = (totals) => {
+        const orderItems = totals.normalizedItems.map(({ sellerAddress, ...item }) => item);
+        return {
+            items: orderItems,
+            shippingAddress: totals.safeAddress,
+            subtotal: totals.subtotalCents / 100,
+            tax: totals.taxCents / 100,
+            shipping: totals.shippingCents / 100,
+            shippingAndHandling: totals.shippingCents / 100,
+            shippingTier: totals.shippingTier,
+            shippingQuote: totals.shippingQuote,
+            total: totals.totalCents / 100,
+        };
+    };
+
+    const refreshPendingOrderCheckoutSnapshot = async (orderId, totals) => {
+        const itemsSnapshot = buildOrderItemsSnapshot(totals);
+        const trackingPayload = createInitialTrackingPayload(totals.shippingQuote);
+        await pool.query(
+            `UPDATE orders
+             SET items = $1,
+                 total_amount = $2,
+                 tracking = $3::jsonb,
+                 updated_at = NOW()
+             WHERE id = $4
+               AND status = 'pending'`,
+            [
+                JSON.stringify(itemsSnapshot),
+                totals.totalCents / 100,
+                JSON.stringify(trackingPayload),
+                orderId,
+            ]
+        );
+    };
+
+    const recalculateTotalsFromOrderPayload = async (itemsPayload) => {
+        const orderItems = Array.isArray(itemsPayload?.items) ? itemsPayload.items : [];
+        const address = extractShippingAddressFromOrderItems(itemsPayload);
+        if (!address) {
+            const error = new Error("Order is missing a shipping address.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        return calculateCheckoutAmounts({
+            items: orderItems.map((item) => ({
+                id: item.id || item.productId || item.product_id,
+                quantity: item.quantity,
+            })),
+            address,
+            shippingTier: itemsPayload?.shippingTier,
+        });
     };
 
     const createCheckoutSessionForOrder = async ({ orderId, userId, itemsPayload, userEmail }) => {
-        const { line_items, orderItems } = buildStripeLineItemsFromOrderPayload(itemsPayload);
-        if (orderItems.length === 0) {
+        const totals = await recalculateTotalsFromOrderPayload(itemsPayload);
+        if (totals.normalizedItems.length === 0) {
             const error = new Error("Order has no items.");
             error.statusCode = 400;
             throw error;
         }
 
-        const validatedItems = await normalizeCheckoutItemsFromDatabase(
-            orderItems.map((item) => ({
-                id: item.id || item.productId || item.product_id,
-                quantity: item.quantity,
-            }))
-        );
+        await refreshPendingOrderCheckoutSnapshot(orderId, totals);
 
-        const totalCents = Math.round(Number(itemsPayload.total || 0) * 100)
-            || validatedItems.reduce(
-                (sum, item) => sum + Math.round(Number(item.current_price || 0) * 100) * Number(item.quantity || 1),
-                0
-            )
-            + Math.round(Number(itemsPayload.tax || 0) * 100)
-            + Math.round(Number(itemsPayload.shipping || itemsPayload.shippingAndHandling || 0) * 100);
+        const line_items = buildStripeLineItemsFromTotals(totals);
+        const { totalCents, normalizedItems } = totals;
 
         assertCheckoutTotalsAreValid(totalCents);
-        const sellerAccountById = await loadSellerStripeAccounts(validatedItems);
+        assertStripeLineItemsMatchTotal(line_items, totalCents);
+        const sellerAccountById = await loadSellerStripeAccounts(normalizedItems);
         const connectConfig = buildCheckoutPaymentIntentData({
             totalCents,
-            orderItems: validatedItems,
+            orderItems: normalizedItems,
             sellerAccountById,
         });
 
@@ -302,12 +414,9 @@ module.exports = function paymentController(deps) {
             throw error;
         }
 
-        const safeAddress = normalizeAddressPayload(address);
-        if (!safeAddress.line1 || !safeAddress.city || !safeAddress.zip || !safeAddress.state || !safeAddress.country) {
-            const error = new Error("Invalid shipping address");
-            error.statusCode = 400;
-            throw error;
-        }
+        const safeAddress = await resolveVerifiedShippingAddress(address, {
+            name: "3D Printings Customer",
+        });
 
         let taxCents = 0;
         try {
@@ -341,6 +450,7 @@ module.exports = function paymentController(deps) {
             items: normalizedItems,
             toAddress: safeAddress,
             shippingTier: validatedShippingTier,
+            verifiedDestination: safeAddress,
         });
         const shippingCents = shippingQuote.shippingCents;
         const totalCents = subtotalCents + taxCents + shippingCents;
@@ -525,9 +635,9 @@ module.exports = function paymentController(deps) {
 
             return res.json({ checkout_url: session.url });
         } catch (error) {
-            console.error("Error processing order payment:", error);
-            return res.status(error.statusCode || 500).json({
-                error: error.message || "Failed to process payment.",
+            return sendJsonError(res, error, "Failed to process payment.", {
+                key: "error",
+                context: "orders-pay",
             });
         }
     });
@@ -538,10 +648,7 @@ module.exports = function paymentController(deps) {
             const auth = isAuthenticatedAnIisValid(req, res, "nothing");
             if (!auth?.userId) return;
 
-            const { items, address, shippingTier } = req.body;
-            if (!items || !items.length) {
-                return res.status(400).json({ error: "No items provided" });
-            }
+            const { items, address, shippingTier } = parseCheckoutRequestFromBody(req.body);
 
             const totals = await calculateCheckoutAmounts({ items, address, shippingTier });
             assertCheckoutTotalsAreValid(totals.totalCents);
@@ -572,10 +679,13 @@ module.exports = function paymentController(deps) {
                     markupRate: totals.shippingQuote.markupRate,
                     shipments: totals.shippingQuote.shipments,
                 },
+                verifiedShippingAddress: totals.safeAddress,
             });
         } catch (error) {
-            console.error('Error calculating totals:', error);
-            res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+            return sendJsonError(res, error, "Failed to calculate checkout totals.", {
+                key: "error",
+                context: "payment-calculate-totals",
+            });
         }
     });
 
@@ -588,101 +698,35 @@ module.exports = function paymentController(deps) {
             const userResult = await pool.query(`SELECT email FROM users WHERE id = $1`, [auth.userId]);
             const userEmail = userResult.rows[0]?.email;
 
-            const { items, address, shippingTier } = req.body;
-            if (!items || !items.length) {
-                return res.status(400).json({ error: "No items to checkout" });
-            }
+            const { items, address, shippingTier } = parseCheckoutRequestFromBody(req.body);
 
             const totals = await calculateCheckoutAmounts({ items, address, shippingTier });
-            const {
-                normalizedItems,
-                safeAddress,
-                subtotalCents,
-                taxCents,
-                shippingCents,
-                totalCents,
-                shippingQuote,
-            } = totals;
+            const { totalCents, shippingQuote } = totals;
+            const line_items = buildStripeLineItemsFromTotals(totals);
+            const itemsSnapshot = buildOrderItemsSnapshot(totals);
 
-            // Create line items for Stripe
-            const line_items = normalizedItems.map(item => {
-                const product_data = {
-                    name: item.name,
-                    images: item.image_url ? [item.image_url] : [],
-                };
+            assertCheckoutTotalsAreValid(totalCents);
+            assertStripeLineItemsMatchTotal(line_items, totalCents);
 
-                if (item.description) {
-                    product_data.description = item.description;
-                }
-
-                return {
-                    price_data: {
-                        currency: 'usd',
-                        product_data,
-                        unit_amount: Math.round(item.current_price * 100),
-                    },
-                    quantity: item.quantity,
-                };
-            });
-
-            // Add tax as a line item
-            if (taxCents > 0) {
-                line_items.push({
-                    price_data: {
-                        currency: 'usd',
-                        product_data: {
-                            name: 'Sales Tax',
-                        },
-                        unit_amount: taxCents,
-                    },
-                    quantity: 1,
-                });
-            }
-
-            // Add shipping as a line item
-            line_items.push({
-                price_data: {
-                    currency: 'usd',
-                    product_data: {
-                        name: 'Shipping and handling',
-                    },
-                    unit_amount: shippingCents,
-                },
-                quantity: 1,
-            });
-
-            // Create order in database with pending status
             const trackingPayload = createInitialTrackingPayload(shippingQuote);
-            const orderItems = normalizedItems.map(({ sellerAddress, ...item }) => item);
             const orderInsert = await pool.query(
                 `INSERT INTO orders (customer_id, items, status, total_amount, shipping_address_id, tracking) 
                  VALUES ($1, $2, 'pending', $3, $4, $5::jsonb) RETURNING id`,
                 [
                     authUser.id,
-                    JSON.stringify({
-                        items: orderItems,
-                        shippingAddress: safeAddress,
-                        subtotal: subtotalCents / 100,
-                        tax: taxCents / 100,
-                        shipping: shippingCents / 100,
-                        shippingAndHandling: shippingCents / 100,
-                        shippingTier: totals.shippingTier,
-                        shippingQuote,
-                        total: totalCents / 100,
-                    }),
+                    JSON.stringify(itemsSnapshot),
                     totalCents / 100,
-                    null, // Will store address data if needed
+                    null,
                     JSON.stringify(trackingPayload),
                 ]
             );
 
             const orderId = orderInsert.rows[0].id;
 
-            assertCheckoutTotalsAreValid(totalCents);
-            const sellerAccountById = await loadSellerStripeAccounts(normalizedItems);
+            const sellerAccountById = await loadSellerStripeAccounts(totals.normalizedItems);
             const connectConfig = buildCheckoutPaymentIntentData({
                 totalCents,
-                orderItems: normalizedItems,
+                orderItems: totals.normalizedItems,
                 sellerAccountById,
             });
 
@@ -714,8 +758,10 @@ module.exports = function paymentController(deps) {
 
             res.json({ url: session.url, orderId });
         } catch (error) {
-            console.error('Error creating checkout session:', error);
-            res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+            return sendJsonError(res, error, "Checkout failed. Please try again.", {
+                key: "error",
+                context: "payment-create-checkout-session",
+            });
         }
     });
 

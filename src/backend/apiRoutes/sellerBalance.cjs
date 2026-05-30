@@ -8,6 +8,7 @@ const {
   upsertSellerPayoutSchedule,
 } = require("./sellerBalanceShared.cjs");
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require("./sellerOnboardingShared.cjs");
+const { sendJsonError } = require("../apiErrorShared.cjs");
 
 module.exports = function sellerBalanceRoutes(deps) {
   const { app, pool, stripe, getAuthUserFromRequest } = deps;
@@ -125,9 +126,8 @@ module.exports = function sellerBalanceRoutes(deps) {
         payoutSchedule: schedule,
       });
     } catch (error) {
-      console.error("Failed to save recurring payout settings:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to save recurring payout settings.",
+      return sendJsonError(res, error, "Failed to save recurring payout settings.", {
+        context: "seller-balance-recurring",
       });
     }
   });

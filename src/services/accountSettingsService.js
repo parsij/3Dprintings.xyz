@@ -1,6 +1,7 @@
 import axios from "axios";
 import { applyCsrfInterceptor, ensureCsrfToken } from "./csrf.js";
 import { API_BASE } from "../config/api.js";
+import { getUserFacingError } from "../utils/userFacingError.js";
 
 const apiClient = applyCsrfInterceptor(axios.create({
   withCredentials: true,
@@ -16,10 +17,7 @@ export async function updateAccountProfile({ username, email, phone_number }) {
 
     return response.data;
   } catch (error) {
-    const message =
-      error?.response?.data?.message ||
-      "Could not update your profile right now. Please try again.";
-    throw new Error(message);
+    throw new Error(getUserFacingError(error, "Could not update your profile right now. Please try again."));
   }
 }
 
@@ -32,10 +30,7 @@ export async function changeAccountPassword({ oldPassword, newPassword }) {
 
     return response.data;
   } catch (error) {
-    const message =
-      error?.response?.data?.message ||
-      "Could not change your password right now. Please try again.";
-    throw new Error(message);
+    throw new Error(getUserFacingError(error, "Could not change your password right now. Please try again."));
   }
 }
 
@@ -45,16 +40,12 @@ export async function signOutAccount() {
     const response = await apiClient.post(`${API_BASE}/api/signout`, {});
 
     if (response.data?.message !== "Signed out") {
-      throw new Error(response.data?.message || "Sign out did not complete.");
+      throw new Error(getUserFacingError(null, "Sign out did not complete."));
     }
 
     return response.data;
   } catch (error) {
-    const message =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Could not sign you out right now. Please try again.";
-    throw new Error(message);
+    throw new Error(getUserFacingError(error, "Could not sign you out right now. Please try again."));
   }
 }
 
@@ -64,10 +55,7 @@ export async function getAccountAddress() {
 
     return response.data;
   } catch (error) {
-    const message =
-      error?.response?.data?.message ||
-      "Could not load your address right now. Please try again.";
-    throw new Error(message);
+    throw new Error(getUserFacingError(error, "Could not load your address right now. Please try again."));
   }
 }
 
@@ -77,10 +65,7 @@ export async function updateAccountAddress(address) {
 
     return response.data;
   } catch (error) {
-    const message =
-      error?.response?.data?.message ||
-      "Could not update your address right now. Please try again.";
-    throw new Error(message);
+    throw new Error(getUserFacingError(error, "Could not update your address right now. Please try again."));
   }
 }
 
@@ -92,9 +77,6 @@ export async function suggestAccountAddress(query, { limit = 5, signal } = {}) {
     });
     return response.data;
   } catch (error) {
-    const message =
-      error?.response?.data?.message ||
-      "Could not suggest an address right now. Please try again.";
-    throw new Error(message);
+    throw new Error(getUserFacingError(error, "Could not suggest an address right now. Please try again."));
   }
 }

@@ -7,6 +7,7 @@ const {
   countSellerProducts,
 } = require("./sellerBoxesShared.cjs");
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require("./sellerOnboardingShared.cjs");
+const { sendJsonError } = require("../apiErrorShared.cjs");
 
 module.exports = function sellerBoxesRoutes(deps) {
   const { app, pool, getAuthUserFromRequest } = deps;
@@ -78,10 +79,7 @@ module.exports = function sellerBoxesRoutes(deps) {
         coversLargestProduct: coverage.ok,
       });
     } catch (error) {
-      console.error("Failed to create seller box:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to create box.",
-      });
+      return sendJsonError(res, error, "Failed to create box.", { context: "seller-box-create" });
     }
   });
 
@@ -137,10 +135,7 @@ module.exports = function sellerBoxesRoutes(deps) {
         coversLargestProduct: true,
       });
     } catch (error) {
-      console.error("Failed to update seller box:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to update box.",
-      });
+      return sendJsonError(res, error, "Failed to update box.", { context: "seller-box-update" });
     }
   });
 

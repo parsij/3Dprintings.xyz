@@ -22,11 +22,8 @@ function getUsdBalanceAmounts(balance) {
 }
 
 function mapSellerBalanceRouteError(error, defaultMessage) {
-  if (Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 500) {
-    return { statusCode: error.statusCode, message: error.message };
-  }
-
-  return { statusCode: 500, message: defaultMessage };
+  const { resolveClientError } = require("../apiErrorShared.cjs");
+  return resolveClientError(error, defaultMessage);
 }
 
 function normalizePayoutSchedule(input = {}) {

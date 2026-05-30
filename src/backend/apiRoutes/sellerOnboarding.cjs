@@ -6,6 +6,7 @@ const {
   normalizeCompletionStep,
 } = require("./sellerOnboardingShared.cjs");
 const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared.cjs");
+const { sendJsonError } = require("../apiErrorShared.cjs");
 const {
   assertStripeAccountOwnedBySeller,
   createStripeConnectOnboardingLink,
@@ -195,9 +196,8 @@ module.exports = function sellerOnboardingRoutes(deps) {
         shopUrl: buildSellerShopUrl(req.user.id),
       });
     } catch (error) {
-      console.error("Failed to create Stripe Connect onboarding link:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to start Stripe Connect onboarding.",
+      return sendJsonError(res, error, "Failed to start Stripe Connect onboarding.", {
+        context: "seller-onboarding-stripe-link",
       });
     }
   });
@@ -301,9 +301,8 @@ module.exports = function sellerOnboardingRoutes(deps) {
         isComplete: advanced.isComplete,
       });
     } catch (error) {
-      console.error("Failed to verify Stripe Connect onboarding:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to verify Stripe Connect onboarding.",
+      return sendJsonError(res, error, "Failed to verify Stripe Connect onboarding.", {
+        context: "seller-onboarding-stripe-verify",
       });
     }
   });
@@ -338,9 +337,8 @@ module.exports = function sellerOnboardingRoutes(deps) {
         isComplete: advanced.isComplete,
       });
     } catch (error) {
-      console.error("Failed to save shipping origin:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to save shipping origin.",
+      return sendJsonError(res, error, "Failed to save shipping origin.", {
+        context: "seller-onboarding-shipping",
       });
     }
   });
@@ -370,9 +368,8 @@ module.exports = function sellerOnboardingRoutes(deps) {
         isComplete: advanced.isComplete,
       });
     } catch (error) {
-      console.error("Failed to save first onboarding box:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to save first box.",
+      return sendJsonError(res, error, "Failed to save first box.", {
+        context: "seller-onboarding-first-box",
       });
     }
   });
