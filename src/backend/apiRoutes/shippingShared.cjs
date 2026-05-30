@@ -172,69 +172,67 @@ function easyPostAddressToNormalized(easyPostAddress) {
   });
 }
 
-function getEasyPostVerificationErrors(verifiedAddress) {
-  const verifications = verifiedAddress?.verifications || {};
-  const messages = [];
-
-  for (const [type, result] of Object.entries(verifications)) {
-    if (!result || result.success === true) continue;
-
-    for (const entry of result.errors || []) {
-      if (entry?.message) {
-        messages.push(String(entry.message).trim());
-      }
-    }
-
-    if (messages.length === 0 && result.success === false) {
-      messages.push(`${type} verification failed.`);
-    }
-  }
-
-  return [...new Set(messages.filter(Boolean))];
+function isDeliverableVerifiedAddress(verifiedAddress) {
+  return verifiedAddress?.verifications?.delivery?.success === true;
 }
 
-function formatEasyPostAddressError(error, label = "address") {
-  const verificationMessages = getEasyPostVerificationErrors(error?.address || error?.result);
-  if (verificationMessages.length > 0) {
-    return `${label} could not be verified: ${verificationMessages.join(" ")}`;
+function getDeliveryVerificationErrors(verifiedAddress) {
+  const delivery = verifiedAddress?.verifications?.delivery;
+  if (!delivery || delivery.success === true) {
+    return [];
   }
 
-  const nestedMessages = Array.isArray(error?.errors)
-    ? error.errors.map((entry) => entry?.message).filter(Boolean)
-    : [];
-  if (nestedMessages.length > 0) {
-    return `${label} could not be verified: ${nestedMessages.join(" ")}`;
+  const messages = (delivery.errors || [])
+    .map((entry) => String(entry?.message || "").trim())
+    .filter(Boolean);
+
+  if (messages.length === 0) {
+    messages.push("Address is not deliverable.");
   }
 
-  const message = normalizeText(error?.message);
-  if (message) {
-    return message;
-  }
-
-  return `${label} could not be verified. Please check the street, city, state, and ZIP code.`;
+  return [...new Set(messages)];
 }
 
 async function verifyAddressWithEasyPost(address, fallback = {}, label = "address") {
-  const client = getEasyPostClient();
+  const normalized = normalizeAddressPayload(address);
+
+  let client;
+  try {
+    client = getEasyPostClient();
+  } catch (error) {
+    logInternalError("easypost-client-unavailable", error);
+    return normalized;
+  }
+
   const payload = {
-    ...buildEasyPostAddress(address, fallback),
-    verify_strict: true,
+    ...buildEasyPostAddress(normalized, fallback),
+    verify: true,
   };
 
   try {
     const verified = await client.Address.create(payload);
-    const verificationErrors = getEasyPostVerificationErrors(verified);
-    if (verificationErrors.length > 0) {
-      logInternalError("easypost-address-verify", { message: verificationErrors.join(" "), label });
-      throw createUserError(
-        "We could not verify that address. Please double-check the street, city, state, and ZIP code."
-      );
+    if (isDeliverableVerifiedAddress(verified)) {
+      return easyPostAddressToNormalized(verified);
     }
 
-    return easyPostAddressToNormalized(verified);
+    const deliveryErrors = getDeliveryVerificationErrors(verified);
+    logInternalError("easypost-address-verify", {
+      label,
+      deliveryErrors,
+      verifications: verified?.verifications,
+    });
+    throw createUserError(
+      "We could not verify that address. Please double-check the street, city, state, and ZIP code."
+    );
   } catch (error) {
     if (error?.exposeToClient === true) {
       throw error;
+    }
+
+    const statusCode = Number(error?.statusCode || error?.status);
+    if (!Number.isInteger(statusCode) || statusCode >= 500) {
+      logInternalError("easypost-address-verify-unavailable", error);
+      return normalized;
     }
 
     logInternalError("easypost-address-verify", error);
@@ -476,27 +474,14 @@ async function calculateEasyPostShippingQuote({
     throw error;
   }
 
-  const verifiedSellerAddresses = new Map();
   const shipmentQuotes = [];
   for (const group of groups) {
-    let verifiedSellerAddress = verifiedSellerAddresses.get(group.sellerId);
-    if (!verifiedSellerAddress) {
-      const sellerAddress = normalizeAddressPayload(group.sellerAddress);
-      const sellerAddressError = validateUsAddress(sellerAddress, `${group.sellerName} fulfillment address`, {
-        requireStreetNumber: true,
-      });
-      if (sellerAddressError) {
-        const error = new Error(sellerAddressError);
-        error.statusCode = 400;
-        throw error;
-      }
-
-      verifiedSellerAddress = await verifyAddressWithEasyPost(
-        sellerAddress,
-        { name: group.sellerName },
-        `${group.sellerName} fulfillment address`
-      );
-      verifiedSellerAddresses.set(group.sellerId, verifiedSellerAddress);
+    const sellerAddress = normalizeAddressPayload(group.sellerAddress);
+    const sellerAddressError = validateUsAddress(sellerAddress, `${group.sellerName} fulfillment address`, {
+      requireStreetNumber: true,
+    });
+    if (sellerAddressError) {
+      throw createUserError(sellerAddressError);
     }
 
     const sellerBoxes = await listSellerBoxes(pool, group.sellerId);
@@ -518,7 +503,7 @@ async function calculateEasyPostShippingQuote({
       to_address: buildEasyPostAddress(destination, {
         name: "3D Printings Customer",
       }),
-      from_address: buildEasyPostAddress(verifiedSellerAddress, {
+      from_address: buildEasyPostAddress(sellerAddress, {
         name: group.sellerName,
       }),
       parcel: packingResult.parcel,
