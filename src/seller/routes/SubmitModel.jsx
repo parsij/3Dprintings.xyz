@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
 import UnitNumberInput from "../components/UnitNumberInput.jsx";
 import DaysToPrepareInput from "../components/DaysToPrepareInput.jsx";
+import CustomSelect from "../components/CustomSelect.jsx";
 import {
   validateDaysToPrepare,
   validateDimensionInput,
@@ -146,8 +146,13 @@ const MAX_PHOTOS = 10;
 const FIELD_CLASS =
   "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none shadow-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 focus:shadow-none hover:border-orange-200";
 
-const SELECT_CLASS =
-  "w-full cursor-pointer appearance-none rounded-xl border border-gray-300 bg-white py-3 pl-4 pr-10 outline-none shadow-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 focus:shadow-none hover:border-orange-200";
+const categoryGroups = CATEGORY_DATA.map((group) => ({
+  label: group.title,
+  options: group.subcategories.map((sub) => ({
+    value: sub.label,
+    label: sub.label,
+  })),
+}));
 
 function RequiredMark() {
   return <span className="text-red-500">*</span>;
@@ -450,30 +455,15 @@ export default function SubmitModel({ onSubmissionSuccess }) {
             {/* FIXED: Dropdown Select implementation with strict optgroup nesting */}
             <div className="group transition-all duration-300 hover:translate-x-1">
               <FieldLabel htmlFor="category">Category</FieldLabel>
-              <div className="group/category relative">
-                <select
-                    id="category"
-                    name="category"
-                    value={form.category}
-                    onChange={handleChange}
-                    className={SELECT_CLASS}
-                >
-                  <option value="">Select a category...</option>
-                  {CATEGORY_DATA.map((group) => (
-                      <optgroup key={group.slug} label={group.title} className="font-bold text-gray-900 bg-gray-50">
-                        {group.subcategories.map((sub) => (
-                            <option key={sub.slug} value={sub.label} className="font-normal text-gray-700 bg-white">
-                              {sub.label}
-                            </option>
-                        ))}
-                      </optgroup>
-                  ))}
-                </select>
-                <ChevronDown
-                  aria-hidden="true"
-                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 transition-transform duration-300 ease-in-out group-focus-within/category:rotate-180"
-                />
-              </div>
+              <CustomSelect
+                id="category"
+                name="category"
+                value={form.category}
+                onChange={(nextValue) => setForm((prev) => ({ ...prev, category: nextValue }))}
+                placeholder="Select a category..."
+                ariaLabel="Category"
+                groups={categoryGroups}
+              />
               {submitted && errors.category && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.category}</p>}
               {form.category === "Other" && (
                 <p className="mt-2 text-xs text-red-600 font-semibold">Setting your product category as "Other" makes your products have less sales compared to others.</p>
