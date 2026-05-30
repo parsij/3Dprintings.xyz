@@ -17,7 +17,7 @@ const {
   syncStripeConnectAccountSettings,
 } = require("./sellerStripeShared.cjs");
 const { listSellerBoxes, parseBoxPayload, sellerBoxesCoverLargestProduct } = require("./sellerBoxesShared.cjs");
-const { getSellerFrontendUrl } = require("../envShared.cjs");
+const { getSellerFrontendUrl, getFrontendUrl } = require("../envShared.cjs");
 
 module.exports = function sellerOnboardingRoutes(deps) {
   const {
@@ -64,6 +64,62 @@ module.exports = function sellerOnboardingRoutes(deps) {
     return res.status(403).json({ message: "Seller access is required." });
   };
 
+  const SELLER_ONBOARDING_ROUTE_BY_STEP = {
+    stripe_connect: "/onboarding/stripe",
+    shipping_origin: "/onboarding/shipping",
+    first_box: "/onboarding/box",
+    completed: "/dashboard",
+  };
+
+  function buildSellerPortalUrl(pathname) {
+    const sellerOrigin = getSellerFrontendUrl().replace(/\/+$/, "");
+    const path = String(pathname || "/dashboard").startsWith("/")
+      ? String(pathname || "/dashboard")
+      : `/${pathname || "dashboard"}`;
+    return `${sellerOrigin}${path}`;
+  }
+
+  function resolveSellerPortalUrl(completionStep) {
+    const step = normalizeCompletionStep(completionStep);
+    if (step === "shop_url") {
+      return `${getFrontendUrl().replace(/\/+$/, "")}/become-seller`;
+    }
+    const portalPath = SELLER_ONBOARDING_ROUTE_BY_STEP[step] || "/dashboard";
+    return buildSellerPortalUrl(portalPath);
+  }
+
+  app.get("/api/seller/onboarding/marketplace-status", attachAuthenticatedUser, async (req, res) => {
+    try {
+      const isSeller = req.user.role === "seller";
+      if (!isSeller) {
+        return res.status(200).json({
+          isSeller: false,
+          onboardingComplete: false,
+          completionStep: null,
+          shopName: "",
+          sellerPortalUrl: null,
+          shopUrl: null,
+        });
+      }
+
+      const state = await getSellerOnboardingState(pool, req.user.id);
+      const completionStep = normalizeCompletionStep(state.completionStep);
+      const onboardingComplete = isSellerOnboardingComplete(completionStep);
+
+      return res.status(200).json({
+        isSeller: true,
+        onboardingComplete,
+        completionStep,
+        shopName: state.shopName || "",
+        sellerPortalUrl: resolveSellerPortalUrl(completionStep),
+        shopUrl: buildSellerShopUrl(req.user.id),
+      });
+    } catch (error) {
+      console.error("Failed to load seller marketplace status:", error);
+      return res.status(500).json({ message: "Failed to load seller status." });
+    }
+  });
+
   app.get("/api/seller/onboarding/status", attachAuthenticatedUser, requireSellerRole, async (req, res) => {
     try {
       const state = await getSellerOnboardingState(pool, req.user.id);
@@ -96,8 +152,15 @@ module.exports = function sellerOnboardingRoutes(deps) {
 
   app.post("/api/seller/onboarding/shop", attachAuthenticatedUser, async (req, res) => {
     try {
-      const shopName = String(req.body?.shopName || "").trim();
-      const termsAccepted = Boolean(req.body?.termsOfServiceAccepted);
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const allowedKeys = new Set(["shopName", "termsOfServiceAccepted"]);
+      const unexpectedKeys = Object.keys(body).filter((key) => !allowedKeys.has(key));
+      if (unexpectedKeys.length > 0) {
+        return res.status(400).json({ message: "Invalid seller onboarding request." });
+      }
+
+      const shopName = String(body.shopName || "").trim();
+      const termsAccepted = body.termsOfServiceAccepted === true;
 
       if (shopName.length < 3 || shopName.length > 30) {
         return res.status(400).json({ message: "Shop name must be between 3 and 30 characters." });

@@ -5,6 +5,7 @@ import SellerRouter from "./SellerRouter.jsx";
 import axios from "axios";
 import { ensureCsrfToken } from "./services/csrf.js";
 import { API_BASE, isSellerHostname } from "./config/api.js";
+import { AuthProvider } from "./AuthContext.jsx";
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -43,12 +44,18 @@ const App = () => {
 
   // The traffic controller switch
   if (isSellerSubdomain) {
-    // If they typed seller.3dprintings.xyz, give them the seller layouts
-    return <SellerRouter user={user} setUser={setUser} />;
+    return (
+      <AuthProvider user={user} setUser={setUser}>
+        <SellerRouter user={user} setUser={setUser} />
+      </AuthProvider>
+    );
   }
 
-  // Otherwise, fallback to your original customer store routes
-  return <Router user={user} setUser={setUser}/>;
+  return (
+    <AuthProvider user={user} setUser={setUser}>
+      <Router user={user} setUser={setUser} />
+    </AuthProvider>
+  );
 };
 
 export default App;

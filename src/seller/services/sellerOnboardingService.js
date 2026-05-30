@@ -12,6 +12,11 @@ export async function getSellerOnboardingStatus() {
   return response.data;
 }
 
+export async function getSellerMarketplaceStatus() {
+  const response = await apiClient.get("/api/seller/onboarding/marketplace-status");
+  return response.data;
+}
+
 export async function saveSellerShopOnboarding(payload) {
   const response = await apiClient.post("/api/seller/onboarding/shop", payload);
   return response.data;

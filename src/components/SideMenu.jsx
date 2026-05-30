@@ -1,16 +1,30 @@
 import { Link } from "react-router-dom";
 import { useMenu } from "../MenuContext.jsx";
-import { MARKETPLACE_HOME_URL } from "../config/api.js";
+import { useAuth } from "../AuthContext.jsx";
+import { MARKETPLACE_HOME_URL, SELLER_SITE_ORIGIN } from "../config/api.js";
 
-const main = [
-  { label: "Home", to: "/home" },
-  { label: "3D Printed Models", to: "/products" },
-  { label: "Liked Products", to: "/liked-products" },
-  { label: "Saved Products", to: "/saved-products" },
-  { label: "My Reviews", to: "/your-reviews" },
-  { label: "My Orders", to: "/account/orders" },
-  { label: "Become a seller", to: "/become-seller" },
-];
+function buildCustomerMenuItems(isSeller) {
+  const items = [
+    { label: "Home", to: "/home" },
+    { label: "3D Printed Models", to: "/products" },
+    { label: "Liked Products", to: "/liked-products" },
+    { label: "Saved Products", to: "/saved-products" },
+    { label: "My Reviews", to: "/your-reviews" },
+    { label: "My Orders", to: "/account/orders" },
+  ];
+
+  if (isSeller) {
+    items.push({
+      label: "Seller Dashboard",
+      to: `${SELLER_SITE_ORIGIN}/dashboard`,
+      external: true,
+    });
+  } else {
+    items.push({ label: "Become a Seller", to: "/become-seller" });
+  }
+
+  return items;
+}
 
 const seller = [
   { label: "Dashboard", to: "/dashboard" },
@@ -25,7 +39,9 @@ const seller = [
 
 const SideMenu = ({ title = "Menu", role = "customer" }) => {
   const { menuOpen, setMenuOpen } = useMenu();
-  const activeItems = role === "seller" ? seller : main;
+  const { user } = useAuth();
+  const isSeller = String(user?.role || "").trim().toLowerCase() === "seller";
+  const activeItems = role === "seller" ? seller : buildCustomerMenuItems(isSeller);
 
   return (
     <>
@@ -54,21 +70,40 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
         </div>
 
         <nav className="space-y-1 p-4">
-          {activeItems.map((item, index) => (
-            <Link
-              key={`${item.to}-${item.label}`}
-              to={item.to}
-              onClick={() => setMenuOpen(false)}
-              className={`block cursor-pointer rounded-lg px-3 py-2.5 transition-all duration-200 ease-in-out hover:translate-x-1 hover:bg-orange-50 hover:text-orange-500 ${
-                menuOpen ? "translate-x-0 opacity-100" : "-translate-x-2 opacity-0"
-              }`}
-              style={{
-                transitionDelay: menuOpen ? `${index * 35}ms` : "0ms",
-              }}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {activeItems.map((item, index) => {
+            const className = `block cursor-pointer rounded-lg px-3 py-2.5 transition-all duration-200 ease-in-out hover:translate-x-1 hover:bg-orange-50 hover:text-orange-500 ${
+              menuOpen ? "translate-x-0 opacity-100" : "-translate-x-2 opacity-0"
+            }`;
+            const style = {
+              transitionDelay: menuOpen ? `${index * 35}ms` : "0ms",
+            };
+
+            if (item.external) {
+              return (
+                <a
+                  key={`${item.to}-${item.label}`}
+                  href={item.to}
+                  onClick={() => setMenuOpen(false)}
+                  className={className}
+                  style={style}
+                >
+                  {item.label}
+                </a>
+              );
+            }
+
+            return (
+              <Link
+                key={`${item.to}-${item.label}`}
+                to={item.to}
+                onClick={() => setMenuOpen(false)}
+                className={className}
+                style={style}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
       </aside>
     </>
