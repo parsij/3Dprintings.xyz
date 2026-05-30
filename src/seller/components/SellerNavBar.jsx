@@ -11,7 +11,8 @@ const SellerNavBar = ({pageName}) => {
                 {/* 1. LEFT BLOCK: Menu Button isolated and locked to the far left */}
                 <div className="flex items-center flex-1 min-w-0">
                     <button
-                        onClick={() => setMenuOpen(prev => !prev)}
+                        type="button"
+                        onClick={() => setMenuOpen((prev) => !prev)}
                         className="group flex cursor-pointer flex-col gap-1"
                         aria-label="Open menu"
                     >

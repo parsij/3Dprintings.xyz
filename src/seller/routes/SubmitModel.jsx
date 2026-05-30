@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
 import UnitNumberInput from "../components/UnitNumberInput.jsx";
@@ -141,6 +142,32 @@ const defaultForm = {
 };
 
 const MAX_PHOTOS = 10;
+
+const FIELD_CLASS =
+  "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 hover:border-orange-200";
+
+const SELECT_CLASS =
+  "w-full cursor-pointer appearance-none rounded-xl border border-gray-300 bg-white py-3 pl-4 pr-10 outline-none transition-colors duration-200 focus:border-orange-500 focus:outline-none focus:ring-0 hover:border-orange-200";
+
+function RequiredMark() {
+  return <span className="text-red-500">*</span>;
+}
+
+function FieldLabel({ htmlFor, children, className = "mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600" }) {
+  return (
+    <label htmlFor={htmlFor} className={className}>
+      {children} <RequiredMark />
+    </label>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <h3 className="text-sm font-semibold text-gray-800">
+      {children} <RequiredMark />
+    </h3>
+  );
+}
 
 function mergePhotos(existingPhotos, incomingPhotos) {
   const unique = [...existingPhotos];
@@ -327,7 +354,9 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
           {/* Photo Upload Section */}
           <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700 transition-colors duration-300">Printed model photos *</label>
+            <label className="mb-2 block text-sm font-semibold text-gray-700 transition-colors duration-300">
+              Printed model photos <RequiredMark />
+            </label>
             <label
                 htmlFor="modelPhotos"
                 onDragOver={handleDragOver}
@@ -375,9 +404,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
           {/* Inputs Fields Grid */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">
-              <label htmlFor="modelName" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                Model name *
-              </label>
+              <FieldLabel htmlFor="modelName">Model name</FieldLabel>
               <input
                   id="modelName"
                   name="modelName"
@@ -385,15 +412,13 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.modelName}
                   onChange={handleChange}
                   placeholder="Model's name"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
+                  className={FIELD_CLASS}
               />
               {submitted && errors.modelName && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelName}</p>}
             </div>
 
             <div className="group transition-all duration-300 hover:translate-x-1">
-              <label htmlFor="price" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                Price (USD) *
-              </label>
+              <FieldLabel htmlFor="price">Price (USD)</FieldLabel>
               <input
                   id="price"
                   name="price"
@@ -401,15 +426,13 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.price}
                   onChange={handleChange}
                   placeholder="19.99"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
+                  className={FIELD_CLASS}
               />
               {submitted && errors.price && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.price}</p>}
             </div>
 
             <div className="group transition-all duration-300 hover:translate-x-1">
-              <label htmlFor="quantity" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                Quantity *
-              </label>
+              <FieldLabel htmlFor="quantity">Quantity</FieldLabel>
               <input
                   id="quantity"
                   name="quantity"
@@ -419,34 +442,38 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.quantity}
                   onChange={handleChange}
                   placeholder="10"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className={`${FIELD_CLASS} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
               />
               {submitted && errors.quantity && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.quantity}</p>}
             </div>
 
             {/* FIXED: Dropdown Select implementation with strict optgroup nesting */}
             <div className="group transition-all duration-300 hover:translate-x-1">
-              <label htmlFor="category" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                Category *
-              </label>
-              <select
-                  id="category"
-                  name="category"
-                  value={form.category}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer"
-              >
-                <option value="">Select a category...</option>
-                {CATEGORY_DATA.map((group) => (
-                    <optgroup key={group.slug} label={group.title} className="font-bold text-gray-900 bg-gray-50">
-                      {group.subcategories.map((sub) => (
-                          <option key={sub.slug} value={sub.label} className="font-normal text-gray-700 bg-white">
-                            {sub.label}
-                          </option>
-                      ))}
-                    </optgroup>
-                ))}
-              </select>
+              <FieldLabel htmlFor="category">Category</FieldLabel>
+              <div className="group/category relative">
+                <select
+                    id="category"
+                    name="category"
+                    value={form.category}
+                    onChange={handleChange}
+                    className={SELECT_CLASS}
+                >
+                  <option value="">Select a category...</option>
+                  {CATEGORY_DATA.map((group) => (
+                      <optgroup key={group.slug} label={group.title} className="font-bold text-gray-900 bg-gray-50">
+                        {group.subcategories.map((sub) => (
+                            <option key={sub.slug} value={sub.label} className="font-normal text-gray-700 bg-white">
+                              {sub.label}
+                            </option>
+                        ))}
+                      </optgroup>
+                  ))}
+                </select>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 transition-transform duration-300 ease-in-out group-focus-within/category:rotate-180"
+                />
+              </div>
               {submitted && errors.category && <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.category}</p>}
               {form.category === "Other" && (
                 <p className="mt-2 text-xs text-red-600 font-semibold">Setting your product category as "Other" makes your products have less sales compared to others.</p>
@@ -454,9 +481,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
             </div>
 
             <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">
-              <label htmlFor="description" className="mb-1 block text-sm font-semibold text-gray-700 transition-colors duration-300 group-hover:text-orange-600">
-                Model description *
-              </label>
+              <FieldLabel htmlFor="description">Model description</FieldLabel>
               <textarea
                   id="description"
                   name="description"
@@ -464,7 +489,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.description}
                   onChange={handleChange}
                   placeholder="Describe size, print settings, material suggestions, and use cases..."
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none transition-all duration-300 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 focus:shadow-lg hover:border-orange-200 cursor-pointer resize-none"
+                  className={`${FIELD_CLASS} resize-none`}
               />
               {submitted && errors.description && (
                   <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.description}</p>
@@ -472,7 +497,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
             </div>
 
             <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
-              <h3 className="text-sm font-semibold text-gray-800">Model weight *</h3>
+              <SectionTitle>Model weight</SectionTitle>
               <p className="mt-1 text-xs text-gray-600">
                 Enter a whole number greater than 0. Maximum weight is 50 kg.
               </p>
@@ -497,7 +522,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
             </div>
 
             <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
-              <h3 className="text-sm font-semibold text-gray-800">Model dimensions *</h3>
+              <SectionTitle>Model dimensions</SectionTitle>
               <p className="mt-1 text-xs text-gray-600">
                 Enter whole numbers greater than 0. Each side can be at most 300 cm. Accurate values help avoid shipping adjustment charges.
               </p>
@@ -533,7 +558,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
             </div>
 
             <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
-              <h3 className="text-sm font-semibold text-gray-800">Days to prepare *</h3>
+              <SectionTitle>Days to prepare</SectionTitle>
               <p className="mt-1 text-xs text-gray-600">
                 How many days you need to print and pack this item before shipping. Choose 1 to 7 days.
               </p>
@@ -561,15 +586,15 @@ export default function SubmitModel({ onSubmissionSuccess }) {
             />
           </div>
 
-          <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`w-full rounded-xl py-3 font-semibold text-white transition-all duration-300 ${
-                  isSubmitting
-                      ? "cursor-not-allowed bg-orange-300 opacity-70"
-                      : "cursor-pointer bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
-              }`}
-          >
+            <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full cursor-pointer rounded-xl py-3 font-semibold text-white transition-all duration-300 ${
+                    isSubmitting
+                        ? "cursor-not-allowed bg-orange-300 opacity-70"
+                        : "bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+                }`}
+            >
             {isSubmitting ? "Preparing listing..." : "Submit listing"}
           </button>
 

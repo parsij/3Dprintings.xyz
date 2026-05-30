@@ -1,6 +1,15 @@
+import { ChevronDown } from "lucide-react";
+
 function sanitizeNaturalNumberInput(value) {
   return String(value || "").replace(/\D/g, "");
 }
+
+const COMBO_CONTAINER_CLASS =
+  "flex overflow-hidden rounded-xl border border-gray-300 bg-white transition-colors duration-200 focus-within:border-orange-500";
+const COMBO_INPUT_CLASS =
+  "min-w-0 flex-1 border-0 bg-transparent px-4 py-3 outline-none focus:ring-0";
+const COMBO_SELECT_CLASS =
+  "cursor-pointer appearance-none border-0 bg-transparent py-3 pl-3 pr-9 text-sm font-semibold text-gray-700 outline-none focus:ring-0";
 
 export default function UnitNumberInput({
   id,
@@ -15,7 +24,7 @@ export default function UnitNumberInput({
   autoComplete = "off",
 }) {
   return (
-    <div className="flex">
+    <div className={COMBO_CONTAINER_CLASS}>
       <input
         id={id}
         name={name}
@@ -25,20 +34,26 @@ export default function UnitNumberInput({
         value={value}
         onChange={(event) => onValueChange(sanitizeNaturalNumberInput(event.target.value))}
         placeholder={placeholder}
-        className="min-w-0 flex-1 rounded-l-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
+        className={COMBO_INPUT_CLASS}
       />
-      <select
-        aria-label={`${name} unit`}
-        value={unit}
-        onChange={(event) => onUnitChange(event.target.value)}
-        className="rounded-r-xl border border-l-0 border-gray-300 bg-white px-3 py-3 text-sm font-semibold text-gray-700 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
-      >
-        {units.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <div className="group/unit relative shrink-0">
+        <select
+          aria-label={`${name} unit`}
+          value={unit}
+          onChange={(event) => onUnitChange(event.target.value)}
+          className={COMBO_SELECT_CLASS}
+        >
+          {units.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 transition-transform duration-300 ease-in-out group-focus-within/unit:rotate-180"
+        />
+      </div>
     </div>
   );
 }
