@@ -193,6 +193,35 @@ function getDeliveryVerificationErrors(verifiedAddress) {
   return [...new Set(messages)];
 }
 
+function getEasyPostVerificationErrors(verifiedAddress) {
+  const verifications = verifiedAddress?.verifications;
+  if (!verifications || typeof verifications !== "object") {
+    return [];
+  }
+
+  const errors = [];
+  for (const key of ["delivery", "zip4"]) {
+    const block = verifications[key];
+    if (!block || block.success === true) continue;
+    for (const entry of block.errors || []) {
+      if (entry && typeof entry === "object") {
+        errors.push(entry);
+      }
+    }
+  }
+
+  return errors;
+}
+
+function isEasyPostNotFoundOnly(verifiedAddress) {
+  const errors = getEasyPostVerificationErrors(verifiedAddress);
+  if (errors.length === 0) {
+    return false;
+  }
+
+  return errors.every((entry) => String(entry?.code || "").trim() === "E.ADDRESS.NOT_FOUND");
+}
+
 function snapshotAddressForDebug(address) {
   if (!address || typeof address !== "object") return address;
   return {
@@ -253,7 +282,7 @@ function buildAddressVerificationUserMessage(verifiedAddress) {
     errorCodes.includes("E.ADDRESS.NOT_FOUND")
     || deliveryErrors.some((message) => /not found/i.test(message))
   ) {
-    return "We couldn't find that street address. Use the full street name including the type (Dr, St, Ave, Blvd, Ct, etc.).";
+    return "We could not verify that address with the postal service. Please double-check the street, city, state, and ZIP code.";
   }
 
   return "We could not verify that address. Please double-check the street, city, state, and ZIP code.";
@@ -323,6 +352,16 @@ async function verifyAddressWithEasyPost(address, fallback = {}, label = "addres
 
     if (isDeliverableVerifiedAddress(verified)) {
       return easyPostAddressToNormalized(verified);
+    }
+
+    if (isEasyPostNotFoundOnly(verified)) {
+      logAddressVerificationDebug("response.easypost-not-found-soft-pass", {
+        label,
+        request: snapshotAddressForDebug(normalized),
+        response: snapshotEasyPostAddressResponse(verified),
+        note: "USPS database miss; accepting locally validated address and deferring to rate quote.",
+      });
+      return normalized;
     }
 
     const deliveryErrors = getDeliveryVerificationErrors(verified);
