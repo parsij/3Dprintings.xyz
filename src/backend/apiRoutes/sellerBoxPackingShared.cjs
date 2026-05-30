@@ -1,4 +1,4 @@
-const { BOX_SHRINK_FACTOR, getEffectiveBoxBin } = require("./sellerBoxesShared.cjs");
+const { getEffectiveBoxBin, itemFitsInBin } = require("./sellerBoxesShared.cjs");
 const { productDimensionsAreValid } = require("./productDimensionsShared.cjs");
 
 const MM_PER_IN = 25.4;
@@ -122,12 +122,42 @@ async function packItemsIntoSmallestSellerBox(items, boxes = []) {
   return { fits: false, reason: "no_matching_box" };
 }
 
+function getProductBoxFitMessage(reason) {
+  if (reason === "too_heavy") {
+    return "This product weighs more than your boxes can handle. Update your box weight limits or reduce the product weight.";
+  }
+  if (reason === "dimensions") {
+    return "You need a box that fits this product at 95% capacity. Update your boxes or reduce dimensions.";
+  }
+  if (reason === "invalid_dimensions") {
+    return "Model weight, height, width, and length are invalid.";
+  }
+  return "You need a box that fits this product at 95% capacity and weight limits. Update your boxes or reduce dimensions/weight.";
+}
+
 async function productFitsInAnyBox(product, boxes = []) {
   if (!productDimensionsAreValid(product)) {
     return { fits: false, reason: "invalid_dimensions" };
   }
 
-  return packItemsIntoSmallestSellerBox([{ ...product, quantity: 1 }], boxes);
+  const item = getProductPackingItem(product);
+  const sortedBoxes = [...boxes].sort((left, right) => boxVolumeMm3(left) - boxVolumeMm3(right));
+
+  for (const box of sortedBoxes) {
+    const bin = getEffectiveBoxBin(box);
+    if (itemFitsInBin(item, bin)) {
+      return { fits: true, box };
+    }
+  }
+
+  const fitsWeightInAnyBox = boxes.some(
+    (box) => item.weight <= getEffectiveBoxBin(box).maxWeight
+  );
+  if (!fitsWeightInAnyBox) {
+    return { fits: false, reason: "too_heavy" };
+  }
+
+  return { fits: false, reason: "dimensions" };
 }
 
 function resolvePrepareDays(items = []) {
@@ -144,6 +174,7 @@ module.exports = {
   ceilGramsToOunces,
   ceilMmToInches,
   expandItemsForPacking,
+  getProductBoxFitMessage,
   getProductPackingItem,
   packItemsIntoSmallestSellerBox,
   productFitsInAnyBox,

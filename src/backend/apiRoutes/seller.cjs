@@ -31,7 +31,7 @@ const {
 const {
   listSellerBoxes,
 } = require("./sellerBoxesShared.cjs");
-const { productFitsInAnyBox } = require("./sellerBoxPackingShared.cjs");
+const { productFitsInAnyBox, getProductBoxFitMessage } = require("./sellerBoxPackingShared.cjs");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
@@ -778,7 +778,7 @@ module.exports = function sellerRoutes(deps) {
 
         if (!fitResult.fits) {
           return res.status(400).json({
-            message: "You need a box that fits this product at 95% capacity. Update your boxes or reduce dimensions.",
+            message: getProductBoxFitMessage(fitResult.reason),
             boxesUrl: "/boxes",
           });
         }

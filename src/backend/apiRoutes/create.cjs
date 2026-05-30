@@ -9,7 +9,7 @@ const {
 const {
   listSellerBoxes,
 } = require('./sellerBoxesShared.cjs');
-const { productFitsInAnyBox } = require('./sellerBoxPackingShared.cjs');
+const { productFitsInAnyBox, getProductBoxFitMessage } = require('./sellerBoxPackingShared.cjs');
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require('./sellerOnboardingShared.cjs');
 
 module.exports = function createRoutes(deps) {
@@ -132,7 +132,7 @@ module.exports = function createRoutes(deps) {
       if (!fitResult.fits) {
         await cleanupUploadedFiles(photos);
         return res.status(400).json({
-          message: 'You need a box that fits this product.',
+          message: getProductBoxFitMessage(fitResult.reason),
           boxesUrl: '/boxes',
         });
       }
