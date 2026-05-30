@@ -203,7 +203,7 @@ export default function SellerBoxes() {
                 id="boxName"
                 value={form.name}
                 onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Medium flat-rate box"
+                placeholder="Your box name"
                 className={FIELD_CLASS}
                 required
               />

@@ -132,7 +132,7 @@ module.exports = function createRoutes(deps) {
       if (!fitResult.fits) {
         await cleanupUploadedFiles(photos);
         return res.status(400).json({
-          message: 'You need a box that fits this product. Add it to your boxes.',
+          message: 'You need a box that fits this product.',
           boxesUrl: '/boxes',
         });
       }
