@@ -1,8 +1,10 @@
-const { getSellerStripeAccountId } = require("./sellerStripeShared.cjs");
+const { assertStripeAccountOwnedBySeller, getSellerStripeAccountId } = require("./sellerStripeShared.cjs");
 const {
   getSellerPayoutSchedule,
+  getUsdBalanceAmounts,
+  mapSellerBalanceRouteError,
   normalizePayoutSchedule,
-  resolvePayoutAmountCents,
+  retrieveConnectedAccountBalance,
   upsertSellerPayoutSchedule,
 } = require("./sellerBalanceShared.cjs");
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require("./sellerOnboardingShared.cjs");
@@ -48,20 +50,21 @@ module.exports = function sellerBalanceRoutes(deps) {
         return res.status(400).json({ message: "Stripe Connect account is not configured." });
       }
 
-      const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
-      const available = (balance.available || []).find((entry) => entry.currency === "usd");
-      const pending = (balance.pending || []).find((entry) => entry.currency === "usd");
+      await assertStripeAccountOwnedBySeller(stripe, pool, req.user.id, accountId);
+      const balance = await retrieveConnectedAccountBalance(stripe, accountId);
+      const { availableCents, pendingCents } = getUsdBalanceAmounts(balance);
       const schedule = await getSellerPayoutSchedule(pool, req.user.id);
 
       return res.status(200).json({
-        available: (available?.amount || 0) / 100,
-        pending: (pending?.amount || 0) / 100,
+        available: availableCents / 100,
+        pending: pendingCents / 100,
         currency: "usd",
         payoutSchedule: schedule,
       });
     } catch (error) {
+      const mapped = mapSellerBalanceRouteError(error, "Failed to load seller balance.");
       console.error("Failed to load seller balance:", error);
-      return res.status(500).json({ message: "Failed to load seller balance." });
+      return res.status(mapped.statusCode).json({ message: mapped.message });
     }
   });
 
@@ -72,10 +75,11 @@ module.exports = function sellerBalanceRoutes(deps) {
         return res.status(400).json({ message: "Stripe Connect account is not configured." });
       }
 
+      await assertStripeAccountOwnedBySeller(stripe, pool, req.user.id, accountId);
+
       const requestedAmount = Number(req.body?.amount);
-      const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
-      const availableEntry = (balance.available || []).find((entry) => entry.currency === "usd");
-      const availableCents = availableEntry?.amount || 0;
+      const balance = await retrieveConnectedAccountBalance(stripe, accountId);
+      const { availableCents } = getUsdBalanceAmounts(balance);
 
       let payoutCents = availableCents;
       if (req.body?.amount !== undefined && req.body?.amount !== null && String(req.body.amount).trim() !== "") {
@@ -107,10 +111,9 @@ module.exports = function sellerBalanceRoutes(deps) {
         status: payout.status,
       });
     } catch (error) {
+      const mapped = mapSellerBalanceRouteError(error, "Failed to cash out balance.");
       console.error("Failed seller cashout:", error);
-      return res.status(error.statusCode || 500).json({
-        message: error.message || "Failed to cash out balance.",
-      });
+      return res.status(mapped.statusCode).json({ message: mapped.message });
     }
   });
 

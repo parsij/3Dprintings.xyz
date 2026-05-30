@@ -51,8 +51,8 @@ function allocateSellerPayoutsCents(orderItems, totalCents, platformFeeCents) {
   let assigned = 0;
   const entries = [...sellerTotals.entries()];
   entries.forEach(([sellerId, sellerSubtotalCents], index) => {
-    let amountCents;
-    if (index === entries.length - 1) {
+   let amountCents;
+   if (index === entries.length - 1) {
       amountCents = Math.max(0, distributableCents - assigned);
     } else {
       amountCents = Math.floor((distributableCents * sellerSubtotalCents) / subtotalCents);

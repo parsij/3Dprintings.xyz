@@ -1,6 +1,34 @@
 const PAYOUT_TYPES = new Set(["full", "half", "custom"]);
 const { getSellerStripeAccountId } = require("./sellerStripeShared.cjs");
 
+async function retrieveConnectedAccountBalance(stripe, accountId) {
+  if (!accountId || typeof accountId !== "string") {
+    const error = new Error("Stripe Connect account is not configured.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return stripe.balance.retrieve({}, { stripeAccount: accountId });
+}
+
+function getUsdBalanceAmounts(balance) {
+  const available = (balance.available || []).find((entry) => entry.currency === "usd");
+  const pending = (balance.pending || []).find((entry) => entry.currency === "usd");
+
+  return {
+    availableCents: available?.amount || 0,
+    pendingCents: pending?.amount || 0,
+  };
+}
+
+function mapSellerBalanceRouteError(error, defaultMessage) {
+  if (Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 500) {
+    return { statusCode: error.statusCode, message: error.message };
+  }
+
+  return { statusCode: 500, message: defaultMessage };
+}
+
 function normalizePayoutSchedule(input = {}) {
   const payoutType = String(input.payoutType || input.payout_type || "full").trim().toLowerCase();
   const dayOfMonth = Number.parseInt(input.dayOfMonth ?? input.day_of_month, 10);
@@ -139,9 +167,8 @@ async function executeScheduledSellerPayout(pool, stripe, sellerId, options = {}
     return { skipped: true, reason: "missing_stripe_account" };
   }
 
-  const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
-  const availableEntry = (balance.available || []).find((entry) => entry.currency === "usd");
-  const availableCents = availableEntry?.amount || 0;
+  const balance = await retrieveConnectedAccountBalance(stripe, accountId);
+  const { availableCents } = getUsdBalanceAmounts(balance);
   const payoutCents = resolvePayoutAmountCents(availableCents, schedule);
   if (payoutCents <= 0) {
     return { skipped: true, reason: "no_available_balance" };
@@ -168,10 +195,13 @@ module.exports = {
   ensureSellerPayoutSchedulesTable,
   executeScheduledSellerPayout,
   getSellerPayoutSchedule,
+  getUsdBalanceAmounts,
   getUtcDayOfMonth,
   getUtcPayoutDateKey,
   listScheduledPayoutSellerIds,
+  mapSellerBalanceRouteError,
   normalizePayoutSchedule,
   resolvePayoutAmountCents,
+  retrieveConnectedAccountBalance,
   upsertSellerPayoutSchedule,
 };
