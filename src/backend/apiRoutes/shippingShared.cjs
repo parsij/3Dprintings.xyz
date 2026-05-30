@@ -248,15 +248,47 @@ function pickShippingTierRate(rates = [], tier = DEFAULT_SHIPPING_TIER) {
   return fastestRates.sort((left, right) => left.rateCents - right.rateCents)[0] || sorted[0];
 }
 
-function buildDeliveryWindowLabel(deliveryDays, prepareDays) {
-  const carrierDays = Number(deliveryDays);
+const MIN_CARRIER_TRANSIT_DAYS = 1;
+const MAX_CARRIER_TRANSIT_DAYS_UNKNOWN = 7;
+const MIN_DELIVERY_WINDOW_SPREAD = 1;
+
+function normalizeDeliveryWindowRange(minDays, maxDays) {
+  const min = Math.max(1, Math.round(minDays));
+  let max = Math.max(1, Math.round(maxDays));
+  if (max <= min) {
+    max = min + MIN_DELIVERY_WINDOW_SPREAD;
+  }
+  return { minDays: min, maxDays: max };
+}
+
+function computeDeliveryWindowDays(deliveryDays, prepareDays) {
   const prepDays = Math.max(1, Math.min(7, Number(prepareDays) || 1));
 
-  if (!Number.isFinite(carrierDays) || carrierDays < 0) {
-    return `${1 + prepDays}-${7 + prepDays} business days`;
+  if (deliveryDays === null || deliveryDays === undefined || deliveryDays === "") {
+    return normalizeDeliveryWindowRange(
+      prepDays + MIN_CARRIER_TRANSIT_DAYS,
+      prepDays + MAX_CARRIER_TRANSIT_DAYS_UNKNOWN
+    );
   }
 
-  return `${carrierDays + 1}-${carrierDays + prepDays} business days`;
+  const carrierDays = Number(deliveryDays);
+  if (!Number.isFinite(carrierDays) || carrierDays < 0) {
+    return normalizeDeliveryWindowRange(
+      prepDays + MIN_CARRIER_TRANSIT_DAYS,
+      prepDays + MAX_CARRIER_TRANSIT_DAYS_UNKNOWN
+    );
+  }
+
+  const transitDays = Math.max(MIN_CARRIER_TRANSIT_DAYS, carrierDays);
+  return normalizeDeliveryWindowRange(
+    prepDays + transitDays,
+    prepDays + transitDays + MIN_DELIVERY_WINDOW_SPREAD
+  );
+}
+
+function buildDeliveryWindowLabel(deliveryDays, prepareDays) {
+  const { minDays, maxDays } = computeDeliveryWindowDays(deliveryDays, prepareDays);
+  return `${minDays}-${maxDays} business days`;
 }
 
 function applyShippingMarkup(originalShippingCents) {
@@ -422,15 +454,9 @@ async function calculateEasyPostShippingQuote({ pool, items, toAddress, shipping
       }
 
       originalShippingCents += rate.rateCents;
-      const deliveryDays = rate.deliveryDays;
-      const minDays = Number.isFinite(deliveryDays) ? deliveryDays + 1 : null;
-      const maxDays = Number.isFinite(deliveryDays) ? deliveryDays + quote.prepareDays : null;
-      if (minDays !== null) {
-        minDeliveryDays = minDeliveryDays === null ? minDays : Math.max(minDeliveryDays, minDays);
-      }
-      if (maxDays !== null) {
-        maxDeliveryDays = maxDeliveryDays === null ? maxDays : Math.max(maxDeliveryDays, maxDays);
-      }
+      const { minDays, maxDays } = computeDeliveryWindowDays(rate.deliveryDays, quote.prepareDays);
+      minDeliveryDays = minDeliveryDays === null ? minDays : Math.max(minDeliveryDays, minDays);
+      maxDeliveryDays = maxDeliveryDays === null ? maxDays : Math.max(maxDeliveryDays, maxDays);
 
       return {
         sellerId: quote.sellerId,
@@ -459,6 +485,12 @@ async function calculateEasyPostShippingQuote({ pool, items, toAddress, shipping
     });
 
     const shippingCents = tierShipments.reduce((sum, entry) => sum + entry.shippingCents, 0);
+    const normalizedWindow = minDeliveryDays !== null && maxDeliveryDays !== null
+      ? normalizeDeliveryWindowRange(minDeliveryDays, maxDeliveryDays)
+      : computeDeliveryWindowDays(
+        null,
+        Math.max(...tierShipments.map((entry) => entry.prepareDays || 1))
+      );
 
     return {
       tier,
@@ -467,9 +499,7 @@ async function calculateEasyPostShippingQuote({ pool, items, toAddress, shipping
       shippingCents,
       originalShipping: dollarsFromCents(originalShippingCents),
       shipping: dollarsFromCents(shippingCents),
-      deliveryWindow: minDeliveryDays !== null && maxDeliveryDays !== null
-        ? `${minDeliveryDays}-${maxDeliveryDays} business days`
-        : buildDeliveryWindowLabel(null, Math.max(...tierShipments.map((entry) => entry.prepareDays || 1))),
+      deliveryWindow: `${normalizedWindow.minDays}-${normalizedWindow.maxDays} business days`,
       shipments: tierShipments,
     };
   });
@@ -1075,9 +1105,11 @@ module.exports = {
   addOrUpdateSellerTracker,
   applyLabelToSellerShipment,
   assertValidShippingTier,
+  buildDeliveryWindowLabel,
   buyEasyPostShipmentLabel,
   calculateEasyPostShippingQuote,
   centsFromDollars,
+  computeDeliveryWindowDays,
   createEasyPostTracker,
   createInitialTrackingPayload,
   dollarsFromCents,
