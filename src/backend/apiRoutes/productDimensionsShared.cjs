@@ -6,6 +6,7 @@ const WEIGHT_UNITS = new Set(["lb", "kg"]);
 const DIMENSION_UNITS = new Set(["in", "cm"]);
 const LB_TO_G = 453.592;
 const IN_TO_MM = 25.4;
+const { parseOneDecimalNumber, parseOneDecimalCanonical } = require("./numericInputShared.cjs");
 
 function normalizeUnit(value, allowedUnits, fallback) {
   const unit = String(value || fallback).trim().toLowerCase();
@@ -20,31 +21,25 @@ function isNaturalNumber(value) {
   return Number.isInteger(parsed) && parsed >= 1;
 }
 
-function parseNaturalNumber(value, fieldLabel) {
-  if (!isNaturalNumber(value)) {
-    const error = new Error(`${fieldLabel} must be a whole number greater than 0.`);
-    error.statusCode = 400;
-    throw error;
-  }
-  return Number.parseInt(String(value).trim(), 10);
-}
-
 function convertWeightToGrams(value, unit) {
+  const amount = parseOneDecimalNumber(value, "Model weight");
   if (unit === "kg") {
-    return value * 1000;
+    return Math.round(amount * 1000 * 10) / 10;
   }
-  return Math.round(value * LB_TO_G);
+  return Math.round(amount * LB_TO_G * 10) / 10;
 }
 
 function convertDimensionToMm(value, unit) {
+  const amount = parseOneDecimalNumber(value, "Dimension");
   if (unit === "cm") {
-    return value * 10;
+    return Math.round(amount * 10 * 10) / 10;
   }
-  return Math.round(value * IN_TO_MM);
+  return Math.round(amount * IN_TO_MM * 10) / 10;
 }
 
 function assertWeightWithinLimit(modelWeightG) {
-  if (!Number.isInteger(modelWeightG) || modelWeightG < 1 || modelWeightG > MAX_WEIGHT_G) {
+  const normalized = Math.round(Number(modelWeightG) * 10) / 10;
+  if (!Number.isFinite(normalized) || normalized <= 0 || normalized > MAX_WEIGHT_G) {
     const error = new Error(`Model weight cannot exceed ${MAX_WEIGHT_G / 1000} kg.`);
     error.statusCode = 400;
     throw error;
@@ -52,7 +47,8 @@ function assertWeightWithinLimit(modelWeightG) {
 }
 
 function assertDimensionWithinLimit(modelMm, fieldLabel) {
-  if (!Number.isInteger(modelMm) || modelMm < 1 || modelMm > MAX_DIMENSION_MM) {
+  const normalized = Math.round(Number(modelMm) * 10) / 10;
+  if (!Number.isFinite(normalized) || normalized <= 0 || normalized > MAX_DIMENSION_MM) {
     const error = new Error(`${fieldLabel} cannot exceed ${MAX_DIMENSION_MM / 10} cm.`);
     error.statusCode = 400;
     throw error;
@@ -71,12 +67,15 @@ function assertClientCanonicalValuesMatch(computed, body) {
     if (clientValue === undefined || clientValue === null || String(clientValue).trim() === "") {
       continue;
     }
-    if (!isNaturalNumber(clientValue)) {
-      const error = new Error(`${label} canonical value is invalid.`);
-      error.statusCode = 400;
+
+    let parsedClient;
+    try {
+      parsedClient = parseOneDecimalCanonical(clientValue, label);
+    } catch (error) {
       throw error;
     }
-    if (Number.parseInt(String(clientValue).trim(), 10) !== expected) {
+
+    if (Math.round(parsedClient * 10) !== Math.round(expected * 10)) {
       const error = new Error(`${label} does not match the selected unit.`);
       error.statusCode = 400;
       throw error;
@@ -117,27 +116,21 @@ function parseAndValidateProductDimensions(body = {}) {
     "in"
   );
 
-  const weightInput = parseNaturalNumber(
-    body.modelWeight ?? body.modelWeightG ?? body.model_weight_g,
-    "Model weight"
-  );
-  const heightInput = parseNaturalNumber(
-    body.modelHeight ?? body.modelHeightMm ?? body.model_height_mm,
-    "Height"
-  );
-  const widthInput = parseNaturalNumber(
-    body.modelWidth ?? body.modelWidthMm ?? body.model_width_mm,
-    "Width"
-  );
-  const lengthInput = parseNaturalNumber(
-    body.modelLength ?? body.modelLengthMm ?? body.model_length_mm,
-    "Length"
-  );
+  const modelWeightG = String(body.modelWeight ?? "").trim() !== ""
+    ? convertWeightToGrams(body.modelWeight, modelWeightUnit)
+    : parseOneDecimalCanonical(body.modelWeightG ?? body.model_weight_g, "Model weight");
 
-  const modelWeightG = convertWeightToGrams(weightInput, modelWeightUnit);
-  const modelHeightMm = convertDimensionToMm(heightInput, modelDimensionUnit);
-  const modelWidthMm = convertDimensionToMm(widthInput, modelDimensionUnit);
-  const modelLengthMm = convertDimensionToMm(lengthInput, modelDimensionUnit);
+  const modelHeightMm = String(body.modelHeight ?? "").trim() !== ""
+    ? convertDimensionToMm(body.modelHeight, modelDimensionUnit)
+    : parseOneDecimalCanonical(body.modelHeightMm ?? body.model_height_mm, "Height");
+
+  const modelWidthMm = String(body.modelWidth ?? "").trim() !== ""
+    ? convertDimensionToMm(body.modelWidth, modelDimensionUnit)
+    : parseOneDecimalCanonical(body.modelWidthMm ?? body.model_width_mm, "Width");
+
+  const modelLengthMm = String(body.modelLength ?? "").trim() !== ""
+    ? convertDimensionToMm(body.modelLength, modelDimensionUnit)
+    : parseOneDecimalCanonical(body.modelLengthMm ?? body.model_length_mm, "Length");
 
   assertWeightWithinLimit(modelWeightG);
   assertDimensionWithinLimit(modelHeightMm, "Height");
@@ -174,7 +167,7 @@ function productDimensionsAreValid(product) {
   const length = Number(product.model_length_mm ?? product.modelLengthMm);
 
   return [weight, height, width, length].every(
-    (value) => Number.isInteger(value) && value >= 1
+    (value) => Number.isFinite(value) && value > 0
   )
     && weight <= MAX_WEIGHT_G
     && height <= MAX_DIMENSION_MM

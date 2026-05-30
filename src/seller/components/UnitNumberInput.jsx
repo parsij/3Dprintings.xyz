@@ -1,4 +1,5 @@
 import CustomSelect from "./CustomSelect.jsx";
+import { sanitizeOneDecimalInput } from "../../utils/numericInput.js";
 
 function sanitizeNaturalNumberInput(value) {
   return String(value || "").replace(/\D/g, "");
@@ -18,19 +19,27 @@ export default function UnitNumberInput({
   onValueChange,
   onUnitChange,
   placeholder,
-  inputMode = "numeric",
+  inputMode = "decimal",
   autoComplete = "off",
+  allowOneDecimal = false,
 }) {
+  function handleChange(event) {
+    const nextValue = allowOneDecimal
+      ? sanitizeOneDecimalInput(event.target.value)
+      : sanitizeNaturalNumberInput(event.target.value);
+    onValueChange(nextValue);
+  }
+
   return (
     <div className={COMBO_CONTAINER_CLASS}>
       <input
         id={id}
         name={name}
         type="text"
-        inputMode={inputMode}
+        inputMode={allowOneDecimal ? "decimal" : inputMode}
         autoComplete={autoComplete}
         value={value}
-        onChange={(event) => onValueChange(sanitizeNaturalNumberInput(event.target.value))}
+        onChange={handleChange}
         placeholder={placeholder}
         className={COMBO_INPUT_CLASS}
       />

@@ -1,3 +1,9 @@
+import {
+  isOneDecimalNumber,
+  parseOneDecimalNumber,
+  formatToOneDecimal,
+} from "./numericInput.js";
+
 export const MAX_WEIGHT_G = 50000;
 export const MAX_DIMENSION_MM = 3000;
 export const MIN_DAYS_TO_PREPARE = 1;
@@ -8,6 +14,8 @@ export const MAX_DIMENSION_CM = MAX_DIMENSION_MM / 10;
 const LB_TO_G = 453.592;
 const IN_TO_MM = 25.4;
 
+export { isOneDecimalNumber, parseOneDecimalNumber, formatToOneDecimal };
+
 export function isNaturalNumber(value) {
   if (value === null || value === undefined) return false;
   const normalized = String(value).trim();
@@ -17,49 +25,49 @@ export function isNaturalNumber(value) {
 }
 
 export function convertWeightToGrams(value, unit) {
-  const amount = Number.parseInt(String(value).trim(), 10);
+  const amount = Number.parseFloat(String(value).trim());
   if (unit === "kg") {
-    return amount * 1000;
+    return Math.round(amount * 1000 * 10) / 10;
   }
-  return Math.round(amount * LB_TO_G);
+  return Math.round(amount * LB_TO_G * 10) / 10;
 }
 
 export function convertDimensionToMm(value, unit) {
-  const amount = Number.parseInt(String(value).trim(), 10);
+  const amount = Number.parseFloat(String(value).trim());
   if (unit === "cm") {
-    return amount * 10;
+    return Math.round(amount * 10 * 10) / 10;
   }
-  return Math.round(amount * IN_TO_MM);
+  return Math.round(amount * IN_TO_MM * 10) / 10;
 }
 
 export function getMaxWeightForUnit(unit) {
   if (unit === "kg") return MAX_WEIGHT_KG;
-  return Math.floor(MAX_WEIGHT_G / LB_TO_G);
+  return Math.round((MAX_WEIGHT_G / LB_TO_G) * 10) / 10;
 }
 
 export function getMaxDimensionForUnit(unit) {
   if (unit === "cm") return MAX_DIMENSION_CM;
-  return Math.floor(MAX_DIMENSION_MM / IN_TO_MM);
+  return Math.round((MAX_DIMENSION_MM / IN_TO_MM) * 10) / 10;
 }
 
 export function validateWeightInput(value, unit) {
-  if (!isNaturalNumber(value)) {
-    return "Weight must be a whole number greater than 0.";
+  if (!isOneDecimalNumber(value)) {
+    return "Weight must be a number greater than 0 with at most 1 decimal place.";
   }
   const grams = convertWeightToGrams(value, unit);
   if (grams > MAX_WEIGHT_G) {
-    return `Weight cannot exceed ${getMaxWeightForUnit(unit)} ${unit}.`;
+    return `Weight cannot exceed ${formatToOneDecimal(getMaxWeightForUnit(unit))} ${unit}.`;
   }
   return null;
 }
 
 export function validateDimensionInput(value, unit, label) {
-  if (!isNaturalNumber(value)) {
-    return `${label} must be a whole number greater than 0.`;
+  if (!isOneDecimalNumber(value)) {
+    return `${label} must be a number greater than 0 with at most 1 decimal place.`;
   }
   const millimeters = convertDimensionToMm(value, unit);
   if (millimeters > MAX_DIMENSION_MM) {
-    return `${label} cannot exceed ${getMaxDimensionForUnit(unit)} ${unit}.`;
+    return `${label} cannot exceed ${formatToOneDecimal(getMaxDimensionForUnit(unit))} ${unit}.`;
   }
   return null;
 }
@@ -98,19 +106,15 @@ export function toCanonicalDimensions({
 export function fromCanonicalWeight(grams, unit = "lb") {
   const normalized = Number(grams);
   if (!Number.isFinite(normalized) || normalized <= 0) return "";
-  if (unit === "kg") {
-    return String(Math.round(normalized / 1000));
-  }
-  return String(Math.round(normalized / LB_TO_G));
+  const value = unit === "kg" ? normalized / 1000 : normalized / LB_TO_G;
+  return formatToOneDecimal(value);
 }
 
 export function fromCanonicalDimension(mm, unit = "in") {
   const normalized = Number(mm);
   if (!Number.isFinite(normalized) || normalized <= 0) return "";
-  if (unit === "cm") {
-    return String(Math.round(normalized / 10));
-  }
-  return String(Math.round(normalized / IN_TO_MM));
+  const value = unit === "cm" ? normalized / 10 : normalized / IN_TO_MM;
+  return formatToOneDecimal(value);
 }
 
 export function productToFormDimensions(product = {}) {

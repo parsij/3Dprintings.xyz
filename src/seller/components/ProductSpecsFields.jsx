@@ -49,7 +49,7 @@ export default function ProductSpecsFields({
       <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
         <SectionTitle>Model weight</SectionTitle>
         <p className="mt-1 text-xs text-gray-600">
-          Enter a whole number greater than 0. Maximum weight is 50 kg.
+          Enter a number greater than 0 with at most 1 decimal place. Maximum weight is 50 kg.
         </p>
         <div className="mt-2">
           <UnitNumberInput
@@ -61,6 +61,7 @@ export default function ProductSpecsFields({
               { value: "lb", label: "lb" },
               { value: "kg", label: "kg" },
             ]}
+            allowOneDecimal
             onValueChange={(value) => onDimensionValueChange("modelWeight", value)}
             onUnitChange={(value) => onUnitChange("modelWeightUnit", value)}
             placeholder="Weight"
@@ -74,7 +75,7 @@ export default function ProductSpecsFields({
       <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
         <SectionTitle>Model dimensions</SectionTitle>
         <p className="mt-1 text-xs text-gray-600">
-          Enter whole numbers greater than 0. Each side can be at most 300 cm. Accurate values help avoid shipping adjustment charges.
+          Enter numbers greater than 0 with at most 1 decimal place. Each side can be at most 300 cm.
         </p>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {DIMENSION_FIELDS.map(([field, label]) => (
@@ -91,6 +92,7 @@ export default function ProductSpecsFields({
                   { value: "in", label: "in" },
                   { value: "cm", label: "cm" },
                 ]}
+                allowOneDecimal
                 onValueChange={(value) => onDimensionValueChange(field, value)}
                 onUnitChange={(value) => onUnitChange("modelDimensionUnit", value)}
                 placeholder={label}

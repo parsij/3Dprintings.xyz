@@ -215,7 +215,7 @@ export default function SellerBoxes() {
             <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
               <SectionTitle>Interior dimensions</SectionTitle>
               <p className="mt-1 text-xs text-gray-600">
-                Inside measurements of the empty box. Values are checked at 95% capacity when fitting products.
+                Inside measurements of the empty box. Use numbers with at most 1 decimal place. Values are checked at 95% capacity.
               </p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {[
@@ -233,6 +233,7 @@ export default function SellerBoxes() {
                       value={form[field]}
                       unit={form.dimensionUnit}
                       units={BOX_DIMENSION_UNITS}
+                      allowOneDecimal
                       onValueChange={(value) => setForm((prev) => ({ ...prev, [field]: value }))}
                       onUnitChange={(value) => setForm((prev) => ({ ...prev, dimensionUnit: value }))}
                       placeholder={label}
@@ -247,7 +248,9 @@ export default function SellerBoxes() {
 
             <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
               <SectionTitle>Maximum weight</SectionTitle>
-              <p className="mt-1 text-xs text-gray-600">The most weight this box can safely carry, including packing materials.</p>
+              <p className="mt-1 text-xs text-gray-600">
+                The most weight this box can safely carry. Use a number with at most 1 decimal place.
+              </p>
               <div className="mt-2 max-w-sm">
                 <UnitNumberInput
                   id="maxWeight"
@@ -255,6 +258,7 @@ export default function SellerBoxes() {
                   value={form.maxWeight}
                   unit={form.weightUnit}
                   units={BOX_WEIGHT_UNITS}
+                  allowOneDecimal
                   onValueChange={(value) => setForm((prev) => ({ ...prev, maxWeight: value }))}
                   onUnitChange={(value) => setForm((prev) => ({ ...prev, weightUnit: value }))}
                   placeholder="Max weight"

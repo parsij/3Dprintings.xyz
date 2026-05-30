@@ -1,27 +1,33 @@
 const BOX_SHRINK_FACTOR = 0.95;
-const MIN_BOX_DIMENSION_MM = 1;
+const MIN_BOX_DIMENSION_MM = 0.1;
 const MAX_BOX_DIMENSION_MM = 2000;
 const MAX_BOX_WEIGHT_G = 100000;
-const { productDimensionsAreValid } = require("./productDimensionsShared.cjs");
+const { productDimensionsAreValid, convertDimensionToMm, convertWeightToGrams, DIMENSION_UNITS, WEIGHT_UNITS } = require("./productDimensionsShared.cjs");
+const { parseOneDecimalCanonical } = require("./numericInputShared.cjs");
 
-function parsePositiveNumber(value, fieldName) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < MIN_BOX_DIMENSION_MM) {
+function normalizeUnit(value, allowedUnits, fallback) {
+  const unit = String(value || fallback).trim().toLowerCase();
+  return allowedUnits.has(unit) ? unit : fallback;
+}
+
+function parseBoxMeasurement(rawValue, canonicalValue, fieldName, convertFn, unit) {
+  if (String(rawValue ?? "").trim() !== "") {
+    return convertFn(rawValue, unit);
+  }
+
+  const canonical = canonicalValue;
+  const parsed = parseOneDecimalCanonical(canonical, fieldName);
+  if (parsed < MIN_BOX_DIMENSION_MM) {
     const error = new Error(`${fieldName} must be a positive number.`);
     error.statusCode = 400;
     throw error;
   }
-  if (parsed > MAX_BOX_DIMENSION_MM && fieldName !== "max weight") {
+  if (fieldName !== "Max weight" && parsed > MAX_BOX_DIMENSION_MM) {
     const error = new Error(`${fieldName} is too large.`);
     error.statusCode = 400;
     throw error;
   }
-  return parsed;
-}
-
-function parseMaxWeight(value) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < MIN_BOX_DIMENSION_MM || parsed > MAX_BOX_WEIGHT_G) {
+  if (fieldName === "Max weight" && parsed > MAX_BOX_WEIGHT_G) {
     const error = new Error("Max weight must be a positive number within allowed limits.");
     error.statusCode = 400;
     throw error;
@@ -37,12 +43,44 @@ function parseBoxPayload(input = {}) {
     throw error;
   }
 
+  const dimensionUnit = normalizeUnit(input.dimensionUnit ?? input.dimension_unit, DIMENSION_UNITS, "in");
+  const weightUnit = normalizeUnit(input.weightUnit ?? input.weight_unit, WEIGHT_UNITS, "lb");
+
+  const widthMm = parseBoxMeasurement(
+    input.width,
+    input.widthMm,
+    "Box width",
+    convertDimensionToMm,
+    dimensionUnit
+  );
+  const lengthMm = parseBoxMeasurement(
+    input.length,
+    input.lengthMm,
+    "Box length",
+    convertDimensionToMm,
+    dimensionUnit
+  );
+  const heightMm = parseBoxMeasurement(
+    input.height,
+    input.heightMm,
+    "Box height",
+    convertDimensionToMm,
+    dimensionUnit
+  );
+  const maxWeightG = parseBoxMeasurement(
+    input.maxWeight,
+    input.maxWeightG ?? input.max_weight_g,
+    "Max weight",
+    convertWeightToGrams,
+    weightUnit
+  );
+
   return {
     name,
-    widthMm: parsePositiveNumber(input.width ?? input.widthMm, "Box width"),
-    lengthMm: parsePositiveNumber(input.length ?? input.lengthMm, "Box length"),
-    heightMm: parsePositiveNumber(input.height ?? input.heightMm, "Box height"),
-    maxWeightG: parseMaxWeight(input.maxWeight ?? input.maxWeightG),
+    widthMm,
+    lengthMm,
+    heightMm,
+    maxWeightG,
   };
 }
 
