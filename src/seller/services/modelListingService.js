@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { API_BASE } from "../../config/api.js";
+import { toCanonicalDimensions } from "../../utils/productDimensions.js";
 
 export async function submitModelListing({
   modelName,
@@ -10,11 +11,23 @@ export async function submitModelListing({
   tags,
   quantity,
   modelWeight,
+  modelWeightUnit,
   modelHeight,
   modelWidth,
   modelLength,
+  modelDimensionUnit,
+  daysToPrepare,
   photos,
 }) {
+  const canonical = toCanonicalDimensions({
+    modelWeight,
+    modelWeightUnit,
+    modelHeight,
+    modelWidth,
+    modelLength,
+    modelDimensionUnit,
+  });
+
   const formData = new FormData();
 
   formData.append("modelName", modelName.trim());
@@ -22,9 +35,16 @@ export async function submitModelListing({
   formData.append("price", String(price));
   formData.append("quantity", String(quantity));
   formData.append("modelWeight", String(modelWeight));
+  formData.append("modelWeightUnit", modelWeightUnit);
   formData.append("modelHeight", String(modelHeight));
   formData.append("modelWidth", String(modelWidth));
   formData.append("modelLength", String(modelLength));
+  formData.append("modelDimensionUnit", modelDimensionUnit);
+  formData.append("modelWeightG", String(canonical.modelWeightG));
+  formData.append("modelHeightMm", String(canonical.modelHeightMm));
+  formData.append("modelWidthMm", String(canonical.modelWidthMm));
+  formData.append("modelLengthMm", String(canonical.modelLengthMm));
+  formData.append("daysToPrepare", String(daysToPrepare));
 
   if (category?.trim()) {
     formData.append("category", category.trim());

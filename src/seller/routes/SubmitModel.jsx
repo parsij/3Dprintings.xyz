@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
+import UnitNumberInput from "../components/UnitNumberInput.jsx";
+import DaysToPrepareInput from "../components/DaysToPrepareInput.jsx";
+import {
+  validateDaysToPrepare,
+  validateDimensionInput,
+  validateWeightInput,
+} from "../../utils/productDimensions.js";
 
 // Your complete, community-specific 3D printing taxonomy
 // eslint-disable-next-line react-refresh/only-export-components
@@ -125,9 +132,12 @@ const defaultForm = {
   tags: [],
   quantity: "1",
   modelWeight: "",
+  modelWeightUnit: "lb",
   modelHeight: "",
   modelWidth: "",
   modelLength: "",
+  modelDimensionUnit: "in",
+  daysToPrepare: "1",
 };
 
 const MAX_PHOTOS = 10;
@@ -203,18 +213,26 @@ export default function SubmitModel({ onSubmissionSuccess }) {
       nextErrors.quantity = "Enter a valid quantity greater than 0.";
     }
 
-    const dimensionFields = [
-      ["modelWeight", "Model weight"],
+    const weightError = validateWeightInput(form.modelWeight, form.modelWeightUnit);
+    if (weightError) {
+      nextErrors.modelWeight = weightError;
+    }
+
+    [
       ["modelHeight", "Height"],
       ["modelWidth", "Width"],
       ["modelLength", "Length"],
-    ];
-    dimensionFields.forEach(([field, label]) => {
-      const parsed = Number(form[field]);
-      if (!form[field] || Number.isNaN(parsed) || parsed <= 0) {
-        nextErrors[field] = `${label} is required and must be greater than 0.`;
+    ].forEach(([field, label]) => {
+      const dimensionError = validateDimensionInput(form[field], form.modelDimensionUnit, label);
+      if (dimensionError) {
+        nextErrors[field] = dimensionError;
       }
     });
+
+    const daysToPrepareError = validateDaysToPrepare(form.daysToPrepare);
+    if (daysToPrepareError) {
+      nextErrors.daysToPrepare = daysToPrepareError;
+    }
 
     return nextErrors;
   }, [form, photos]);
@@ -224,6 +242,14 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function handleUnitChange(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleDimensionValueChange(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function handlePhotoChange(event) {
@@ -272,10 +298,13 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         category: form.category,
         tags: form.tags,
         quantity: Number(form.quantity),
-        modelWeight: Number(form.modelWeight),
-        modelHeight: Number(form.modelHeight),
-        modelWidth: Number(form.modelWidth),
-        modelLength: Number(form.modelLength),
+        modelWeight: form.modelWeight,
+        modelWeightUnit: form.modelWeightUnit,
+        modelHeight: form.modelHeight,
+        modelWidth: form.modelWidth,
+        modelLength: form.modelLength,
+        modelDimensionUnit: form.modelDimensionUnit,
+        daysToPrepare: Number(form.daysToPrepare),
         photos,
       });
 
@@ -444,26 +473,33 @@ export default function SubmitModel({ onSubmissionSuccess }) {
 
             <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
               <h3 className="text-sm font-semibold text-gray-800">Model weight *</h3>
-              <input
-                id="modelWeight"
-                name="modelWeight"
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={form.modelWeight}
-                onChange={handleChange}
-                placeholder="Weight in grams"
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
-              />
+              <p className="mt-1 text-xs text-gray-600">
+                Enter a whole number greater than 0. Maximum weight is 50 kg.
+              </p>
+              <div className="mt-2">
+                <UnitNumberInput
+                  id="modelWeight"
+                  name="modelWeight"
+                  value={form.modelWeight}
+                  unit={form.modelWeightUnit}
+                  units={[
+                    { value: "lb", label: "lb" },
+                    { value: "kg", label: "kg" },
+                  ]}
+                  onValueChange={(value) => handleDimensionValueChange("modelWeight", value)}
+                  onUnitChange={(value) => handleUnitChange("modelWeightUnit", value)}
+                  placeholder="Weight"
+                />
+              </div>
               {submitted && errors.modelWeight && (
                 <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.modelWeight}</p>
               )}
             </div>
 
             <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
-              <h3 className="text-sm font-semibold text-gray-800">Model dimensions (mm) *</h3>
+              <h3 className="text-sm font-semibold text-gray-800">Model dimensions *</h3>
               <p className="mt-1 text-xs text-gray-600">
-                It is important to make sure these values are correct to avoid extra charges.
+                Enter whole numbers greater than 0. Each side can be at most 300 cm. Accurate values help avoid shipping adjustment charges.
               </p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {[
@@ -475,15 +511,18 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                     <label htmlFor={field} className="mb-1 block text-xs font-semibold text-gray-700">
                       {label}
                     </label>
-                    <input
+                    <UnitNumberInput
                       id={field}
                       name={field}
-                      type="number"
-                      min="0.01"
-                      step="0.01"
                       value={form[field]}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
+                      unit={form.modelDimensionUnit}
+                      units={[
+                        { value: "in", label: "in" },
+                        { value: "cm", label: "cm" },
+                      ]}
+                      onValueChange={(value) => handleDimensionValueChange(field, value)}
+                      onUnitChange={(value) => handleUnitChange("modelDimensionUnit", value)}
+                      placeholder={label}
                     />
                     {submitted && errors[field] && (
                       <p className="mt-1 text-xs text-red-500 animate-pulse">{errors[field]}</p>
@@ -491,6 +530,24 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="sm:col-span-2 rounded-xl border border-orange-100 bg-orange-50/50 p-4">
+              <h3 className="text-sm font-semibold text-gray-800">Days to prepare *</h3>
+              <p className="mt-1 text-xs text-gray-600">
+                How many days you need to print and pack this item before shipping. Choose 1 to 7 days.
+              </p>
+              <div className="mt-2 max-w-xs">
+                <DaysToPrepareInput
+                  id="daysToPrepare"
+                  name="daysToPrepare"
+                  value={form.daysToPrepare}
+                  onChange={(value) => setForm((prev) => ({ ...prev, daysToPrepare: value }))}
+                />
+              </div>
+              {submitted && errors.daysToPrepare && (
+                <p className="mt-1 text-xs text-red-500 animate-pulse">{errors.daysToPrepare}</p>
+              )}
             </div>
 
             <Tags

@@ -1,4 +1,5 @@
 const { fulfillPaidOrder } = require("./orderFulfillment.cjs");
+const { queueSellerTransfersIfNeeded } = require("./sellerOrderTransfers.cjs");
 
 const ORDER_PAYMENT_POLL_INTERVAL_MS = 10_000;
 const ORDER_PAYMENT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -27,7 +28,7 @@ async function clearCartForOrderCustomer(pool, orderId) {
   );
 }
 
-async function runOrderPaymentCheck(pool, stripe, orderId) {
+async function runOrderPaymentCheck(pool, stripe, orderId, enqueueWrite = null) {
   const result = await pool.query(
     `SELECT id, status, created_at, stripe_session_id, payment_type
      FROM orders
@@ -75,6 +76,26 @@ async function runOrderPaymentCheck(pool, stripe, orderId) {
 
   if (session?.payment_status !== "paid") {
     return { shouldContinue: true };
+  }
+
+  if (session.payment_intent) {
+    await pool.query(
+      `UPDATE orders
+       SET stripe_payment_intent_id = $1,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [String(session.payment_intent), orderId]
+    );
+
+    if (typeof enqueueWrite === "function") {
+      await queueSellerTransfersIfNeeded(
+        stripe,
+        pool,
+        enqueueWrite,
+        orderId,
+        String(session.payment_intent)
+      );
+    }
   }
 
   const paymentType = getPaymentTypeFromSession(session, order.payment_type || "card");

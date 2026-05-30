@@ -7,6 +7,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 const US_STATE_REGEX = /^[A-Z]{2}$/;
 const US_ZIP_REGEX = /^\d{5}(-\d{4})?$/;
 const MAX_ADDRESS_FIELD_LENGTH = 120;
+const DEFAULT_SHIPPING_TIER = 'economy';
 
 const EMPTY_ADDRESS = {
     line1: '',
@@ -71,6 +72,8 @@ const Checkout = () => {
     const [addressLine, setAddressLine] = useState('');
     const [isSuggestingAddress, setIsSuggestingAddress] = useState(false);
     const [shippingAddress, setShippingAddress] = useState(EMPTY_ADDRESS);
+    const [shippingTier, setShippingTier] = useState(DEFAULT_SHIPPING_TIER);
+    const [shippingOptions, setShippingOptions] = useState([]);
     const totalsRequestRef = useRef(0);
     const addressSearchRef = useRef(null);
     const suppressAutocompleteRef = useRef(false);
@@ -194,6 +197,7 @@ const Checkout = () => {
                             quantity: item.quantity,
                         })),
                         address: normalizedShippingAddress,
+                        shippingTier,
                     }),
                 });
 
@@ -212,6 +216,10 @@ const Checkout = () => {
                     shipping: Number(data.shipping) || 0,
                     total: Number(data.total) || 0,
                 });
+                setShippingOptions(Array.isArray(data.shippingOptions) ? data.shippingOptions : []);
+                if (data.shippingTier) {
+                    setShippingTier(data.shippingTier);
+                }
             } catch (err) {
                 if (requestId !== totalsRequestRef.current) return;
                 console.error('Totals calculation error:', err);
@@ -225,7 +233,7 @@ const Checkout = () => {
         }, 400);
 
         return () => window.clearTimeout(timer);
-    }, [cartItems, normalizedShippingAddress, addressComplete]);
+    }, [cartItems, normalizedShippingAddress, addressComplete, shippingTier]);
 
     const handleAddressChange = (event) => {
         const { name, value } = event.target;
@@ -305,6 +313,7 @@ const Checkout = () => {
                         quantity: item.quantity,
                     })),
                     address: normalizedShippingAddress,
+                    shippingTier,
                 }),
             });
 
@@ -575,6 +584,59 @@ const Checkout = () => {
                                 <p className="mt-3 text-sm text-gray-500">
                                     Search for your address or open More Details to finish entering it.
                                 </p>
+                            )}
+                        </div>
+
+                        <div className="bg-white p-6 rounded-xl shadow-md border border-orange-100">
+                            <h3 className="font-semibold mb-4 text-lg text-gray-800">Shipping</h3>
+                            {!addressComplete ? (
+                                <p className="text-sm text-gray-500">
+                                    Enter your shipping address to see delivery options.
+                                </p>
+                            ) : isCalculatingTotals ? (
+                                <div className="space-y-3">
+                                    <PriceSkeleton className="h-16 w-full" />
+                                    <PriceSkeleton className="h-16 w-full" />
+                                    <PriceSkeleton className="h-16 w-full" />
+                                </div>
+                            ) : shippingOptions.length === 0 ? (
+                                <p className="text-sm text-gray-500">No shipping options are available yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {shippingOptions.map((option) => {
+                                        const isSelected = shippingTier === option.tier;
+                                        return (
+                                            <label
+                                                key={option.tier}
+                                                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                                                    isSelected
+                                                        ? 'border-orange-500 bg-orange-50'
+                                                        : 'border-gray-200 hover:border-orange-200'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="shippingTier"
+                                                    value={option.tier}
+                                                    checked={isSelected}
+                                                    onChange={() => setShippingTier(option.tier)}
+                                                    className="mt-1 h-4 w-4 border-gray-300 text-orange-500 focus:ring-orange-500"
+                                                />
+                                                <span className="flex-1">
+                                                    <span className="flex flex-wrap items-center justify-between gap-2">
+                                                        <span className="font-semibold text-gray-900">{option.label}</span>
+                                                        <span className="font-semibold text-gray-900">
+                                                            ${Number(option.shipping || 0).toFixed(2)}
+                                                        </span>
+                                                    </span>
+                                                    <span className="mt-1 block text-sm text-gray-600">
+                                                        Estimated delivery: {option.deliveryWindow}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
 

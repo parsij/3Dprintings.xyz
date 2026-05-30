@@ -2,6 +2,7 @@ const BOX_SHRINK_FACTOR = 0.95;
 const MIN_BOX_DIMENSION_MM = 1;
 const MAX_BOX_DIMENSION_MM = 2000;
 const MAX_BOX_WEIGHT_G = 100000;
+const { productDimensionsAreValid } = require("./productDimensionsShared.cjs");
 
 function parsePositiveNumber(value, fieldName) {
   const parsed = Number(value);
@@ -83,13 +84,6 @@ function getProductPackingItem(product) {
   };
 }
 
-function productDimensionsAreValid(product) {
-  const item = getProductPackingItem(product);
-  return [item.width, item.height, item.depth, item.weight].every(
-    (value) => Number.isFinite(value) && value >= MIN_BOX_DIMENSION_MM
-  );
-}
-
 function permuteDimensions(width, height, depth) {
   const w = Number(width);
   const h = Number(height);
@@ -127,22 +121,6 @@ function itemFitsInBin(item, bin) {
   );
 }
 
-function productFitsInAnyBox(product, boxes) {
-  if (!productDimensionsAreValid(product)) {
-    return { fits: false, reason: "invalid_dimensions" };
-  }
-
-  const item = getProductPackingItem(product);
-  for (const box of boxes) {
-    const bin = getEffectiveBoxBin(box);
-    if (itemFitsInBin(item, bin)) {
-      return { fits: true, box };
-    }
-  }
-
-  return { fits: false, reason: "no_matching_box" };
-}
-
 async function getLargestProductForSeller(pool, sellerUserId) {
   const result = await pool.query(
     `SELECT id, name, model_weight_g, model_width_mm, model_height_mm, model_length_mm
@@ -163,11 +141,12 @@ async function getLargestProductForSeller(pool, sellerUserId) {
 }
 
 async function sellerBoxesCoverLargestProduct(pool, sellerUserId, boxes = null) {
+  const { productFitsInAnyBox } = require("./sellerBoxPackingShared.cjs");
   const largestProduct = await getLargestProductForSeller(pool, sellerUserId);
   if (!largestProduct) return { ok: true, largestProduct: null };
 
   const boxList = boxes || (await listSellerBoxes(pool, sellerUserId));
-  const fit = productFitsInAnyBox(largestProduct, boxList);
+  const fit = await productFitsInAnyBox(largestProduct, boxList);
   return {
     ok: fit.fits,
     largestProduct,
@@ -224,6 +203,5 @@ module.exports = {
   normalizeBoxRow,
   parseBoxPayload,
   productDimensionsAreValid,
-  productFitsInAnyBox,
   sellerBoxesCoverLargestProduct,
 };

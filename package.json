@@ -20,6 +20,7 @@
     "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
+    "binpackingjs": "^4.1.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

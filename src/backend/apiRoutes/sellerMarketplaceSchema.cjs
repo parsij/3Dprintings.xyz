@@ -40,6 +40,36 @@ async function ensureSellerMarketplaceSchema(pool) {
   `);
 
   await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS model_weight_unit VARCHAR(2) NOT NULL DEFAULT 'lb'
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS model_dimension_unit VARCHAR(2) NOT NULL DEFAULT 'in'
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS days_to_prepare INTEGER NOT NULL DEFAULT 1
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'products_days_to_prepare_check'
+      ) THEN
+        ALTER TABLE products
+        ADD CONSTRAINT products_days_to_prepare_check
+        CHECK (days_to_prepare BETWEEN 1 AND 7);
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
     ALTER TABLE orders
     ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255)
   `);

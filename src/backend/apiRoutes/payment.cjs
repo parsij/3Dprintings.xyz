@@ -2,8 +2,10 @@ module.exports = function paymentController(deps) {
     const { app, pool, isAuthenticatedAnIisValid, stripe, enqueueWrite } = deps;
     const { fulfillPaidOrder } = require("./orderFulfillment.cjs");
     const {
+        assertValidShippingTier,
         calculateEasyPostShippingQuote,
         createInitialTrackingPayload,
+        DEFAULT_SHIPPING_TIER,
         normalizeAddressPayload,
         normalizeSellerAddressFromRow,
     } = require("./shippingShared.cjs");
@@ -66,6 +68,11 @@ module.exports = function paymentController(deps) {
                 p.quantity,
                 p.user_id AS seller_id,
                 p.img_path,
+                p.model_weight_g,
+                p.model_height_mm,
+                p.model_width_mm,
+                p.model_length_mm,
+                p.days_to_prepare,
                 u.username AS seller_username,
                 u.email AS seller_email,
                 u.phone_number AS seller_phone_number,
@@ -102,6 +109,13 @@ module.exports = function paymentController(deps) {
                 throw error;
             }
 
+            if (![product.model_weight_g, product.model_height_mm, product.model_width_mm, product.model_length_mm]
+                .every((value) => Number.isFinite(Number(value)) && Number(value) > 0)) {
+                const error = new Error(`Shipping dimensions are missing for item: ${product.name || productId}`);
+                error.statusCode = 400;
+                throw error;
+            }
+
             const sellerAddress = normalizeSellerAddressFromRow(product);
             normalizedItems.push({
                 id: Number(product.id),
@@ -115,6 +129,12 @@ module.exports = function paymentController(deps) {
                 seller_id: Number(product.seller_id),
                 sellerName: product.shop_name || product.seller_username || `Seller ${product.seller_id}`,
                 sellerAddress,
+                model_weight_g: Number(product.model_weight_g),
+                model_height_mm: Number(product.model_height_mm),
+                model_width_mm: Number(product.model_width_mm),
+                model_length_mm: Number(product.model_length_mm),
+                days_to_prepare: Number(product.days_to_prepare) || 1,
+                daysToPrepare: Number(product.days_to_prepare) || 1,
             });
         }
 
@@ -235,17 +255,16 @@ module.exports = function paymentController(deps) {
             success_url: `${getFrontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
             cancel_url: `${getFrontendUrl()}/cancel?order_id=${orderId}`,
             ...(userEmail ? { customer_email: userEmail } : {}),
+            payment_intent_data: {
+                transfer_group: String(orderId),
+            },
             metadata: {
                 orderId,
                 userId: String(userId),
-                multiSeller: connectConfig.multiSeller ? "1" : "0",
+                multiSeller: "1",
                 platformFeeCents: String(connectConfig.platformFeeCents),
             },
         };
-
-        if (!connectConfig.multiSeller && connectConfig.payment_intent_data) {
-            sessionPayload.payment_intent_data = connectConfig.payment_intent_data;
-        }
 
         const session = await stripe.checkout.sessions.create(sessionPayload);
 
@@ -258,7 +277,8 @@ module.exports = function paymentController(deps) {
         return session;
     };
 
-    const calculateCheckoutAmounts = async ({ items, address }) => {
+    const calculateCheckoutAmounts = async ({ items, address, shippingTier = DEFAULT_SHIPPING_TIER }) => {
+        const validatedShippingTier = assertValidShippingTier(shippingTier);
         const normalizedItems = await normalizeCheckoutItemsFromDatabase(items);
         if (normalizedItems.length === 0) {
             const error = new Error("No items provided");
@@ -317,8 +337,10 @@ module.exports = function paymentController(deps) {
         }
 
         const shippingQuote = await calculateEasyPostShippingQuote({
+            pool,
             items: normalizedItems,
             toAddress: safeAddress,
+            shippingTier: validatedShippingTier,
         });
         const shippingCents = shippingQuote.shippingCents;
         const totalCents = subtotalCents + taxCents + shippingCents;
@@ -331,6 +353,7 @@ module.exports = function paymentController(deps) {
             shippingCents,
             totalCents,
             shippingQuote,
+            shippingTier: validatedShippingTier,
         };
     };
 
@@ -515,15 +538,14 @@ module.exports = function paymentController(deps) {
             const auth = isAuthenticatedAnIisValid(req, res, "nothing");
             if (!auth?.userId) return;
 
-            const { items, address } = req.body;
+            const { items, address, shippingTier } = req.body;
             if (!items || !items.length) {
                 return res.status(400).json({ error: "No items provided" });
             }
 
-            const totals = await calculateCheckoutAmounts({ items, address });
+            const totals = await calculateCheckoutAmounts({ items, address, shippingTier });
             assertCheckoutTotalsAreValid(totals.totalCents);
-            const validatedItems = await normalizeCheckoutItemsFromDatabase(items);
-            await loadSellerStripeAccounts(validatedItems);
+            await loadSellerStripeAccounts(totals.normalizedItems);
 
             res.json({
                 subtotal: totals.subtotalCents / 100,
@@ -535,7 +557,16 @@ module.exports = function paymentController(deps) {
                 taxCents: totals.taxCents,
                 shippingCents: totals.shippingCents,
                 totalCents: totals.totalCents,
+                shippingTier: totals.shippingTier,
+                shippingOptions: totals.shippingQuote.shippingOptions.map((option) => ({
+                    tier: option.tier,
+                    label: option.label,
+                    shipping: option.shipping,
+                    shippingCents: option.shippingCents,
+                    deliveryWindow: option.deliveryWindow,
+                })),
                 shippingQuote: {
+                    shippingTier: totals.shippingQuote.shippingTier,
                     originalShipping: totals.shippingQuote.originalShipping,
                     originalShippingCents: totals.shippingQuote.originalShippingCents,
                     markupRate: totals.shippingQuote.markupRate,
@@ -557,12 +588,12 @@ module.exports = function paymentController(deps) {
             const userResult = await pool.query(`SELECT email FROM users WHERE id = $1`, [auth.userId]);
             const userEmail = userResult.rows[0]?.email;
 
-            const { items, address } = req.body;
+            const { items, address, shippingTier } = req.body;
             if (!items || !items.length) {
                 return res.status(400).json({ error: "No items to checkout" });
             }
 
-            const totals = await calculateCheckoutAmounts({ items, address });
+            const totals = await calculateCheckoutAmounts({ items, address, shippingTier });
             const {
                 normalizedItems,
                 safeAddress,
@@ -635,6 +666,7 @@ module.exports = function paymentController(deps) {
                         tax: taxCents / 100,
                         shipping: shippingCents / 100,
                         shippingAndHandling: shippingCents / 100,
+                        shippingTier: totals.shippingTier,
                         shippingQuote,
                         total: totalCents / 100,
                     }),
@@ -661,17 +693,16 @@ module.exports = function paymentController(deps) {
                 success_url: `${getFrontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
                 cancel_url: `${getFrontendUrl()}/cancel?order_id=${orderId}`,
                 ...(userEmail ? { customer_email: userEmail } : {}),
+                payment_intent_data: {
+                    transfer_group: String(orderId),
+                },
                 metadata: {
                     orderId,
                     userId: String(authUser.id),
-                    multiSeller: connectConfig.multiSeller ? '1' : '0',
+                    multiSeller: '1',
                     platformFeeCents: String(connectConfig.platformFeeCents),
                 },
             };
-
-            if (!connectConfig.multiSeller && connectConfig.payment_intent_data) {
-                sessionPayload.payment_intent_data = connectConfig.payment_intent_data;
-            }
 
             const session = await stripe.checkout.sessions.create(sessionPayload);
 

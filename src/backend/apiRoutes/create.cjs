@@ -3,25 +3,14 @@ const path = require('path');
 
 
 const {
-  listSellerBoxes,
-  productFitsInAnyBox,
+  parseAndValidateProductDimensions,
   productDimensionsAreValid,
+} = require("./productDimensionsShared.cjs");
+const {
+  listSellerBoxes,
 } = require('./sellerBoxesShared.cjs');
+const { productFitsInAnyBox } = require('./sellerBoxPackingShared.cjs');
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require('./sellerOnboardingShared.cjs');
-
-function parseProductDimensions(body = {}) {
-  const modelWeightG = Number(body.modelWeight ?? body.modelWeightG ?? body.model_weight_g);
-  const modelHeightMm = Number(body.modelHeight ?? body.modelHeightMm ?? body.model_height_mm);
-  const modelWidthMm = Number(body.modelWidth ?? body.modelWidthMm ?? body.model_width_mm);
-  const modelLengthMm = Number(body.modelLength ?? body.modelLengthMm ?? body.model_length_mm);
-
-  return {
-    modelWeightG,
-    modelHeightMm,
-    modelWidthMm,
-    modelLengthMm,
-  };
-}
 
 module.exports = function createRoutes(deps) {
   const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, isAuthenticatedAnIisValid, enqueueWrite } = deps;
@@ -59,7 +48,18 @@ module.exports = function createRoutes(deps) {
       }
 
       const { modelName = '', description = '', price, category = '', tags, quantity } = req.body;
-      const dimensions = parseProductDimensions(req.body);
+      let dimensions;
+      try {
+        dimensions = parseAndValidateProductDimensions(req.body);
+      } catch (dimensionError) {
+        await cleanupUploadedFiles(photos);
+        return res.status(dimensionError.statusCode || 400).json({
+          message: 'Validation failed.',
+          errors: {
+            dimensions: dimensionError.message || 'Invalid model dimensions.',
+          },
+        });
+      }
       const parsedPrice = Number(price);
       const parsedQuantity = Math.max(1, Number(quantity) || 1);
 
@@ -98,7 +98,7 @@ module.exports = function createRoutes(deps) {
       }
 
       if (!productDimensionsAreValid(dimensions)) {
-        fieldErrors.dimensions = 'Model weight, height, width, and length are required and must be positive numbers.';
+        fieldErrors.dimensions = 'Model weight, height, width, and length are invalid.';
       }
 
       if (Object.keys(fieldErrors).length > 0) {
@@ -118,7 +118,7 @@ module.exports = function createRoutes(deps) {
         });
       }
 
-      const fitResult = productFitsInAnyBox(
+      const fitResult = await productFitsInAnyBox(
         {
           name: modelName,
           model_weight_g: dimensions.modelWeightG,
@@ -151,11 +151,15 @@ module.exports = function createRoutes(deps) {
           model_weight_g,
           model_height_mm,
           model_width_mm,
-          model_length_mm
+          model_length_mm,
+          model_weight_unit,
+          model_dimension_unit,
+          days_to_prepare
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags, quantity,
-                  model_weight_g, model_height_mm, model_width_mm, model_length_mm
+                  model_weight_g, model_height_mm, model_width_mm, model_length_mm,
+                  model_weight_unit, model_dimension_unit, days_to_prepare
       `;
       // Persist tags as explicit JSON for jsonb columns.
       const normalizedCategory = category ? category.trim() : null;
@@ -174,6 +178,9 @@ module.exports = function createRoutes(deps) {
         dimensions.modelHeightMm,
         dimensions.modelWidthMm,
         dimensions.modelLengthMm,
+        dimensions.modelWeightUnit,
+        dimensions.modelDimensionUnit,
+        dimensions.daysToPrepare,
       ];
       const productResult = await pool.query(insertProductQuery, productValues);
       const product = productResult.rows[0];

@@ -1,5 +1,14 @@
 const EasyPostClient = require("@easypost/api");
+const { listSellerBoxes } = require("./sellerBoxesShared.cjs");
+const {
+  packItemsIntoSmallestSellerBox,
+  resolvePrepareDays,
+} = require("./sellerBoxPackingShared.cjs");
+
 const SHIPPING_MARKUP_RATE = 0.165;
+const SHIPPING_TIERS = new Set(["economy", "standard", "express"]);
+const SHIPPING_TIER_ORDER = ["economy", "standard", "express"];
+const DEFAULT_SHIPPING_TIER = "economy";
 const DEFAULT_PARCEL = {
   length: Number(process.env.EASYPOST_DEFAULT_PARCEL_LENGTH_IN || 8),
   width: Number(process.env.EASYPOST_DEFAULT_PARCEL_WIDTH_IN || 6),
@@ -185,14 +194,77 @@ async function createEasyPostTracker({ trackingCode, carrier }) {
   }
 }
 
-function chooseCheapestRate(rates = []) {
+function normalizeShippingTier(value) {
+  const tier = String(value || DEFAULT_SHIPPING_TIER).trim().toLowerCase();
+  return SHIPPING_TIERS.has(tier) ? tier : DEFAULT_SHIPPING_TIER;
+}
+
+function assertValidShippingTier(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return DEFAULT_SHIPPING_TIER;
+  }
+
+  const tier = String(value).trim().toLowerCase();
+  if (!SHIPPING_TIERS.has(tier)) {
+    const error = new Error("Invalid shipping option selected.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return tier;
+}
+
+function normalizeRates(rates = []) {
   return rates
     .map((rate) => ({
       ...rate,
       rateCents: centsFromDollars(rate?.rate),
+      deliveryDays: Number.isFinite(Number(rate?.delivery_days))
+        ? Number(rate.delivery_days)
+        : Number.isFinite(Number(rate?.est_delivery_days))
+          ? Number(rate.est_delivery_days)
+          : null,
     }))
     .filter((rate) => rate.rateCents > 0 && String(rate.currency || "USD").toUpperCase() === "USD")
-    .sort((left, right) => left.rateCents - right.rateCents)[0] || null;
+    .sort((left, right) => left.rateCents - right.rateCents);
+}
+
+function pickShippingTierRate(rates = [], tier = DEFAULT_SHIPPING_TIER) {
+  const sorted = normalizeRates(rates);
+  if (sorted.length === 0) return null;
+
+  if (tier === "economy") {
+    return sorted[0];
+  }
+
+  if (tier === "standard") {
+    const middleIndex = Math.floor((sorted.length - 1) / 2);
+    return sorted[middleIndex];
+  }
+
+  const withDeliveryDays = sorted.filter((rate) => Number.isFinite(rate.deliveryDays));
+  const candidateRates = withDeliveryDays.length > 0 ? withDeliveryDays : sorted;
+  const fastestDays = Math.min(...candidateRates.map((rate) => rate.deliveryDays ?? Number.MAX_SAFE_INTEGER));
+  const fastestRates = candidateRates.filter((rate) => (rate.deliveryDays ?? Number.MAX_SAFE_INTEGER) === fastestDays);
+  return fastestRates.sort((left, right) => left.rateCents - right.rateCents)[0] || sorted[0];
+}
+
+function buildDeliveryWindowLabel(deliveryDays, prepareDays) {
+  const carrierDays = Number(deliveryDays);
+  const prepDays = Math.max(1, Math.min(7, Number(prepareDays) || 1));
+
+  if (!Number.isFinite(carrierDays) || carrierDays < 0) {
+    return `${1 + prepDays}-${7 + prepDays} business days`;
+  }
+
+  return `${carrierDays + 1}-${carrierDays + prepDays} business days`;
+}
+
+function applyShippingMarkup(originalShippingCents) {
+  return Math.ceil(Number(originalShippingCents || 0) * (1 + SHIPPING_MARKUP_RATE));
+}
+
+function chooseCheapestRate(rates = []) {
+  return pickShippingTierRate(rates, "economy");
 }
 
 function buildParcelForItems(items = []) {
@@ -253,7 +325,8 @@ function groupItemsBySeller(items = []) {
   return [...groups.values()];
 }
 
-async function calculateEasyPostShippingQuote({ items, toAddress }) {
+async function calculateEasyPostShippingQuote({ pool, items, toAddress, shippingTier = DEFAULT_SHIPPING_TIER }) {
+  const normalizedTier = normalizeShippingTier(shippingTier);
   const destination = normalizeAddressPayload({ ...toAddress, residential: true });
   const destinationError = validateUsAddress(destination, "shipping address", { requireStreetNumber: true });
   if (destinationError) {
@@ -269,7 +342,7 @@ async function calculateEasyPostShippingQuote({ items, toAddress }) {
     throw error;
   }
 
-  const shipments = [];
+  const shipmentQuotes = [];
   for (const group of groups) {
     const sellerAddress = normalizeAddressPayload(group.sellerAddress);
     const sellerAddressError = validateUsAddress(sellerAddress, `${group.sellerName} fulfillment address`, {
@@ -281,6 +354,21 @@ async function calculateEasyPostShippingQuote({ items, toAddress }) {
       throw error;
     }
 
+    const sellerBoxes = await listSellerBoxes(pool, group.sellerId);
+    if (sellerBoxes.length === 0) {
+      const error = new Error(`${group.sellerName} has not configured shipping boxes yet.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const packingResult = await packItemsIntoSmallestSellerBox(group.items, sellerBoxes);
+    if (!packingResult.fits) {
+      const error = new Error(`No seller box fits the selected items from ${group.sellerName}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const prepareDays = resolvePrepareDays(group.items);
     const shipment = await createEasyPostShipment({
       to_address: buildEasyPostAddress(destination, {
         name: "3D Printings Customer",
@@ -288,48 +376,116 @@ async function calculateEasyPostShippingQuote({ items, toAddress }) {
       from_address: buildEasyPostAddress(sellerAddress, {
         name: group.sellerName,
       }),
-      parcel: buildParcelForItems(group.items),
+      parcel: packingResult.parcel,
     });
 
-    const rate = chooseCheapestRate(shipment?.rates || []);
-    if (!rate) {
+    const rates = shipment?.rates || [];
+    if (rates.length === 0) {
       const error = new Error(`No EasyPost shipping rates found for ${group.sellerName}.`);
       error.statusCode = 502;
       throw error;
     }
 
-    const originalShippingCents = rate.rateCents;
-    const shippingCents = Math.ceil(originalShippingCents * (1 + SHIPPING_MARKUP_RATE));
-    shipments.push({
+    shipmentQuotes.push({
       sellerId: group.sellerId,
       sellerName: group.sellerName,
       productIds: group.items.map((item) => Number(item.id || item.productId)).filter(Number.isFinite),
       productNames: group.items.map((item) => item.name).filter(Boolean),
       quantity: group.items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0),
       easypostShipmentId: shipment.id || null,
-      rateId: rate.id || null,
-      carrier: rate.carrier || null,
-      service: rate.service || null,
+      rates,
+      prepareDays,
+      selectedBox: {
+        id: packingResult.box.id,
+        name: packingResult.box.name,
+        widthMm: packingResult.box.widthMm,
+        lengthMm: packingResult.box.lengthMm,
+        heightMm: packingResult.box.heightMm,
+        maxWeightG: packingResult.box.maxWeightG,
+      },
+      parcel: packingResult.parcel,
+      totalWeightG: packingResult.totalWeightG,
+    });
+  }
+
+  const shippingOptions = SHIPPING_TIER_ORDER.map((tier) => {
+    let originalShippingCents = 0;
+    let minDeliveryDays = null;
+    let maxDeliveryDays = null;
+
+    const tierShipments = shipmentQuotes.map((quote) => {
+      const rate = pickShippingTierRate(quote.rates, tier);
+      if (!rate) {
+        const error = new Error(`No shipping rate available for ${quote.sellerName}.`);
+        error.statusCode = 502;
+        throw error;
+      }
+
+      originalShippingCents += rate.rateCents;
+      const deliveryDays = rate.deliveryDays;
+      const minDays = Number.isFinite(deliveryDays) ? deliveryDays + 1 : null;
+      const maxDays = Number.isFinite(deliveryDays) ? deliveryDays + quote.prepareDays : null;
+      if (minDays !== null) {
+        minDeliveryDays = minDeliveryDays === null ? minDays : Math.max(minDeliveryDays, minDays);
+      }
+      if (maxDays !== null) {
+        maxDeliveryDays = maxDeliveryDays === null ? maxDays : Math.max(maxDeliveryDays, maxDays);
+      }
+
+      return {
+        sellerId: quote.sellerId,
+        sellerName: quote.sellerName,
+        productIds: quote.productIds,
+        productNames: quote.productNames,
+        quantity: quote.quantity,
+        easypostShipmentId: quote.easypostShipmentId,
+        rateId: rate.id || null,
+        carrier: rate.carrier || null,
+        service: rate.service || null,
+        originalShippingCents: rate.rateCents,
+        shippingCents: applyShippingMarkup(rate.rateCents),
+        originalShipping: dollarsFromCents(rate.rateCents),
+        shipping: dollarsFromCents(applyShippingMarkup(rate.rateCents)),
+        markupRate: SHIPPING_MARKUP_RATE,
+        deliveryDays: rate.deliveryDays,
+        deliveryDate: rate.delivery_date || null,
+        prepareDays: quote.prepareDays,
+        deliveryWindow: buildDeliveryWindowLabel(rate.deliveryDays, quote.prepareDays),
+        selectedBox: quote.selectedBox,
+        parcel: quote.parcel,
+        totalWeightG: quote.totalWeightG,
+        shippingTier: tier,
+      };
+    });
+
+    const shippingCents = tierShipments.reduce((sum, entry) => sum + entry.shippingCents, 0);
+
+    return {
+      tier,
+      label: tier === "economy" ? "Economy" : tier === "standard" ? "Standard" : "Express",
       originalShippingCents,
       shippingCents,
       originalShipping: dollarsFromCents(originalShippingCents),
       shipping: dollarsFromCents(shippingCents),
-      markupRate: SHIPPING_MARKUP_RATE,
-      deliveryDays: rate.delivery_days ?? rate.est_delivery_days ?? null,
-      deliveryDate: rate.delivery_date || null,
-    });
-  }
+      deliveryWindow: minDeliveryDays !== null && maxDeliveryDays !== null
+        ? `${minDeliveryDays}-${maxDeliveryDays} business days`
+        : buildDeliveryWindowLabel(null, Math.max(...tierShipments.map((entry) => entry.prepareDays || 1))),
+      shipments: tierShipments,
+    };
+  });
 
-  const originalShippingCents = shipments.reduce((sum, shipment) => sum + shipment.originalShippingCents, 0);
-  const shippingCents = shipments.reduce((sum, shipment) => sum + shipment.shippingCents, 0);
+  const selectedOption = shippingOptions.find((option) => option.tier === normalizedTier)
+    || shippingOptions[0];
 
   return {
-    originalShippingCents,
-    shippingCents,
-    originalShipping: dollarsFromCents(originalShippingCents),
-    shipping: dollarsFromCents(shippingCents),
+    shippingTier: selectedOption.tier,
+    shippingOptions,
+    originalShippingCents: selectedOption.originalShippingCents,
+    shippingCents: selectedOption.shippingCents,
+    originalShipping: selectedOption.originalShipping,
+    shipping: selectedOption.shipping,
     markupRate: SHIPPING_MARKUP_RATE,
-    shipments,
+    shipments: selectedOption.shipments,
   };
 }
 
@@ -350,6 +506,11 @@ function createInitialTrackingPayload(quote, nowIsoTime = new Date().toISOString
       trackerId: null,
       publicUrl: null,
       estDeliveryDate: shipment.deliveryDate || null,
+      deliveryWindow: shipment.deliveryWindow || null,
+      prepareDays: shipment.prepareDays || null,
+      selectedBox: shipment.selectedBox || null,
+      parcel: shipment.parcel || null,
+      shippingTier: shipment.shippingTier || null,
       submittedAt: null,
       updatedAt: nowIsoTime,
       events: [
@@ -908,9 +1069,12 @@ async function ensureSellerAddressColumn(pool) {
 }
 
 module.exports = {
+  DEFAULT_SHIPPING_TIER,
   SHIPPING_MARKUP_RATE,
+  SHIPPING_TIERS,
   addOrUpdateSellerTracker,
   applyLabelToSellerShipment,
+  assertValidShippingTier,
   buyEasyPostShipmentLabel,
   calculateEasyPostShippingQuote,
   centsFromDollars,
@@ -927,6 +1091,7 @@ module.exports = {
   mergeTrackerWebhookIntoOrders,
   normalizeAddressPayload,
   normalizeSellerAddressFromRow,
+  normalizeShippingTier,
   scheduleTestTrackingTimeline,
   validateEasyPostWebhookSignature,
   validateUsAddress,

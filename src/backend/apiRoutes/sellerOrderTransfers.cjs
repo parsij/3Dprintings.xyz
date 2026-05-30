@@ -2,6 +2,43 @@ const { distributeOrderTransfers } = require("./sellerStripeShared.cjs");
 
 let sellerTransfersColumnReady = false;
 
+async function paymentIntentUsesDestinationTransfer(stripe, paymentIntentId) {
+  if (!paymentIntentId) return false;
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(String(paymentIntentId));
+  return Boolean(paymentIntent.transfer_data?.destination);
+}
+
+async function markSellerTransfersCompleted(pool, orderId) {
+  await ensureSellerTransfersColumn(pool);
+  await pool.query(
+    `UPDATE orders
+     SET seller_transfers_completed = TRUE,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [orderId]
+  );
+}
+
+async function queueSellerTransfersIfNeeded(stripe, pool, enqueueWrite, orderId, paymentIntentId) {
+  if (!orderId || !paymentIntentId || typeof enqueueWrite !== "function") {
+    return { queued: false, reason: "missing_arguments" };
+  }
+
+  if (await paymentIntentUsesDestinationTransfer(stripe, paymentIntentId)) {
+    await markSellerTransfersCompleted(pool, orderId);
+    return { queued: false, reason: "destination_charge_already_routed" };
+  }
+
+  await enqueueWrite(
+    "orders.transferSellers",
+    { orderId, paymentIntentId: String(paymentIntentId) },
+    { jobKey: `transfer:${orderId}` }
+  );
+
+  return { queued: true };
+}
+
 async function ensureSellerTransfersColumn(pool) {
   if (sellerTransfersColumnReady) return;
 
@@ -90,5 +127,8 @@ async function processMultiSellerTransfers(stripe, pool, orderId, paymentIntentI
 
 module.exports = {
   ensureSellerTransfersColumn,
+  markSellerTransfersCompleted,
+  paymentIntentUsesDestinationTransfer,
   processMultiSellerTransfers,
+  queueSellerTransfersIfNeeded,
 };

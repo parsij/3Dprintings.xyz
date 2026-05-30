@@ -41,7 +41,10 @@ function allocateSellerPayoutsCents(orderItems, totalCents, platformFeeCents) {
   }
 
   const subtotalCents = [...sellerTotals.values()].reduce((sum, value) => sum + value, 0);
-  const distributableCents = Math.max(0, Math.round(Number(totalCents) || 0) - platformFeeCents);
+  // Sellers receive product revenue only (after platform fee on products).
+  // Tax, shipping, and shipping markup stay on the platform balance.
+  const sellerPlatformFeeCents = calculatePlatformFeeCents(subtotalCents);
+  const distributableCents = Math.max(0, subtotalCents - sellerPlatformFeeCents);
   const allocations = [];
 
   if (subtotalCents <= 0 || sellerTotals.size === 0) {
@@ -442,6 +445,18 @@ async function distributeOrderTransfers(stripe, pool, { orderId, paymentIntentId
   const allocations = allocateSellerPayoutsCents(orderItems, totalCents, platformFeeCents);
   const transfers = [];
 
+  const paymentIntent = await stripe.paymentIntents.retrieve(String(paymentIntentId));
+  const sourceTransaction = paymentIntent.latest_charge;
+  if (!sourceTransaction) {
+    const error = new Error(`PaymentIntent ${paymentIntentId} has no charge for seller transfers.`);
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const sourceTransactionId = typeof sourceTransaction === "string"
+    ? sourceTransaction
+    : sourceTransaction.id;
+
   for (const allocation of allocations) {
     const destination = await assertSellerCanReceivePayments(pool, stripe, allocation.sellerId);
 
@@ -450,10 +465,12 @@ async function distributeOrderTransfers(stripe, pool, { orderId, paymentIntentId
         amount: allocation.amountCents,
         currency: "usd",
         destination,
-        transfer_group: paymentIntentId,
+        source_transaction: sourceTransactionId,
+        transfer_group: String(paymentIntentId),
         metadata: {
           orderId: String(orderId),
           sellerId: String(allocation.sellerId),
+          platformFeeCents: String(platformFeeCents),
         },
       },
       {
@@ -473,35 +490,27 @@ async function distributeOrderTransfers(stripe, pool, { orderId, paymentIntentId
 function buildCheckoutPaymentIntentData({ totalCents, orderItems, sellerAccountById }) {
   const { platformFeeCents } = assertCheckoutTotalsAreValid(totalCents);
   const allocations = allocateSellerPayoutsCents(orderItems, totalCents, platformFeeCents);
-  const uniqueSellerIds = [...new Set(allocations.map((entry) => entry.sellerId))];
 
-  if (uniqueSellerIds.length === 0) {
+  if (allocations.length === 0) {
     const error = new Error("Checkout items are missing seller payout details.");
     error.statusCode = 400;
     throw error;
   }
 
-  if (uniqueSellerIds.length !== 1) {
-    return { multiSeller: true, platformFeeCents, allocations };
+  for (const allocation of allocations) {
+    if (!sellerAccountById.get(allocation.sellerId)) {
+      const error = new Error("Seller payout account is not configured.");
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
-  const sellerId = uniqueSellerIds[0];
-  const destination = sellerAccountById.get(sellerId);
-  if (!destination) {
-    const error = new Error("Seller payout account is not configured.");
-    error.statusCode = 400;
-    throw error;
-  }
-
+  // Collect the full payment on the platform and transfer seller shares after
+  // checkout completes so the platform fee stays on the platform balance.
   return {
-    multiSeller: false,
+    multiSeller: true,
     platformFeeCents,
-    payment_intent_data: {
-      application_fee_amount: platformFeeCents,
-      transfer_data: {
-        destination,
-      },
-    },
+    allocations,
   };
 }
 

@@ -20,6 +20,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { ensureSellerDashboardTable } = require("./apiRoutes/sellerShared.cjs");
 const { ensureSellerMarketplaceSchema } = require("./apiRoutes/sellerMarketplaceSchema.cjs");
 const { evaluateStripeConnectReadiness } = require("./apiRoutes/sellerStripeShared.cjs");
+const { queueSellerTransfersIfNeeded } = require("./apiRoutes/sellerOrderTransfers.cjs");
 const { ensureInventoryDeductedColumn } = require("./apiRoutes/orderFulfillment.cjs");
 const { initWorkerQueue, startWorkerRunner, shutdownWorkerQueue } = require("./worker/queue.cjs");
 const { csrfProtection, setCsrfCookie, clearCsrfCookie } = require("./csrf.cjs");
@@ -509,11 +510,13 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
                   );
               }
 
-              if (session.metadata?.multiSeller === '1' && session.payment_intent) {
-                  await enqueueWrite(
-                      'orders.transferSellers',
-                      { orderId, paymentIntentId: String(session.payment_intent) },
-                      { jobKey: `transfer:${orderId}` }
+              if (session.payment_intent) {
+                  await queueSellerTransfersIfNeeded(
+                      stripe,
+                      pool,
+                      enqueueWrite,
+                      orderId,
+                      String(session.payment_intent)
                   );
               }
               let paymentType = 'card';

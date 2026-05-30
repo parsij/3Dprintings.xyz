@@ -122,7 +122,7 @@ const taskList = {
     const { orderId } = payload;
     if (!orderId) return;
 
-    const { shouldContinue } = await runOrderPaymentCheck(appPool, stripe, orderId);
+    const { shouldContinue } = await runOrderPaymentCheck(appPool, stripe, orderId, enqueueWrite);
     if (!shouldContinue) return;
 
     await enqueueWrite(
