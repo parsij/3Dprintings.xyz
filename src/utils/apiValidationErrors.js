@@ -196,7 +196,7 @@ function buildFieldErrorsFromResponse(data, status) {
   }
 
   if (!fieldErrors.general && status === 413) {
-    fieldErrors.general = "The upload is too large. Use smaller photos and try again.";
+    fieldErrors.general = "We could not upload one of your photos. Try again with fewer photos.";
   }
 
   if (!fieldErrors.general && status >= 500) {

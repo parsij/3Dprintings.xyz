@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 
 
@@ -10,6 +9,7 @@ const {
 } = require('./sellerBoxesShared.cjs');
 const { productFitsInAnyBox, getProductBoxFitMessage } = require('./sellerBoxPackingShared.cjs');
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require('./sellerOnboardingShared.cjs');
+const { optimizeUploadedProductPhoto } = require('./imageProcessingShared.cjs');
 
 module.exports = function createRoutes(deps) {
   const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, isAuthenticatedAnIisValid, enqueueWrite } = deps;
@@ -236,19 +236,29 @@ module.exports = function createRoutes(deps) {
       const productId = product.id;
 
       // Rename photo files and collect their new names
-      const renamedPhotos = await Promise.all(
-        photos.map(async (file, index) => {
-          const extension = path.extname(file.filename || file.originalname || '').toLowerCase() || '.jpg';
-          const renamedFileName = `${productId}-${index + 1}${extension}`;
-          const renamedFilePath = path.join(path.dirname(file.path), renamedFileName);
+      const renamedPhotos = [];
+      for (const [index, file] of photos.entries()) {
+        const renamedFileName = `${productId}-${index + 1}.webp`;
+        const renamedFilePath = path.join(path.dirname(file.path), renamedFileName);
 
-          await fs.promises.rename(file.path, renamedFilePath);
+        try {
+          await optimizeUploadedProductPhoto(file.path, renamedFilePath);
+        } catch (optimizeError) {
+          await cleanupUploadedFiles(photos);
+          console.error('Photo optimization error:', optimizeError?.message);
+          return res.status(400).json({
+            message: 'Could not process one of your photos. Try a different image.',
+            errors: {
+              photos: 'Could not process one of your photos. Try a different image.',
+            },
+          });
+        }
 
-          file.filename = renamedFileName;
-          file.path = renamedFilePath;
-          return file;
-        })
-      );
+        file.filename = renamedFileName;
+        file.path = renamedFilePath;
+        file.mimetype = 'image/webp';
+        renamedPhotos.push(file);
+      }
       const imageFileNames = renamedPhotos.map(file => file.filename);
 
       await pool.query(

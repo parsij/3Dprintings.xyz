@@ -41,9 +41,9 @@ const { clearAuthCookie: expireAuthCookies } = require("./authCookies.cjs");
 const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
-const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const MAX_PHOTO_SIZE = 50 * 1024 * 1024;
 const MAX_REVIEW_CONTENT_LENGTH = 5000;
-const ALLOWED_UPLOAD_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const uploadDir = path.join(__dirname, "imgUploads");
@@ -821,7 +821,7 @@ const { resolveClientError } = require("./apiErrorShared.cjs");
 function getClientErrorResponse(error) {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
-      return { statusCode: 400, message: "Each photo must be 5MB or less." };
+      return { statusCode: 400, message: "One of your photos could not be processed. Try another image." };
     }
     if (error.code === "LIMIT_FILE_COUNT") {
       return { statusCode: 400, message: `You can upload up to ${MAX_PHOTOS} photos.` };

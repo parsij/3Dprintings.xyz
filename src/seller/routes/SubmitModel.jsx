@@ -5,6 +5,7 @@ import Tags from "../../components/Tags.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
 import ProductSpecsFields from "../components/ProductSpecsFields.jsx";
 import { validateProductSpecs } from "../services/productSpecsValidation.js";
+import { compressListingPhotos } from "../../utils/compressListingPhoto.js";
 import { FieldLabel, FIELD_CLASS, RequiredMark } from "../components/listingFormUi.jsx";
 import {
   getFirstListingFieldError,
@@ -197,6 +198,8 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   const [boxesUrl, setBoxesUrl] = useState(null);
   const [onboardingUrl, setOnboardingUrl] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
+  const [photoProcessingError, setPhotoProcessingError] = useState("");
 
   useEffect(() => {
     const urls = photos.map((file) => URL.createObjectURL(file));
@@ -306,10 +309,32 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   }
 
   function handlePhotoChange(event) {
-    clearServerError("photos");
-    const selectedFiles = Array.from(event.target.files || []);
-    setPhotos((prev) => mergePhotos(prev, selectedFiles));
+    void addPhotos(Array.from(event.target.files || []));
     event.target.value = "";
+  }
+
+  async function addPhotos(incomingPhotos) {
+    if (!incomingPhotos.length) {
+      return;
+    }
+
+    clearServerError("photos");
+    setPhotoProcessingError("");
+    setIsProcessingPhotos(true);
+
+    try {
+      const optimizedPhotos = await compressListingPhotos(incomingPhotos);
+      if (optimizedPhotos.length === 0) {
+        setPhotoProcessingError("Only image files can be uploaded.");
+        return;
+      }
+
+      setPhotos((prev) => mergePhotos(prev, optimizedPhotos));
+    } catch {
+      setPhotoProcessingError("We couldn't prepare one of your photos. Try a different image.");
+    } finally {
+      setIsProcessingPhotos(false);
+    }
   }
 
   function removePhoto(indexToRemove) {
@@ -330,9 +355,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   function handleDrop(event) {
     event.preventDefault();
     setIsDragActive(false);
-    clearServerError("photos");
-    const droppedFiles = Array.from(event.dataTransfer.files || []);
-    setPhotos((prev) => mergePhotos(prev, droppedFiles));
+    void addPhotos(Array.from(event.dataTransfer.files || []));
   }
 
   async function handleSubmit(event) {
@@ -342,6 +365,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     setServerErrors({});
     setBoxesUrl(null);
     setOnboardingUrl(null);
+
+    if (isProcessingPhotos) {
+      setSubmitMessage("Please wait while your photos finish optimizing.");
+      return;
+    }
 
     if (!isFormValid) {
       return;
@@ -424,10 +452,16 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                     isDragActive
                         ? "border-orange-500 bg-orange-100 scale-[1.01] shadow-lg"
                         : "border-orange-200 bg-orange-50/60 hover:border-orange-400 hover:bg-orange-100/40 hover:scale-[1.01]"
-                }`}
+                } ${isProcessingPhotos ? "pointer-events-none opacity-70" : ""}`}
             >
-              <span className="text-sm font-medium text-gray-700">Drag and drop images here, or click to upload</span>
-              <span className="mt-1 text-xs text-gray-500">PNG, JPG, WEBP or GIF (max {MAX_PHOTOS} photos)</span>
+              <span className="text-sm font-medium text-gray-700">
+                {isProcessingPhotos
+                  ? "Optimizing photos..."
+                  : "Drag and drop images here, or click to upload"}
+              </span>
+              <span className="mt-1 text-xs text-gray-500">
+                Any size JPG, PNG, WEBP, or GIF — large photos are automatically compressed (max {MAX_PHOTOS} photos)
+              </span>
             </label>
             <input
                 id="modelPhotos"
@@ -438,6 +472,9 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 onChange={handlePhotoChange}
                 className="hidden"
             />
+            {photoProcessingError && (
+              <p className="mt-2 text-xs text-red-500">{photoProcessingError}</p>
+            )}
             {submitted && displayErrors.photos && (
               <p className="mt-2 text-xs text-red-500">{displayErrors.photos}</p>
             )}
@@ -577,14 +614,18 @@ export default function SubmitModel({ onSubmissionSuccess }) {
 
             <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isProcessingPhotos}
                 className={`w-full cursor-pointer rounded-xl py-3 font-semibold text-white transition-all duration-300 ${
-                    isSubmitting
+                    isSubmitting || isProcessingPhotos
                         ? "cursor-not-allowed bg-orange-300 opacity-70"
                         : "bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
                 }`}
             >
-            {isSubmitting ? "Preparing listing..." : "Submit listing"}
+            {isProcessingPhotos
+              ? "Optimizing photos..."
+              : isSubmitting
+                ? "Preparing listing..."
+                : "Submit listing"}
           </button>
 
           {submitMessage && (
