@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Box, Lock, Package, Ruler, Scale } from "lucide-react";
+import {
+  Box,
+  Check as CheckIcon,
+  Lock,
+  PenLine as EditIcon,
+  Ruler,
+  Scale,
+  Trash2 as TrashIcon,
+  X as XIcon,
+} from "lucide-react";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
 import UnitNumberInput from "../components/UnitNumberInput.jsx";
@@ -44,6 +53,9 @@ export default function SellerBoxes() {
   const [form, setForm] = useState(EMPTY_BOX);
   const [editingId, setEditingId] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [deletingBoxId, setDeletingBoxId] = useState(null);
+  const [successBoxId, setSuccessBoxId] = useState(null);
+  const [errorBoxId, setErrorBoxId] = useState(null);
 
   const loadBoxes = async () => {
     setLoading(true);
@@ -125,23 +137,28 @@ export default function SellerBoxes() {
     setEditingId(box.id);
     setForm(boxToFormValues(box, form.dimensionUnit, form.weightUnit));
     setSubmitted(false);
+    setErrorBoxId(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (box) => {
-    if (!box.canDelete) return;
-    setSaving(true);
+    if (!box.canDelete || deletingBoxId) return;
     setError("");
     setMessage("");
+    setErrorBoxId(null);
+    setDeletingBoxId(box.id);
     try {
       await deleteSellerBox(box.id);
-      setMessage("Box removed.");
+      setSuccessBoxId(box.id);
       if (editingId === box.id) resetForm();
       await loadBoxes();
+      setTimeout(() => setSuccessBoxId(null), 2000);
     } catch (err) {
+      setErrorBoxId(box.id);
       setError(err?.response?.data?.message || "Failed to delete box.");
+      setTimeout(() => setErrorBoxId(null), 3000);
     } finally {
-      setSaving(false);
+      setDeletingBoxId(null);
     }
   };
 
@@ -149,22 +166,16 @@ export default function SellerBoxes() {
     <div className="min-h-screen bg-[#f2f2f2]">
       <SellerNavBar pageName="Boxes" />
       <SideMenu title="Seller Menu" role="seller" />
-      <main className="mx-auto max-w-4xl px-4 pb-12 pt-28">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Shipping boxes</h1>
-            <p className="mt-2 max-w-2xl text-sm text-gray-600">
-              Define the boxes you ship with. Products must fit inside at least one box at 95% capacity.
-              {productCount > 0 ? " You must keep at least one box while products are listed." : ""}
-            </p>
-          </div>
-          <div className="rounded-xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-              <Package className="h-4 w-4 text-orange-500" />
-              {productCount} listed product{productCount === 1 ? "" : "s"}
-            </div>
-            <div className="mt-1 text-xs text-gray-500">{boxes.length} shipping box{boxes.length === 1 ? "" : "es"}</div>
-          </div>
+      <main className="mx-auto max-w-7xl px-4 pb-12 pt-24 lg:px-[5vw]">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Shipping boxes</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {boxes.length} shipping box{boxes.length === 1 ? "" : "es"} configured
+          </p>
+          <p className="mt-2 max-w-2xl text-sm text-gray-600">
+            Define the boxes you ship with. Products must fit inside at least one box at 95% capacity.
+            {productCount > 0 ? " You must keep at least one box while products are listed." : ""}
+          </p>
         </div>
 
         {!coversLargestProduct ? (
@@ -177,10 +188,10 @@ export default function SellerBoxes() {
         ) : null}
 
         {error ? (
-          <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600">{error}</p>
         ) : null}
         {message ? (
-          <p className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{message}</p>
+          <p className="mb-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-700">{message}</p>
         ) : null}
 
         <section className="mt-6 rounded-2xl border border-orange-100 bg-white shadow-lg">
@@ -290,68 +301,106 @@ export default function SellerBoxes() {
           </form>
         </section>
 
-        <section className="mt-6 space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Your boxes</h2>
-          {loading ? <p className="text-gray-600">Loading boxes...</p> : null}
-          {!loading && boxes.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">
-              No boxes yet. Add your first shipping box above.
-            </div>
-          ) : null}
-          {boxes.map((box) => (
-            <article
-              key={box.id}
-              className={`overflow-hidden rounded-xl border bg-white shadow-sm transition-all duration-300 hover:shadow-md ${
-                editingId === box.id ? "border-orange-400 ring-2 ring-orange-100" : "border-gray-200"
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4 p-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-gray-900">{box.name}</h3>
-                    {!box.canDelete ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                        <Lock className="h-3 w-3" />
-                        Required
+        {loading ? <p className="text-sm text-gray-600 animate-pulse">Loading shipping boxes...</p> : null}
+
+        {!loading && boxes.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 text-center text-gray-500">
+            No boxes yet. Add your first shipping box above.
+          </div>
+        ) : null}
+
+        <div className="mt-6 space-y-3">
+          {boxes.map((box) => {
+            const isDeleting = deletingBoxId === box.id;
+            const isSuccess = successBoxId === box.id;
+            const isError = errorBoxId === box.id;
+            const canDelete = box.canDelete && !deletingBoxId;
+
+            return (
+              <article
+                key={box.id}
+                className={`flex items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-2xs ${
+                  editingId === box.id ? "border-orange-400 ring-2 ring-orange-100" : "border-gray-200"
+                }`}
+              >
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-3xs">
+                    <Box className="h-6 w-6 text-orange-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate font-bold text-gray-900">{box.name}</h3>
+                      {!box.canDelete ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                          <Lock className="h-3 w-3" />
+                          Required
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Ruler className="h-3.5 w-3.5 text-orange-500" />
+                        {formatBoxDimensions(box, "in")} · {formatBoxDimensions(box, "cm")}
                       </span>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Scale className="h-3.5 w-3.5 text-orange-500" />
+                        {formatBoxWeight(box, "lb")} · {formatBoxWeight(box, "kg")}
+                      </span>
+                    </div>
+                    {!box.canDelete && box.deleteBlockedReason ? (
+                      <p className="mt-1 text-xs text-amber-700">{box.deleteBlockedReason}</p>
                     ) : null}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Ruler className="h-4 w-4 text-orange-500" />
-                      {formatBoxDimensions(box, "in")} · {formatBoxDimensions(box, "cm")}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Scale className="h-4 w-4 text-orange-500" />
-                      {formatBoxWeight(box, "lb")} · {formatBoxWeight(box, "kg")}
-                    </span>
-                  </div>
-                  {!box.canDelete && box.deleteBlockedReason ? (
-                    <p className="mt-2 text-xs text-amber-700">{box.deleteBlockedReason}</p>
-                  ) : null}
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleEdit(box)}
-                    className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-100"
+                    className="flex shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-gray-950 p-2.5 font-bold text-white shadow-xs transition-all duration-300 ease-in-out transform-gpu hover:scale-105 sm:px-4 sm:py-2"
                   >
-                    Edit
+                    <EditIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Edit Box</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(box)}
-                    disabled={!box.canDelete || saving}
-                    title={box.canDelete ? "Remove box" : box.deleteBlockedReason || "Cannot remove this box"}
-                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={!canDelete || isSuccess || isError}
+                    title={
+                      isSuccess
+                        ? "Removed!"
+                        : isError
+                        ? "Failed to remove!"
+                        : box.canDelete
+                        ? "Remove box"
+                        : box.deleteBlockedReason || "Cannot remove this box"
+                    }
+                    className={`flex items-center justify-center rounded-md border p-1.5 transition-all duration-300 ${
+                      isSuccess
+                        ? "cursor-default border-green-500 bg-green-500 text-white"
+                        : isError
+                        ? "cursor-default border-red-500 bg-red-500 text-white"
+                        : !canDelete
+                        ? "cursor-not-allowed border-gray-200 bg-gray-200 text-gray-400"
+                        : "cursor-pointer border-red-200 bg-white text-red-600 shadow-sm hover:bg-red-50"
+                    }`}
                   >
-                    Remove
+                    {isDeleting ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-red-400" />
+                    ) : isSuccess ? (
+                      <CheckIcon className="h-4 w-4 animate-pulse" />
+                    ) : isError ? (
+                      <XIcon className="h-4 w-4 animate-pulse" />
+                    ) : (
+                      <TrashIcon className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
-              </div>
-            </article>
-          ))}
-        </section>
+              </article>
+            );
+          })}
+        </div>
 
         <p className="mt-6 text-sm text-gray-600">
           Need to list a product? Return to{" "}
