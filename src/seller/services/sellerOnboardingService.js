@@ -73,8 +73,3 @@ export async function saveSellerShippingOrigin(payload) {
   const response = await apiClient.post("/api/seller/onboarding/shipping", payload);
   return response.data;
 }
-
-export async function saveSellerFirstBox(payload) {
-  const response = await apiClient.post("/api/seller/onboarding/first-box", payload);
-  return response.data;
-}

@@ -23,7 +23,7 @@ function hasSellerRole(user) {
 const ONBOARDING_ROUTE_BY_STEP = {
   stripe_connect: "/onboarding/stripe",
   shipping_origin: "/onboarding/shipping",
-  first_box: "/onboarding/box",
+  first_box: "/boxes?new=1",
   completed: null,
 };
 
@@ -149,8 +149,8 @@ const SellerRouter = ({ user, setUser }) => {
         <Route
           path="/onboarding/box"
           element={
-            <ProtectedSellerRoute user={user} allowIncomplete>
-              <SellerOnboarding step="first_box" />
+            <ProtectedSellerRoute user={user}>
+              <Navigate to="/boxes?new=1" replace />
             </ProtectedSellerRoute>
           }
         />

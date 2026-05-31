@@ -293,9 +293,10 @@ function shouldLogAddressVerificationVerbose() {
   return flag === "1" || flag === "true" || flag === "yes";
 }
 
-async function verifyAddressWithEasyPost(address, fallback = {}, label = "address") {
+async function verifyAddressWithEasyPost(address, fallback = {}, label = "address", options = {}) {
   const normalized = normalizeAddressPayload(address);
   const verbose = shouldLogAddressVerificationVerbose();
+  const allowNotFoundSoftPass = options?.allowNotFoundSoftPass !== false;
 
   if (verbose) {
     logAddressVerificationDebug("request.input", {
@@ -354,7 +355,7 @@ async function verifyAddressWithEasyPost(address, fallback = {}, label = "addres
       return easyPostAddressToNormalized(verified);
     }
 
-    if (isEasyPostNotFoundOnly(verified)) {
+    if (allowNotFoundSoftPass && isEasyPostNotFoundOnly(verified)) {
       logAddressVerificationDebug("response.easypost-not-found-soft-pass", {
         label,
         request: snapshotAddressForDebug(normalized),
@@ -426,7 +427,7 @@ async function verifyAddressWithEasyPost(address, fallback = {}, label = "addres
   }
 }
 
-async function resolveVerifiedShippingAddress(address, fallback = {}, label = "Shipping address") {
+async function resolveVerifiedShippingAddress(address, fallback = {}, label = "Shipping address", options = {}) {
   const normalized = normalizeAddressPayload({ ...address, residential: true });
   const validationError = validateUsAddress(normalized, label, { requireStreetNumber: true });
   if (validationError) {
@@ -445,7 +446,7 @@ async function resolveVerifiedShippingAddress(address, fallback = {}, label = "S
     });
   }
 
-  return verifyAddressWithEasyPost(normalized, fallback, label);
+  return verifyAddressWithEasyPost(normalized, fallback, label, options);
 }
 
 function getEasyPostClient() {

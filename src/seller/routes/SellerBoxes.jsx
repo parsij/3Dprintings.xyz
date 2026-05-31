@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Box,
   Check as CheckIcon,
@@ -135,6 +135,9 @@ function ModalCloseButton({ onClick, label }) {
 }
 
 export default function SellerBoxes() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoOpenedCreateModalRef = useRef(false);
+  const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -210,6 +213,29 @@ export default function SellerBoxes() {
     setIsModalOpen(true);
   };
 
+  useEffect(() => {
+    if (autoOpenedCreateModalRef.current) return;
+
+    const shouldOpen =
+      searchParams.get("new") === "1"
+      || searchParams.get("newBox") === "1"
+      || searchParams.get("create") === "1";
+    if (!shouldOpen) return;
+
+    autoOpenedCreateModalRef.current = true;
+    setShowOnboardingPrompt(true);
+    setForm(EMPTY_BOX);
+    setSubmitted(false);
+    setSaveError(false);
+    setIsModalOpen(true);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("new");
+    nextParams.delete("newBox");
+    nextParams.delete("create");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const handleEdit = (box) => {
     setEditingBox(box);
     setForm(boxToFormValues(box, "in", "lb"));
@@ -234,6 +260,7 @@ export default function SellerBoxes() {
         await createSellerBox(payload);
       }
       await loadBoxes();
+      setShowOnboardingPrompt(false);
       closeBoxModal();
     } catch (err) {
       setSaveError(true);
@@ -289,6 +316,15 @@ export default function SellerBoxes() {
             + New Box
           </button>
         </div>
+
+        {showOnboardingPrompt && boxes.length === 0 ? (
+          <div className="mb-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+            <p className="font-semibold">Almost there — add your first shipping box</p>
+            <p className="mt-1 text-orange-800">
+              You need at least one box before listing products. Use the form below to define interior dimensions and max weight.
+            </p>
+          </div>
+        ) : null}
 
         {!coversLargestProduct ? (
           <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">

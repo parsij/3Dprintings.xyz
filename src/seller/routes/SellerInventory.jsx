@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import Tags from "../../components/Tags.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
 import ProductSpecsFields from "../components/ProductSpecsFields.jsx";
 import { validateProductSpecs } from "../services/productSpecsValidation.js";
 import { FieldLabel, FIELD_CLASS } from "../components/listingFormUi.jsx";
 import {
+  getSellerBoxes,
   getSellerProducts,
   updateSellerProduct,
 } from "../services/sellerPortalService.js";
@@ -41,6 +43,8 @@ export default function SellerInventory() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState("");
   const [sellerProducts, setSellerProducts] = useState([]);
+  const [boxesLoading, setBoxesLoading] = useState(false);
+  const [boxCount, setBoxCount] = useState(null);
   const [editForms, setEditForms] = useState({});
   const [savingProductId, setSavingProductId] = useState(null);
   const [successProductId, setSuccessProductId] = useState(null);
@@ -74,7 +78,34 @@ export default function SellerInventory() {
     reloadProducts();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBoxes() {
+      setBoxesLoading(true);
+      try {
+        const response = await getSellerBoxes();
+        if (cancelled) return;
+        const boxes = Array.isArray(response.boxes) ? response.boxes : [];
+        setBoxCount(boxes.length);
+      } catch (error) {
+        if (!cancelled) {
+          setProductsError(error?.response?.data?.message || "Failed to load seller boxes.");
+          setBoxCount(0);
+        }
+      } finally {
+        if (!cancelled) setBoxesLoading(false);
+      }
+    }
+
+    loadBoxes();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const formattedProductsCount = useMemo(() => sellerProducts.length, [sellerProducts.length]);
+  const canAddProducts = !boxesLoading && Number(boxCount || 0) > 0;
 
   const editingForm = editingProduct ? editForms[editingProduct.id] : null;
 
@@ -205,12 +236,29 @@ export default function SellerInventory() {
 
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="bg-gray-950 text-white font-bold px-5 py-2.5 rounded-xl transition-all duration-300 ease-in-out transform-gpu hover:scale-105 shadow-md cursor-pointer whitespace-nowrap"
+            onClick={() => {
+              if (canAddProducts) setIsModalOpen(true);
+            }}
+            disabled={!canAddProducts}
+            className={`font-bold px-5 py-2.5 rounded-xl transition-all duration-300 ease-in-out transform-gpu shadow-md whitespace-nowrap ${
+              canAddProducts
+                ? "bg-gray-950 text-white hover:scale-105 cursor-pointer"
+                : "cursor-not-allowed bg-gray-300 text-gray-500"
+            }`}
           >
             + New Product
           </button>
         </div>
+
+        {!boxesLoading && Number(boxCount || 0) === 0 ? (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Add at least one shipping box before creating product listings.{" "}
+            <Link to="/boxes?new=1" className="font-semibold text-orange-700 hover:underline">
+              Add a box
+            </Link>
+            .
+          </div>
+        ) : null}
 
         {productsError ? (
           <p className="mb-4 text-sm font-medium text-red-600 bg-red-50 p-3 rounded-xl border border-red-200">{productsError}</p>
@@ -332,7 +380,7 @@ export default function SellerInventory() {
         </div>
       </main>
 
-      {isModalOpen ? (
+      {isModalOpen && canAddProducts ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="relative bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-100 max-h-[90vh] overflow-y-auto pt-14">
             <button

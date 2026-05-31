@@ -2,15 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import SellerNavBar from "../components/SellerNavBar.jsx";
+import { suggestAccountAddress } from "../../services/accountSettingsService.js";
 import {
   createStripeConnectLink,
   getSellerOnboardingStatus,
-  saveSellerFirstBox,
   saveSellerShippingOrigin,
   verifyStripeConnectOnboardingWithRetry,
 } from "../services/sellerOnboardingService.js";
 
 const MotionDiv = motion.div;
+const ADDRESS_AUTOCOMPLETE_DEBOUNCE_MS = 100;
 
 const EMPTY_ADDRESS = {
   line1: "",
@@ -25,7 +26,7 @@ const EMPTY_ADDRESS = {
 const ONBOARDING_ROUTE_BY_STEP = {
   stripe_connect: "/onboarding/stripe",
   shipping_origin: "/onboarding/shipping",
-  first_box: "/onboarding/box",
+  first_box: "/boxes?new=1",
   completed: "/inventory",
 };
 
@@ -47,13 +48,9 @@ export default function SellerOnboarding({ step }) {
   const [stripeNotice, setStripeNotice] = useState("");
   const [status, setStatus] = useState(null);
   const [shippingAddress, setShippingAddress] = useState(EMPTY_ADDRESS);
-  const [boxForm, setBoxForm] = useState({
-    name: "Primary Box",
-    width: "",
-    length: "",
-    height: "",
-    maxWeight: "",
-  });
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
+  const [isSuggestingAddress, setIsSuggestingAddress] = useState(false);
 
   const stripeReturnMode = searchParams.get("return") === "1"
     ? "return"
@@ -95,7 +92,7 @@ export default function SellerOnboarding({ step }) {
         }
 
         if (data.isComplete) {
-          navigate("/inventory", { replace: true });
+          navigate(data.boxCount > 0 ? "/inventory" : "/boxes?new=1", { replace: true });
           return;
         }
 
@@ -193,6 +190,38 @@ export default function SellerOnboarding({ step }) {
     };
   }, [clearStripeReturnParams, loading, navigate, step, stripeReturnMode]);
 
+  useEffect(() => {
+    if (activeStep !== "shipping_origin") return undefined;
+
+    const q = shippingAddress.line1.trim();
+    if (q.length < 3) {
+      setAddressSuggestions([]);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        setIsSuggestingAddress(true);
+        const data = await suggestAccountAddress(q, { limit: 6, signal: controller.signal });
+        const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : [];
+        setAddressSuggestions(suggestions);
+      } catch {
+        if (controller.signal.aborted) return;
+        setAddressSuggestions([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSuggestingAddress(false);
+        }
+      }
+    }, ADDRESS_AUTOCOMPLETE_DEBOUNCE_MS);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [activeStep, shippingAddress.line1]);
+
   const handleStripeRemediation = () => {
     const actionUrl = stripeRequiresAction?.actionUrl || stripeActionUrl;
     if (actionUrl) {
@@ -231,7 +260,7 @@ export default function SellerOnboarding({ step }) {
     try {
       const result = await saveSellerShippingOrigin({ sellerAddress: shippingAddress });
       setStatus((prev) => ({ ...prev, ...result }));
-      navigate("/onboarding/box", { replace: true });
+      navigate(result?.isComplete ? "/boxes?new=1" : resolveOnboardingRoute(result?.completionStep), { replace: true });
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to save shipping origin.");
     } finally {
@@ -239,18 +268,39 @@ export default function SellerOnboarding({ step }) {
     }
   };
 
-  const handleFirstBoxSubmit = async (event) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError("");
-    try {
-      await saveSellerFirstBox(boxForm);
-      navigate("/onboarding/complete", { replace: true });
-    } catch (err) {
-      setError(err?.response?.data?.message || "Failed to save your first box.");
-    } finally {
-      setSubmitting(false);
-    }
+  const visibleAddressSuggestions = useMemo(() => {
+    if (!isAddressSearchFocused) return [];
+
+    const query = shippingAddress.line1.trim().toLowerCase();
+    if (!query) return addressSuggestions;
+
+    return addressSuggestions.filter((suggestion) => {
+      const streetLine = (
+        suggestion.streetLine
+        || `${suggestion.houseNumber ? `${suggestion.houseNumber} ` : ""}${suggestion.street || ""}`
+      ).trim().toLowerCase();
+      const display = String(suggestion.displayAddress || "").trim().toLowerCase();
+      return streetLine !== query && display !== query;
+    });
+  }, [addressSuggestions, isAddressSearchFocused, shippingAddress.line1]);
+
+  const showShippingSuggestionDropdown = isAddressSearchFocused
+    && (isSuggestingAddress || visibleAddressSuggestions.length > 0);
+
+  const applyAddressSuggestion = (suggestion) => {
+    const streetLine = (
+      suggestion.streetLine
+      || `${suggestion.houseNumber ? `${suggestion.houseNumber} ` : ""}${suggestion.street || ""}`
+    ).trim();
+    setShippingAddress((prev) => ({
+      ...prev,
+      line1: streetLine,
+      city: suggestion.city || "",
+      state: (suggestion.state || "").toUpperCase(),
+      zip: suggestion.postcode || "",
+      country: "US",
+    }));
+    setIsAddressSearchFocused(false);
   };
 
   if (loading || verifyingStripeReturn) {
@@ -340,16 +390,109 @@ export default function SellerOnboarding({ step }) {
             <h1 className="text-2xl font-bold text-gray-900">Where will you ship from?</h1>
             <p className="mt-2 text-sm text-gray-600">This address is used for shipping rate calculations.</p>
             <form className="mt-5 space-y-3" onSubmit={handleShippingSubmit}>
-              {["line1", "line2", "city", "state", "zip"].map((field) => (
+              <div>
+                <label htmlFor="shipping-line1" className="mb-1 block text-sm font-semibold text-gray-700">
+                  Street address
+                </label>
+                <div className="relative">
+                  <input
+                    id="shipping-line1"
+                    name="line1"
+                    value={shippingAddress.line1}
+                    onChange={(event) => {
+                      setShippingAddress((prev) => ({ ...prev, line1: event.target.value }));
+                    }}
+                    onFocus={() => {
+                      setIsAddressSearchFocused(true);
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(() => {
+                        setIsAddressSearchFocused(false);
+                      }, 150);
+                    }}
+                    placeholder="Start typing your street address..."
+                    autoComplete="off"
+                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition-all duration-300 hover:border-orange-200 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
+                    required
+                  />
+                  {isSuggestingAddress && isAddressSearchFocused ? (
+                    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+                    </div>
+                  ) : null}
+
+                  {showShippingSuggestionDropdown ? (
+                    <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-orange-100 bg-white shadow-xl">
+                      <ul className="hide-scrollbar max-h-60 overflow-auto py-1">
+                        {isSuggestingAddress && visibleAddressSuggestions.length === 0 ? (
+                          <li className="px-4 py-3 text-sm text-gray-500">Searching addresses...</li>
+                        ) : (
+                          visibleAddressSuggestions.map((suggestion, idx) => {
+                            const streetLine = (
+                              suggestion.streetLine
+                              || `${suggestion.houseNumber ? `${suggestion.houseNumber} ` : ""}${suggestion.street || ""}`
+                            ).trim();
+
+                            return (
+                              <li key={`${suggestion.displayAddress}-${idx}`}>
+                                <button
+                                  type="button"
+                                  onMouseDown={(event) => event.preventDefault()}
+                                  onClick={() => applyAddressSuggestion(suggestion)}
+                                  className="w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 hover:bg-orange-50"
+                                >
+                                  <div className="text-sm font-medium text-gray-800">{streetLine}</div>
+                                  <div className="text-xs text-gray-600">
+                                    {suggestion.city}, {suggestion.state} {suggestion.postcode}
+                                  </div>
+                                </button>
+                              </li>
+                            );
+                          })
+                        )}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="shipping-line2" className="mb-1 block text-sm font-semibold text-gray-700">
+                  Apt / suite number
+                </label>
                 <input
-                  key={field}
+                  id="shipping-line2"
+                  name="line2"
+                  value={shippingAddress.line2}
+                  onChange={(event) => setShippingAddress((prev) => ({ ...prev, line2: event.target.value }))}
+                  placeholder="Apt, suite, unit, building, floor, etc."
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition-all duration-300 hover:border-orange-200 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20"
+                />
+              </div>
+
+              {[
+                ["city", "City", "San Francisco"],
+                ["state", "State", "CA"],
+                ["zip", "ZIP code", "94107"],
+              ].map(([field, label, placeholder]) => (
+                <label key={field} htmlFor={`shipping-${field}`} className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700">{label}</span>
+                <input
+                  id={`shipping-${field}`}
                   name={field}
                   value={shippingAddress[field]}
-                  onChange={(event) => setShippingAddress((prev) => ({ ...prev, [field]: event.target.value }))}
-                  placeholder={field}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
-                  required={field !== "line2"}
+                  onChange={(event) => {
+                    const value = field === "state"
+                      ? event.target.value.toUpperCase()
+                      : event.target.value;
+                    setShippingAddress((prev) => ({ ...prev, [field]: value }));
+                  }}
+                  placeholder={placeholder}
+                  className={`w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition-all duration-300 hover:border-orange-200 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20${field === "state" ? " uppercase" : ""}`}
+                  required
+                  {...(field === "state" ? { maxLength: 2 } : {})}
                 />
+                </label>
               ))}
               <button
                 type="submit"
@@ -357,44 +500,6 @@ export default function SellerOnboarding({ step }) {
                 className="w-full rounded-xl bg-orange-500 py-3 font-semibold text-white hover:bg-orange-400 disabled:opacity-60"
               >
                 {submitting ? "Saving..." : "Save shipping origin"}
-              </button>
-            </form>
-          </section>
-        ) : null}
-
-        {activeStep === "first_box" ? (
-          <section className="rounded-2xl border border-orange-100 bg-white p-6 shadow-md">
-            <h1 className="text-2xl font-bold text-gray-900">Add your first shipping box</h1>
-            <p className="mt-2 text-sm text-gray-600">Sellers must keep at least one box that fits products at 95% capacity.</p>
-            <form className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleFirstBoxSubmit}>
-              <input
-                name="name"
-                value={boxForm.name}
-                onChange={(event) => setBoxForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Box name"
-                className="sm:col-span-2 rounded-xl border border-gray-300 px-4 py-3"
-                required
-              />
-              {["width", "length", "height", "maxWeight"].map((field) => (
-                <input
-                  key={field}
-                  name={field}
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={boxForm[field]}
-                  onChange={(event) => setBoxForm((prev) => ({ ...prev, [field]: event.target.value }))}
-                  placeholder={field}
-                  className="rounded-xl border border-gray-300 px-4 py-3"
-                  required
-                />
-              ))}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="sm:col-span-2 rounded-xl bg-orange-500 py-3 font-semibold text-white hover:bg-orange-400 disabled:opacity-60"
-              >
-                {submitting ? "Saving..." : "Save first box"}
               </button>
             </form>
           </section>

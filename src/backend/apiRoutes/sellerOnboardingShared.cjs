@@ -1,10 +1,11 @@
 const { getFrontendUrl } = require("../envShared.cjs");
 
-const SELLER_COMPLETION_STEPS = ["shop_url", "stripe_connect", "shipping_origin", "first_box", "completed"];
+const SELLER_COMPLETION_STEPS = ["shop_url", "stripe_connect", "shipping_origin", "completed"];
 
 function normalizeCompletionStep(value) {
   const step = String(value || "").trim().toLowerCase();
   if (step === "completed") return "completed";
+  if (step === "first_box") return "completed";
   if (SELLER_COMPLETION_STEPS.includes(step)) return step;
   return "shop_url";
 }
@@ -36,6 +37,12 @@ async function ensureSellerCompletionColumn(pool) {
   await pool.query(`
     ALTER TABLE seller_profiles
     ADD COLUMN IF NOT EXISTS stripe_connect_account_id TEXT
+  `);
+  await pool.query(`
+    UPDATE seller_profiles
+    SET completions = 'completed',
+        updated_at = NOW()
+    WHERE completions = 'first_box'
   `);
 }
 

@@ -5,7 +5,11 @@ const {
   isSellerOnboardingComplete,
   normalizeCompletionStep,
 } = require("./sellerOnboardingShared.cjs");
-const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared.cjs");
+const {
+  normalizeAddressPayload,
+  resolveVerifiedShippingAddress,
+  validateUsAddress,
+} = require("./shippingShared.cjs");
 const { sendJsonError } = require("../apiErrorShared.cjs");
 const {
   assertStripeAccountOwnedBySeller,
@@ -16,7 +20,7 @@ const {
   getStripeConnectReadiness,
   syncStripeConnectAccountSettings,
 } = require("./sellerStripeShared.cjs");
-const { listSellerBoxes, parseBoxPayload, sellerBoxesCoverLargestProduct } = require("./sellerBoxesShared.cjs");
+const { listSellerBoxes } = require("./sellerBoxesShared.cjs");
 const { getSellerFrontendUrl, getFrontendUrl } = require("../envShared.cjs");
 
 module.exports = function sellerOnboardingRoutes(deps) {
@@ -67,7 +71,6 @@ module.exports = function sellerOnboardingRoutes(deps) {
   const SELLER_ONBOARDING_ROUTE_BY_STEP = {
     stripe_connect: "/onboarding/stripe",
     shipping_origin: "/onboarding/shipping",
-    first_box: "/onboarding/box",
     completed: "/dashboard",
   };
 
@@ -385,12 +388,22 @@ module.exports = function sellerOnboardingRoutes(deps) {
         return res.status(400).json({ message: addressError });
       }
 
+      const verifiedSellerAddress = await resolveVerifiedShippingAddress(
+        sellerAddress,
+        {
+          name: state.shopName || req.user.username,
+          email: req.user.email,
+        },
+        "Shipping origin address",
+        { allowNotFoundSoftPass: false }
+      );
+
       await pool.query(
         `UPDATE seller_profiles
          SET sellersaddres = $1::jsonb,
              updated_at = NOW()
          WHERE seller_user_id = $2`,
-        [JSON.stringify(sellerAddress), req.user.id]
+        [JSON.stringify(verifiedSellerAddress), req.user.id]
       );
 
       const advanced = await advanceSellerCompletion(pool, req.user.id, "shipping_origin");
@@ -402,37 +415,6 @@ module.exports = function sellerOnboardingRoutes(deps) {
     } catch (error) {
       return sendJsonError(res, error, "Failed to save shipping origin.", {
         context: "seller-onboarding-shipping",
-      });
-    }
-  });
-
-  app.post("/api/seller/onboarding/first-box", attachAuthenticatedUser, requireSellerRole, async (req, res) => {
-    try {
-      const state = await getSellerOnboardingState(pool, req.user.id);
-      if (normalizeCompletionStep(state.completionStep) !== "first_box") {
-        return res.status(409).json({ message: "First box setup is not the current onboarding step." });
-      }
-
-      const box = parseBoxPayload(req.body);
-      const insertResult = await pool.query(
-        `INSERT INTO seller_boxes (
-           seller_user_id, name, width_mm, length_mm, height_mm, max_weight_g
-         )
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, seller_user_id, name, width_mm, length_mm, height_mm, max_weight_g, created_at, updated_at`,
-        [req.user.id, box.name, box.widthMm, box.lengthMm, box.heightMm, box.maxWeightG]
-      );
-
-      const advanced = await advanceSellerCompletion(pool, req.user.id, "first_box");
-      return res.status(201).json({
-        message: "First shipping box saved.",
-        box: require("./sellerBoxesShared.cjs").normalizeBoxRow(insertResult.rows[0]),
-        completionStep: advanced.completionStep,
-        isComplete: advanced.isComplete,
-      });
-    } catch (error) {
-      return sendJsonError(res, error, "Failed to save first box.", {
-        context: "seller-onboarding-first-box",
       });
     }
   });

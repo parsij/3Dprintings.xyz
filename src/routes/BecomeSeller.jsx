@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
-  Box,
   CheckCircle2,
   CreditCard,
   LayoutDashboard,
@@ -35,11 +34,6 @@ const ONBOARDING_STEPS = [
     icon: Truck,
     title: "Set shipping origin",
     description: "Tell us where orders ship from so rates stay accurate.",
-  },
-  {
-    icon: Box,
-    title: "Add your first box",
-    description: "Define packaging so every order ships safely and affordably.",
   },
 ];
 
@@ -280,7 +274,7 @@ export default function BecomeSeller({ user, setUser }) {
                       <ShieldCheck className="h-6 w-6" />
                       <div>
                         <h2 className="text-xl font-bold">Start selling today</h2>
-                        <p className="text-sm text-orange-50">Step 1 of 4 — create your shop</p>
+                        <p className="text-sm text-orange-50">Step 1 of 3 — create your shop</p>
                       </div>
                     </div>
                   </div>
