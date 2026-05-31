@@ -3,7 +3,7 @@ const { ensureChatUserForDbUser } = require("./chatShared.cjs");
 module.exports = function chatRoutes(deps) {
   const { app, pool, getAuthUserFromRequest } = deps;
 
-  app.post("/api/chat/session", async (req, res) => {
+  app.post("/api/messages/session", async (req, res) => {
     try {
       const authUser = getAuthUserFromRequest(req);
       if (!authUser?.id) {

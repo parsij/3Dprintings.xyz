@@ -11,7 +11,7 @@ export async function ensureChatAuthSession() {
 
   if (!sessionPromise) {
     sessionPromise = axios
-      .post(`${API_BASE}/api/chat/session`, {}, { withCredentials: true })
+      .post(`${API_BASE}/api/messages/session`, {}, { withCredentials: true })
       .then((response) => {
         const { token, record } = response.data || {};
         if (!token || !record?.id) {
