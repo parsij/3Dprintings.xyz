@@ -2,8 +2,13 @@ import axios from "axios";
 
 import { API_BASE } from "../../config/api.js";
 import { toCanonicalDimensions } from "../../utils/productDimensions.js";
-import { createApiValidationError } from "../../utils/apiValidationErrors.js";
-import { getUserFacingError } from "../../utils/userFacingError.js";
+import { parseListingSubmitError } from "../../utils/apiValidationErrors.js";
+import { applyCsrfInterceptor, ensureCsrfToken } from "../../services/csrf.js";
+
+const apiClient = applyCsrfInterceptor(axios.create({
+  baseURL: API_BASE,
+  withCredentials: true,
+}));
 
 export async function submitModelListing({
   modelName,
@@ -61,41 +66,17 @@ export async function submitModelListing({
   });
 
   try {
-      const response = await axios.post(
-      `${API_BASE}/api/create`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-        withCredentials: true, //sending cookies for authentication
-      }
-    );
+    await ensureCsrfToken(API_BASE);
+
+    const response = await apiClient.post("/api/create", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
     return response.data;
   } catch (error) {
-    const data = error?.response?.data;
-
-    if (data?.errors && typeof data.errors === "object") {
-      throw createApiValidationError(
-        data,
-        "Please fix the highlighted fields below."
-      );
-    }
-
-    if (data?.boxesUrl) {
-      throw createApiValidationError(
-        data,
-        getUserFacingError(
-          { response: { data } },
-          "You need to configure shipping boxes before listing products."
-        )
-      );
-    }
-
-    throw new Error(
-      getUserFacingError(
-        { response: { data } },
-        "Failed to prepare listing. Please check your input and try again."
-      )
+    throw parseListingSubmitError(
+      error,
+      "Failed to prepare listing. Please check your input and try again."
     );
   }
 }

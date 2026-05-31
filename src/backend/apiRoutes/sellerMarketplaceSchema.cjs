@@ -2,8 +2,10 @@ const { ensureSellerProfilesTable } = require("./sellerProfileShared.cjs");
 const { ensureSellerBoxesTable } = require("./sellerBoxesShared.cjs");
 const { ensureSellerPayoutSchedulesTable } = require("./sellerBalanceShared.cjs");
 const { ensureSellerTransfersColumn } = require("./sellerOrderTransfers.cjs");
+const { ensureProductsTable } = require("./productsTableShared.cjs");
 
 async function ensureSellerMarketplaceSchema(pool) {
+  await ensureProductsTable(pool);
   await ensureSellerProfilesTable(pool);
   await ensureSellerBoxesTable(pool);
   await ensureSellerPayoutSchedulesTable(pool);

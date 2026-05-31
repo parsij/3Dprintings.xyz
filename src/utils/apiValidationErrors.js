@@ -1,3 +1,5 @@
+import { getUserFacingError } from "./userFacingError.js";
+
 const LISTING_FIELD_LABELS = {
   photos: "Photos",
   modelName: "Model name",
@@ -48,12 +50,30 @@ const LISTING_FIELD_IDS = {
   dimensions: "modelWeight",
 };
 
+const ONBOARDING_MESSAGES = {
+  shop_url: "Finish setting up your shop URL before listing products.",
+  stripe_connect: "Connect your Stripe account before listing products.",
+  shipping_origin: "Add your shipping origin address before listing products.",
+};
+
 function isUserSafeFieldMessage(message) {
   return typeof message === "string"
     && message.trim().length > 0
     && message.trim().length <= 280
     && !message.includes("\n")
     && !message.includes("\r");
+}
+
+function normalizeResponseData(rawData) {
+  if (rawData && typeof rawData === "object" && !Array.isArray(rawData)) {
+    return rawData;
+  }
+
+  if (typeof rawData === "string" && rawData.trim()) {
+    return { message: rawData.trim().slice(0, 280) };
+  }
+
+  return {};
 }
 
 export function normalizeApiFieldErrors(rawErrors) {
@@ -96,6 +116,9 @@ export function formatListingValidationSummary(fieldErrors) {
 
   if (entries.length === 1) {
     const [entry] = entries;
+    if (entry.field === "general") {
+      return entry.message;
+    }
     return `${entry.label}: ${entry.message}`;
   }
 
@@ -121,11 +144,12 @@ export function scrollToListingField(field) {
 }
 
 export class ApiValidationError extends Error {
-  constructor(message, { fieldErrors = {}, boxesUrl = null } = {}) {
+  constructor(message, { fieldErrors = {}, boxesUrl = null, completionStep = null } = {}) {
     super(message);
     this.name = "ApiValidationError";
     this.fieldErrors = normalizeApiFieldErrors(fieldErrors);
     this.boxesUrl = boxesUrl ?? null;
+    this.completionStep = completionStep ?? null;
   }
 }
 
@@ -135,10 +159,92 @@ export function createApiValidationError(data, fallbackMessage) {
     ? formatListingValidationSummary(fieldErrors)
     : fallbackMessage;
 
-  const error = new ApiValidationError(message, {
+  return new ApiValidationError(message, {
     fieldErrors,
     boxesUrl: data?.boxesUrl ?? null,
+    completionStep: data?.completionStep ?? null,
   });
+}
 
-  return error;
+function buildFieldErrorsFromResponse(data, status) {
+  const fieldErrors = normalizeApiFieldErrors(data?.errors);
+  const responseMessage = getUserFacingError(
+    { response: { data } },
+    ""
+  );
+
+  if (!fieldErrors.general && responseMessage) {
+    fieldErrors.general = responseMessage;
+  }
+
+  if (!fieldErrors.general && typeof data?.message === "string" && isUserSafeFieldMessage(data.message)) {
+    fieldErrors.general = data.message.trim();
+  }
+
+  if (!fieldErrors.general && status === 401) {
+    fieldErrors.general = "Please sign in again to submit a listing.";
+  }
+
+  if (!fieldErrors.general && status === 403 && data?.completionStep) {
+    fieldErrors.general = ONBOARDING_MESSAGES[data.completionStep]
+      || data.message
+      || "Complete seller onboarding before listing products.";
+  }
+
+  if (!fieldErrors.general && status === 403) {
+    fieldErrors.general = responseMessage || "You do not have permission to submit this listing.";
+  }
+
+  if (!fieldErrors.general && status === 413) {
+    fieldErrors.general = "The upload is too large. Use smaller photos and try again.";
+  }
+
+  if (!fieldErrors.general && status >= 500) {
+    fieldErrors.general = responseMessage
+      || "We could not save your listing right now. Please try again in a few minutes.";
+  }
+
+  return fieldErrors;
+}
+
+export function parseListingSubmitError(error, fallbackMessage) {
+  const response = error?.response;
+  const status = response?.status;
+  const data = normalizeResponseData(response?.data);
+  const fieldErrors = buildFieldErrorsFromResponse(data, status);
+
+  if (!response) {
+    const networkMessage = error?.code === "ERR_NETWORK"
+      ? "Unable to reach the server. Make sure the backend is running, then try again."
+      : "Unable to submit your listing right now. Check your connection and try again.";
+
+    return new ApiValidationError(networkMessage, {
+      fieldErrors: { general: networkMessage },
+    });
+  }
+
+  if (data?.boxesUrl) {
+    const message = fieldErrors.general
+      || getUserFacingError({ response: { data } }, "You need to configure shipping boxes before listing products.");
+
+    return new ApiValidationError(message, {
+      fieldErrors: { ...fieldErrors, general: message },
+      boxesUrl: data.boxesUrl,
+      completionStep: data.completionStep ?? null,
+    });
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return new ApiValidationError(
+      formatListingValidationSummary(fieldErrors) || fieldErrors.general || fallbackMessage,
+      {
+        fieldErrors,
+        completionStep: data?.completionStep ?? null,
+      }
+    );
+  }
+
+  return new ApiValidationError(fallbackMessage, {
+    fieldErrors: { general: fallbackMessage },
+  });
 }

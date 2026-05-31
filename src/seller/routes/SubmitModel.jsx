@@ -146,7 +146,18 @@ const defaultForm = {
   daysToPrepare: "1",
 };
 
+const ONBOARDING_ROUTE_BY_STEP = {
+  shop_url: "/onboarding/stripe",
+  stripe_connect: "/onboarding/stripe",
+  shipping_origin: "/onboarding/shipping",
+  first_box: "/boxes?new=1",
+};
+
 const MAX_PHOTOS = 10;
+
+function resolveOnboardingUrl(completionStep) {
+  return ONBOARDING_ROUTE_BY_STEP[completionStep] || "/onboarding/stripe";
+}
 
 const categoryGroups = CATEGORY_DATA.map((group) => ({
   label: group.title,
@@ -184,6 +195,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   const [submitMessage, setSubmitMessage] = useState("");
   const [serverErrors, setServerErrors] = useState({});
   const [boxesUrl, setBoxesUrl] = useState(null);
+  const [onboardingUrl, setOnboardingUrl] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
 
   useEffect(() => {
@@ -329,6 +341,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     setSubmitMessage("");
     setServerErrors({});
     setBoxesUrl(null);
+    setOnboardingUrl(null);
 
     if (!isFormValid) {
       return;
@@ -356,6 +369,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
 
       setSubmitMessage(response?.message || "Your listing is ready and queued for backend submission.");
       setBoxesUrl(null);
+      setOnboardingUrl(null);
       setServerErrors({});
       setForm(defaultForm);
       setPhotos([]);
@@ -364,13 +378,20 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         onSubmissionSuccess();
       }
     } catch (error) {
-      if (error?.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
-        setServerErrors(error.fieldErrors);
-        setSubmitted(true);
+      const nextFieldErrors = error?.fieldErrors && typeof error.fieldErrors === "object"
+        ? error.fieldErrors
+        : {};
+
+      if (Object.keys(nextFieldErrors).length > 0) {
+        setServerErrors(nextFieldErrors);
+      } else if (error?.message) {
+        setServerErrors({ general: error.message });
       }
 
+      setSubmitted(true);
       setSubmitMessage(error?.message || "Failed to prepare listing. Please try again.");
       setBoxesUrl(error?.boxesUrl || null);
+      setOnboardingUrl(error?.completionStep ? resolveOnboardingUrl(error.completionStep) : null);
     } finally {
       setIsSubmitting(false);
     }
@@ -576,6 +597,19 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 }`}
               >
                 {submitMessage}
+                {onboardingUrl && (
+                  <>
+                    {" "}
+                    <Link
+                      to={onboardingUrl}
+                      className="text-orange-500 hover:text-orange-600 cursor-pointer hover:scale-105 transform-gpu transition"
+                    >
+                      Continue onboarding
+                    </Link>
+                    {" "}
+                    to finish setup.
+                  </>
+                )}
                 {boxesUrl && (
                   <>
                     {" "}

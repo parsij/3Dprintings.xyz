@@ -30,11 +30,17 @@ module.exports = function createRoutes(deps) {
       );
       if (sellerResult.rows.length === 0) {
         await cleanupUploadedFiles(photos);
-        return res.status(404).json({ message: 'User not found.' });
+        return res.status(404).json({
+          message: 'User not found.',
+          errors: { general: 'Your account could not be found. Please sign in again.' },
+        });
       }
       if (sellerResult.rows[0].role !== 'seller') {
         await cleanupUploadedFiles(photos);
-        return res.status(403).json({ message: 'Seller access is required to list products.' });
+        return res.status(403).json({
+          message: 'Seller access is required to list products.',
+          errors: { general: 'Seller access is required to list products.' },
+        });
       }
 
       const onboarding = await getSellerOnboardingState(pool, userId);
@@ -42,6 +48,9 @@ module.exports = function createRoutes(deps) {
         await cleanupUploadedFiles(photos);
         return res.status(403).json({
           message: 'Complete seller onboarding before listing products.',
+          errors: {
+            general: 'Complete seller onboarding before listing products.',
+          },
           completionStep: onboarding.completionStep,
         });
       }
@@ -150,6 +159,9 @@ module.exports = function createRoutes(deps) {
         await cleanupUploadedFiles(photos);
         return res.status(400).json({
           message: 'You must add at least one shipping box before listing products.',
+          errors: {
+            general: 'You must add at least one shipping box before listing products.',
+          },
           boxesUrl: '/boxes',
         });
       }
@@ -167,8 +179,10 @@ module.exports = function createRoutes(deps) {
 
       if (!fitResult.fits) {
         await cleanupUploadedFiles(photos);
+        const fitMessage = getProductBoxFitMessage(fitResult.reason);
         return res.status(400).json({
-          message: getProductBoxFitMessage(fitResult.reason),
+          message: fitMessage,
+          errors: { general: fitMessage },
           boxesUrl: '/boxes',
         });
       }
@@ -272,8 +286,36 @@ module.exports = function createRoutes(deps) {
 
     } catch (error) {
       await cleanupUploadedFiles(photos);
-      console.error('Create listing error:', error.message);
-      return res.status(500).json({ message: 'Server error' });
+      console.error('Create listing error:', {
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+      });
+
+      if (error?.code === '42P01') {
+        return res.status(500).json({
+          message: 'Listing could not be saved because required database tables are missing.',
+          errors: {
+            general: 'Listing could not be saved because the database setup is incomplete.',
+          },
+        });
+      }
+
+      if (error?.code === '42703') {
+        return res.status(500).json({
+          message: 'Listing could not be saved because the database schema is out of date.',
+          errors: {
+            general: 'Listing could not be saved because the database schema is out of date.',
+          },
+        });
+      }
+
+      return res.status(500).json({
+        message: 'We could not save your listing right now. Please try again in a few minutes.',
+        errors: {
+          general: 'We could not save your listing right now. Please try again in a few minutes.',
+        },
+      });
     }
   });
 };
