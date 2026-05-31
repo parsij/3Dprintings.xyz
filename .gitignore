@@ -25,3 +25,6 @@ dist-ssr
 *.sw?
 /src/backend/.env
 /.junie/
+/package-lock.json
+/src/backend/schematic.sql
+/stripe.tar.gz

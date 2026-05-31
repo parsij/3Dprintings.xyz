@@ -41,18 +41,112 @@ const EMPTY_BOX = {
   weightUnit: "lb",
 };
 
+function BoxFormFields({ form, setForm, submitted, formErrors }) {
+  return (
+    <>
+      <div className="group transition-all duration-300 hover:translate-x-1">
+        <FieldLabel htmlFor="boxName">Box name</FieldLabel>
+        <input
+          id="boxName"
+          value={form.name}
+          onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+          placeholder="Your box name"
+          className={FIELD_CLASS}
+          required
+        />
+        {submitted && formErrors.name ? (
+          <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>
+        ) : null}
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
+        <SectionTitle>Interior dimensions</SectionTitle>
+        <p className="mt-1 text-xs text-gray-600">
+          Inside measurements of the empty box. Use numbers with at most 1 decimal place. Values are checked at 95% capacity.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            ["width", "Width"],
+            ["length", "Length"],
+            ["height", "Height"],
+          ].map(([field, label]) => (
+            <div key={field}>
+              <label htmlFor={field} className="mb-1 block text-xs font-semibold text-gray-700">
+                {label}
+              </label>
+              <UnitNumberInput
+                id={field}
+                name={field}
+                value={form[field]}
+                unit={form.dimensionUnit}
+                units={BOX_DIMENSION_UNITS}
+                allowOneDecimal
+                onValueChange={(value) => setForm((prev) => ({ ...prev, [field]: value }))}
+                onUnitChange={(value) => setForm((prev) => ({ ...prev, dimensionUnit: value }))}
+                placeholder={label}
+              />
+              {submitted && formErrors[field] ? (
+                <p className="mt-1 text-xs text-red-500">{formErrors[field]}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
+        <SectionTitle>Maximum weight</SectionTitle>
+        <p className="mt-1 text-xs text-gray-600">
+          The most weight this box can safely carry. Use a number with at most 1 decimal place.
+        </p>
+        <div className="mt-2 max-w-sm">
+          <UnitNumberInput
+            id="maxWeight"
+            name="maxWeight"
+            value={form.maxWeight}
+            unit={form.weightUnit}
+            units={BOX_WEIGHT_UNITS}
+            allowOneDecimal
+            onValueChange={(value) => setForm((prev) => ({ ...prev, maxWeight: value }))}
+            onUnitChange={(value) => setForm((prev) => ({ ...prev, weightUnit: value }))}
+            placeholder="Max weight"
+          />
+        </div>
+        {submitted && formErrors.maxWeight ? (
+          <p className="mt-1 text-xs text-red-500">{formErrors.maxWeight}</p>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function ModalCloseButton({ onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute top-4 left-4 flex cursor-pointer items-center justify-center rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-orange-500"
+      aria-label={label}
+    >
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
+
 export default function SellerBoxes() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [boxes, setBoxes] = useState([]);
   const [productCount, setProductCount] = useState(0);
   const [coversLargestProduct, setCoversLargestProduct] = useState(true);
   const [largestProduct, setLargestProduct] = useState(null);
   const [form, setForm] = useState(EMPTY_BOX);
-  const [editingId, setEditingId] = useState(null);
+  const [editingBox, setEditingBox] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [deletingBoxId, setDeletingBoxId] = useState(null);
   const [successBoxId, setSuccessBoxId] = useState(null);
   const [errorBoxId, setErrorBoxId] = useState(null);
@@ -101,10 +195,27 @@ export default function SellerBoxes() {
 
   const isFormValid = Object.keys(formErrors).length === 0;
 
-  const resetForm = () => {
+  const closeBoxModal = () => {
+    setIsModalOpen(false);
+    setEditingBox(null);
     setForm(EMPTY_BOX);
-    setEditingId(null);
     setSubmitted(false);
+    setSaveError(false);
+  };
+
+  const openCreateModal = () => {
+    setForm(EMPTY_BOX);
+    setSubmitted(false);
+    setSaveError(false);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (box) => {
+    setEditingBox(box);
+    setForm(boxToFormValues(box, "in", "lb"));
+    setSubmitted(false);
+    setSaveError(false);
+    setErrorBoxId(null);
   };
 
   const handleSubmit = async (event) => {
@@ -114,43 +225,34 @@ export default function SellerBoxes() {
 
     setSaving(true);
     setError("");
-    setMessage("");
+    setSaveError(false);
     try {
       const payload = toCanonicalBoxPayload(form);
-      if (editingId) {
-        await updateSellerBox(editingId, payload);
-        setMessage("Box updated successfully.");
+      if (editingBox) {
+        await updateSellerBox(editingBox.id, payload);
       } else {
         await createSellerBox(payload);
-        setMessage("Box added successfully.");
       }
-      resetForm();
       await loadBoxes();
+      closeBoxModal();
     } catch (err) {
+      setSaveError(true);
       setError(err?.response?.data?.message || "Failed to save box.");
+      setTimeout(() => setSaveError(false), 3000);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEdit = (box) => {
-    setEditingId(box.id);
-    setForm(boxToFormValues(box, form.dimensionUnit, form.weightUnit));
-    setSubmitted(false);
-    setErrorBoxId(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const handleDelete = async (box) => {
     if (!box.canDelete || deletingBoxId) return;
     setError("");
-    setMessage("");
     setErrorBoxId(null);
     setDeletingBoxId(box.id);
     try {
       await deleteSellerBox(box.id);
       setSuccessBoxId(box.id);
-      if (editingId === box.id) resetForm();
+      if (editingBox?.id === box.id) closeBoxModal();
       await loadBoxes();
       setTimeout(() => setSuccessBoxId(null), 2000);
     } catch (err) {
@@ -165,21 +267,31 @@ export default function SellerBoxes() {
   return (
     <div className="min-h-screen bg-[#f2f2f2]">
       <SellerNavBar pageName="Boxes" />
-      <SideMenu title="Seller Menu" role="seller" />
+      <SideMenu role="seller" title="Seller Options" />
+
       <main className="mx-auto max-w-7xl px-4 pb-12 pt-24 lg:px-[5vw]">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Shipping boxes</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {boxes.length} shipping box{boxes.length === 1 ? "" : "es"} configured
-          </p>
-          <p className="mt-2 max-w-2xl text-sm text-gray-600">
-            Define the boxes you ship with. Products must fit inside at least one box at 95% capacity.
-            {productCount > 0 ? " You must keep at least one box while products are listed." : ""}
-          </p>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Shipping boxes</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {boxes.length} shipping box{boxes.length === 1 ? "" : "es"} configured
+            </p>
+            {productCount > 0 ? (
+              <p className="mt-1 text-xs text-gray-500">Keep at least one box while products are listed.</p>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="cursor-pointer whitespace-nowrap rounded-xl bg-gray-950 px-5 py-2.5 font-bold text-white shadow-md transition-all duration-300 ease-in-out transform-gpu hover:scale-105"
+          >
+            + New Box
+          </button>
         </div>
 
         {!coversLargestProduct ? (
-          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p className="font-semibold">Your boxes do not fit your largest product at 95% capacity.</p>
             {largestProduct?.name ? (
               <p className="mt-1 text-amber-800">Largest product: {largestProduct.name}. Add or resize a box.</p>
@@ -190,126 +302,16 @@ export default function SellerBoxes() {
         {error ? (
           <p className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600">{error}</p>
         ) : null}
-        {message ? (
-          <p className="mb-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-700">{message}</p>
-        ) : null}
 
-        <section className="mt-6 rounded-2xl border border-orange-100 bg-white shadow-lg">
-          <div className="border-b border-orange-100 bg-gradient-to-r from-orange-50 to-white px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500 text-white shadow-sm">
-                <Box className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">{editingId ? "Edit box" : "Add a new box"}</h2>
-                <p className="text-xs text-gray-600">Use the same unit pickers as product listings for consistency.</p>
-              </div>
-            </div>
-          </div>
-
-          <form className="space-y-5 p-6" onSubmit={handleSubmit} noValidate>
-            <div className="group transition-all duration-300 hover:translate-x-1">
-              <FieldLabel htmlFor="boxName">Box name</FieldLabel>
-              <input
-                id="boxName"
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Your box name"
-                className={FIELD_CLASS}
-                required
-              />
-              {submitted && formErrors.name ? (
-                <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>
-              ) : null}
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
-              <SectionTitle>Interior dimensions</SectionTitle>
-              <p className="mt-1 text-xs text-gray-600">
-                Inside measurements of the empty box. Use numbers with at most 1 decimal place. Values are checked at 95% capacity.
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {[
-                  ["width", "Width"],
-                  ["length", "Length"],
-                  ["height", "Height"],
-                ].map(([field, label]) => (
-                  <div key={field}>
-                    <label htmlFor={field} className="mb-1 block text-xs font-semibold text-gray-700">
-                      {label}
-                    </label>
-                    <UnitNumberInput
-                      id={field}
-                      name={field}
-                      value={form[field]}
-                      unit={form.dimensionUnit}
-                      units={BOX_DIMENSION_UNITS}
-                      allowOneDecimal
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, [field]: value }))}
-                      onUnitChange={(value) => setForm((prev) => ({ ...prev, dimensionUnit: value }))}
-                      placeholder={label}
-                    />
-                    {submitted && formErrors[field] ? (
-                      <p className="mt-1 text-xs text-red-500">{formErrors[field]}</p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
-              <SectionTitle>Maximum weight</SectionTitle>
-              <p className="mt-1 text-xs text-gray-600">
-                The most weight this box can safely carry. Use a number with at most 1 decimal place.
-              </p>
-              <div className="mt-2 max-w-sm">
-                <UnitNumberInput
-                  id="maxWeight"
-                  name="maxWeight"
-                  value={form.maxWeight}
-                  unit={form.weightUnit}
-                  units={BOX_WEIGHT_UNITS}
-                  allowOneDecimal
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, maxWeight: value }))}
-                  onUnitChange={(value) => setForm((prev) => ({ ...prev, weightUnit: value }))}
-                  placeholder="Max weight"
-                />
-              </div>
-              {submitted && formErrors.maxWeight ? (
-                <p className="mt-1 text-xs text-red-500">{formErrors.maxWeight}</p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-4">
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-xl bg-orange-500 px-5 py-3 font-semibold text-white shadow-md transition-all duration-300 hover:bg-orange-400 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Saving..." : editingId ? "Update box" : "Add box"}
-              </button>
-              {editingId ? (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="rounded-xl border border-gray-300 bg-white px-5 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                >
-                  Cancel edit
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </section>
-
-        {loading ? <p className="text-sm text-gray-600 animate-pulse">Loading shipping boxes...</p> : null}
+        {loading ? <p className="animate-pulse text-sm text-gray-600">Loading shipping boxes...</p> : null}
 
         {!loading && boxes.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white p-12 text-center text-gray-500">
-            No boxes yet. Add your first shipping box above.
+            No shipping boxes configured yet. Click &quot;+ New Box&quot; above to add one.
           </div>
         ) : null}
 
-        <div className="mt-6 space-y-3">
+        <div className="space-y-3">
           {boxes.map((box) => {
             const isDeleting = deletingBoxId === box.id;
             const isSuccess = successBoxId === box.id;
@@ -319,9 +321,7 @@ export default function SellerBoxes() {
             return (
               <article
                 key={box.id}
-                className={`flex items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-2xs ${
-                  editingId === box.id ? "border-orange-400 ring-2 ring-orange-100" : "border-gray-200"
-                }`}
+                className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-2xs"
               >
                 <div className="flex min-w-0 items-center gap-4">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-3xs">
@@ -410,6 +410,120 @@ export default function SellerBoxes() {
           .
         </p>
       </main>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 pt-14 text-gray-900 shadow-2xl">
+            <ModalCloseButton onClick={closeBoxModal} label="Close new box form" />
+
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-orange-100 bg-orange-50">
+                <Box className="h-6 w-6 text-orange-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Add a new box</h2>
+                <p className="text-xs text-gray-500">Define interior dimensions and max weight for shipping.</p>
+              </div>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+              <BoxFormFields form={form} setForm={setForm} submitted={submitted} formErrors={formErrors} />
+
+              <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={closeBoxModal}
+                  className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className={`flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold shadow-xs transition-all duration-300 ${
+                    saveError
+                      ? "border border-red-600 bg-red-500 text-white hover:bg-red-600"
+                      : saving
+                      ? "bg-orange-500 text-white opacity-50"
+                      : "bg-orange-500 text-white hover:bg-orange-400"
+                  }`}
+                >
+                  {saving ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-white" />
+                      Adding box...
+                    </>
+                  ) : saveError ? (
+                    <>
+                      <XIcon className="h-4 w-4 animate-pulse" />
+                      Failed to add
+                    </>
+                  ) : (
+                    "Add box"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {editingBox ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 pt-14 text-gray-900 shadow-2xl">
+            <ModalCloseButton onClick={closeBoxModal} label="Close box editor" />
+
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-orange-100 bg-orange-50">
+                <Box className="h-6 w-6 text-orange-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Edit Box Details</h2>
+                <p className="text-xs text-gray-500">Update dimensions and max weight for {editingBox.name}.</p>
+              </div>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+              <BoxFormFields form={form} setForm={setForm} submitted={submitted} formErrors={formErrors} />
+
+              <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={closeBoxModal}
+                  className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className={`flex cursor-pointer items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold shadow-xs transition-all duration-300 ${
+                    saveError
+                      ? "border border-red-600 bg-red-500 text-white hover:bg-red-600"
+                      : saving
+                      ? "bg-orange-500 text-white opacity-50"
+                      : "bg-orange-500 text-white hover:bg-orange-400"
+                  }`}
+                >
+                  {saving ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-white" />
+                      Saving changes...
+                    </>
+                  ) : saveError ? (
+                    <>
+                      <XIcon className="h-4 w-4 animate-pulse" />
+                      Failed to save
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
