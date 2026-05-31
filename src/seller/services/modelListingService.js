@@ -2,6 +2,7 @@ import axios from "axios";
 
 import { API_BASE } from "../../config/api.js";
 import { toCanonicalDimensions } from "../../utils/productDimensions.js";
+import { createApiValidationError } from "../../utils/apiValidationErrors.js";
 import { getUserFacingError } from "../../utils/userFacingError.js";
 
 export async function submitModelListing({
@@ -72,16 +73,24 @@ export async function submitModelListing({
     return response.data;
   } catch (error) {
     const data = error?.response?.data;
+
+    if (data?.errors && typeof data.errors === "object") {
+      throw createApiValidationError(
+        data,
+        "Please fix the highlighted fields below."
+      );
+    }
+
     if (data?.boxesUrl) {
-      const err = new Error(
+      throw createApiValidationError(
+        data,
         getUserFacingError(
           { response: { data } },
           "You need to configure shipping boxes before listing products."
         )
       );
-      err.boxesUrl = data.boxesUrl;
-      throw err;
     }
+
     throw new Error(
       getUserFacingError(
         { response: { data } },

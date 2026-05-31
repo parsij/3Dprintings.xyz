@@ -4,7 +4,6 @@ const path = require('path');
 
 const {
   parseAndValidateProductDimensions,
-  productDimensionsAreValid,
 } = require("./productDimensionsShared.cjs");
 const {
   listSellerBoxes,
@@ -53,15 +52,21 @@ module.exports = function createRoutes(deps) {
         dimensions = parseAndValidateProductDimensions(req.body);
       } catch (dimensionError) {
         await cleanupUploadedFiles(photos);
+        const field = dimensionError.field || 'dimensions';
         return res.status(dimensionError.statusCode || 400).json({
           message: 'Validation failed.',
           errors: {
-            dimensions: dimensionError.message || 'Invalid model dimensions.',
+            [field]: dimensionError.message || 'Invalid model dimensions.',
           },
         });
       }
+
+      const trimmedModelName = String(modelName).trim();
+      const trimmedDescription = String(description).trim();
+      const trimmedCategory = String(category).trim();
       const parsedPrice = Number(price);
-      const parsedQuantity = Math.max(1, Number(quantity) || 1);
+      const rawQuantity = req.body?.quantity;
+      const parsedQuantity = Number(rawQuantity);
 
       const fieldErrors = {};
 
@@ -71,6 +76,41 @@ module.exports = function createRoutes(deps) {
 
       if (photos.length > MAX_PHOTOS) {
         fieldErrors.photos = `You can upload up to ${MAX_PHOTOS} photos.`;
+      }
+
+      if (trimmedModelName.length < 3) {
+        fieldErrors.modelName = 'Model name must be at least 3 characters.';
+      } else if (!/^[a-zA-Z0-9 ]+$/.test(trimmedModelName)) {
+        fieldErrors.modelName = 'Model name can only contain letters, numbers, and spaces.';
+      }
+
+      if (trimmedDescription.length < 20) {
+        fieldErrors.description = 'Description must be at least 20 characters.';
+      }
+
+      if (price === undefined || price === null || String(price).trim() === '' || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+        fieldErrors.price = 'Enter a valid price greater than 0.';
+      } else if (parsedPrice > 100000) {
+        fieldErrors.price = 'Price cannot exceed $100,000.';
+      }
+
+      if (!trimmedCategory) {
+        fieldErrors.category = 'Please select a specific category.';
+      } else if (trimmedCategory.length > 100) {
+        fieldErrors.category = 'Category is too long.';
+      }
+
+      if (
+        rawQuantity === undefined
+        || rawQuantity === null
+        || String(rawQuantity).trim() === ''
+        || Number.isNaN(parsedQuantity)
+        || parsedQuantity <= 0
+        || !Number.isInteger(parsedQuantity)
+      ) {
+        fieldErrors.quantity = 'Enter a valid whole number quantity greater than 0.';
+      } else if (parsedQuantity > 100000) {
+        fieldErrors.quantity = 'Quantity cannot exceed 100,000.';
       }
 
       // Parse tags
@@ -92,13 +132,9 @@ module.exports = function createRoutes(deps) {
       // Remove duplicates
       parsedTags = [...new Set(parsedTags)];
 
-      const hasBadWords = isProfane(modelName) || isProfane(description) || parsedTags.some(tag => isProfane(tag));
+      const hasBadWords = isProfane(trimmedModelName) || isProfane(trimmedDescription) || parsedTags.some(tag => isProfane(tag));
       if (hasBadWords) {
         fieldErrors.general = 'Explicit content or bad words are not allowed in the title, description, or tags.';
-      }
-
-      if (!productDimensionsAreValid(dimensions)) {
-        fieldErrors.dimensions = 'Model weight, height, width, and length are invalid.';
       }
 
       if (Object.keys(fieldErrors).length > 0) {
@@ -120,7 +156,7 @@ module.exports = function createRoutes(deps) {
 
       const fitResult = await productFitsInAnyBox(
         {
-          name: modelName,
+          name: trimmedModelName,
           model_weight_g: dimensions.modelWeightG,
           model_height_mm: dimensions.modelHeightMm,
           model_width_mm: dimensions.modelWidthMm,
@@ -161,12 +197,11 @@ module.exports = function createRoutes(deps) {
                   model_weight_g, model_height_mm, model_width_mm, model_length_mm,
                   model_weight_unit, model_dimension_unit, days_to_prepare
       `;
-      // Persist tags as explicit JSON for jsonb columns.
-      const normalizedCategory = category ? category.trim() : null;
+      const normalizedCategory = trimmedCategory || null;
       const tagsJson = JSON.stringify(parsedTags);
       const productValues = [
-        modelName.trim(),
-        description.trim(),
+        trimmedModelName,
+        trimmedDescription,
         parsedPrice,
         parsedPrice,
         0,
@@ -223,7 +258,7 @@ module.exports = function createRoutes(deps) {
           ...product,
           img_path: imageFileNames // include the new images in response
         },
-        category: category.trim() || null,
+        category: normalizedCategory,
         tags: parsedTags,
         photoCount: renamedPhotos.length,
         photos: renamedPhotos.map((file) => ({

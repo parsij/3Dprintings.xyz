@@ -36,12 +36,16 @@ function isUserSafeMessage(message) {
 }
 
 export function getUserFacingError(error, fallback = "Something went wrong. Please try again.") {
-  const candidate = error?.response?.data?.message
-    ?? error?.response?.data?.error
+  const data = error?.response?.data;
+  const candidate = data?.message
+    ?? data?.error
     ?? error?.message;
 
   if (typeof candidate === "string" && isUserSafeMessage(candidate)) {
-    return candidate.trim();
+    const trimmed = candidate.trim();
+    if (trimmed.toLowerCase() !== "validation failed.") {
+      return trimmed;
+    }
   }
 
   return fallback;

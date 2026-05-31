@@ -8,6 +8,22 @@ const LB_TO_G = 453.592;
 const IN_TO_MM = 25.4;
 const { parseOneDecimalNumber, parseOneDecimalCanonical } = require("./numericInputShared.cjs");
 
+const FIELD_BY_LABEL = {
+  "Model weight": "modelWeight",
+  Height: "modelHeight",
+  Width: "modelWidth",
+  Length: "modelLength",
+  "Days to prepare": "daysToPrepare",
+  Dimension: "dimensions",
+};
+
+function createValidationError(message, fieldLabel, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.field = FIELD_BY_LABEL[fieldLabel] || "dimensions";
+  return error;
+}
+
 function normalizeUnit(value, allowedUnits, fallback) {
   const unit = String(value || fallback).trim().toLowerCase();
   return allowedUnits.has(unit) ? unit : fallback;
@@ -22,15 +38,27 @@ function isNaturalNumber(value) {
 }
 
 function convertWeightToGrams(value, unit) {
-  const amount = parseOneDecimalNumber(value, "Model weight");
+  let amount;
+  try {
+    amount = parseOneDecimalNumber(value, "Model weight");
+  } catch (error) {
+    throw createValidationError(error.message, "Model weight");
+  }
+
   if (unit === "kg") {
     return Math.round(amount * 1000 * 10) / 10;
   }
   return Math.round(amount * LB_TO_G * 10) / 10;
 }
 
-function convertDimensionToMm(value, unit) {
-  const amount = parseOneDecimalNumber(value, "Dimension");
+function convertDimensionToMm(value, unit, fieldLabel = "Dimension") {
+  let amount;
+  try {
+    amount = parseOneDecimalNumber(value, fieldLabel);
+  } catch (error) {
+    throw createValidationError(error.message, fieldLabel);
+  }
+
   if (unit === "cm") {
     return Math.round(amount * 10 * 10) / 10;
   }
@@ -40,18 +68,20 @@ function convertDimensionToMm(value, unit) {
 function assertWeightWithinLimit(modelWeightG) {
   const normalized = Math.round(Number(modelWeightG) * 10) / 10;
   if (!Number.isFinite(normalized) || normalized <= 0 || normalized > MAX_WEIGHT_G) {
-    const error = new Error(`Model weight cannot exceed ${MAX_WEIGHT_G / 1000} kg.`);
-    error.statusCode = 400;
-    throw error;
+    throw createValidationError(
+      `Model weight cannot exceed ${MAX_WEIGHT_G / 1000} kg.`,
+      "Model weight"
+    );
   }
 }
 
 function assertDimensionWithinLimit(modelMm, fieldLabel) {
   const normalized = Math.round(Number(modelMm) * 10) / 10;
   if (!Number.isFinite(normalized) || normalized <= 0 || normalized > MAX_DIMENSION_MM) {
-    const error = new Error(`${fieldLabel} cannot exceed ${MAX_DIMENSION_MM / 10} cm.`);
-    error.statusCode = 400;
-    throw error;
+    throw createValidationError(
+      `${fieldLabel} cannot exceed ${MAX_DIMENSION_MM / 10} cm.`,
+      fieldLabel
+    );
   }
 }
 
@@ -72,13 +102,11 @@ function assertClientCanonicalValuesMatch(computed, body) {
     try {
       parsedClient = parseOneDecimalCanonical(clientValue, label);
     } catch (error) {
-      throw error;
+      throw createValidationError(error.message, label);
     }
 
     if (Math.round(parsedClient * 10) !== Math.round(expected * 10)) {
-      const error = new Error(`${label} does not match the selected unit.`);
-      error.statusCode = 400;
-      throw error;
+      throw createValidationError(`${label} does not match the selected unit.`, label);
     }
   }
 }
@@ -89,19 +117,29 @@ function parseDaysToPrepare(value, fieldLabel = "Days to prepare") {
   }
 
   if (!isNaturalNumber(value)) {
-    const error = new Error(`${fieldLabel} must be a whole number from ${MIN_DAYS_TO_PREPARE} to ${MAX_DAYS_TO_PREPARE}.`);
-    error.statusCode = 400;
-    throw error;
+    throw createValidationError(
+      `${fieldLabel} must be a whole number from ${MIN_DAYS_TO_PREPARE} to ${MAX_DAYS_TO_PREPARE}.`,
+      fieldLabel
+    );
   }
 
   const parsed = Number.parseInt(String(value).trim(), 10);
   if (parsed < MIN_DAYS_TO_PREPARE || parsed > MAX_DAYS_TO_PREPARE) {
-    const error = new Error(`${fieldLabel} must be between ${MIN_DAYS_TO_PREPARE} and ${MAX_DAYS_TO_PREPARE}.`);
-    error.statusCode = 400;
-    throw error;
+    throw createValidationError(
+      `${fieldLabel} must be between ${MIN_DAYS_TO_PREPARE} and ${MAX_DAYS_TO_PREPARE}.`,
+      fieldLabel
+    );
   }
 
   return parsed;
+}
+
+function parseCanonicalDimension(value, fieldLabel) {
+  try {
+    return parseOneDecimalCanonical(value, fieldLabel);
+  } catch (error) {
+    throw createValidationError(error.message, fieldLabel);
+  }
 }
 
 function parseAndValidateProductDimensions(body = {}) {
@@ -118,19 +156,19 @@ function parseAndValidateProductDimensions(body = {}) {
 
   const modelWeightG = String(body.modelWeight ?? "").trim() !== ""
     ? convertWeightToGrams(body.modelWeight, modelWeightUnit)
-    : parseOneDecimalCanonical(body.modelWeightG ?? body.model_weight_g, "Model weight");
+    : parseCanonicalDimension(body.modelWeightG ?? body.model_weight_g, "Model weight");
 
   const modelHeightMm = String(body.modelHeight ?? "").trim() !== ""
-    ? convertDimensionToMm(body.modelHeight, modelDimensionUnit)
-    : parseOneDecimalCanonical(body.modelHeightMm ?? body.model_height_mm, "Height");
+    ? convertDimensionToMm(body.modelHeight, modelDimensionUnit, "Height")
+    : parseCanonicalDimension(body.modelHeightMm ?? body.model_height_mm, "Height");
 
   const modelWidthMm = String(body.modelWidth ?? "").trim() !== ""
-    ? convertDimensionToMm(body.modelWidth, modelDimensionUnit)
-    : parseOneDecimalCanonical(body.modelWidthMm ?? body.model_width_mm, "Width");
+    ? convertDimensionToMm(body.modelWidth, modelDimensionUnit, "Width")
+    : parseCanonicalDimension(body.modelWidthMm ?? body.model_width_mm, "Width");
 
   const modelLengthMm = String(body.modelLength ?? "").trim() !== ""
-    ? convertDimensionToMm(body.modelLength, modelDimensionUnit)
-    : parseOneDecimalCanonical(body.modelLengthMm ?? body.model_length_mm, "Length");
+    ? convertDimensionToMm(body.modelLength, modelDimensionUnit, "Length")
+    : parseCanonicalDimension(body.modelLengthMm ?? body.model_length_mm, "Length");
 
   assertWeightWithinLimit(modelWeightG);
   assertDimensionWithinLimit(modelHeightMm, "Height");

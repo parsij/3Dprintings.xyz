@@ -6,6 +6,14 @@ import CustomSelect from "../components/CustomSelect.jsx";
 import ProductSpecsFields from "../components/ProductSpecsFields.jsx";
 import { validateProductSpecs } from "../services/productSpecsValidation.js";
 import { FieldLabel, FIELD_CLASS, RequiredMark } from "../components/listingFormUi.jsx";
+import {
+  getFirstListingFieldError,
+  scrollToListingField,
+} from "../../utils/apiValidationErrors.js";
+
+function fieldClassName(hasError) {
+  return hasError ? `${FIELD_CLASS} border-red-500` : FIELD_CLASS;
+}
 
 // Your complete, community-specific 3D printing taxonomy
 // eslint-disable-next-line react-refresh/only-export-components
@@ -174,6 +182,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
+  const [serverErrors, setServerErrors] = useState({});
   const [boxesUrl, setBoxesUrl] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
 
@@ -216,8 +225,13 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     }
 
     const parsedQuantity = Number(form.quantity);
-    if (!form.quantity || Number.isNaN(parsedQuantity) || parsedQuantity <= 0) {
-      nextErrors.quantity = "Enter a valid quantity greater than 0.";
+    if (
+      !form.quantity
+      || Number.isNaN(parsedQuantity)
+      || parsedQuantity <= 0
+      || !Number.isInteger(parsedQuantity)
+    ) {
+      nextErrors.quantity = "Enter a valid whole number quantity greater than 0.";
     }
 
     Object.assign(nextErrors, validateProductSpecs(form));
@@ -227,26 +241,67 @@ export default function SubmitModel({ onSubmissionSuccess }) {
 
   const isFormValid = Object.keys(errors).length === 0;
 
+  const displayErrors = useMemo(
+    () => ({ ...errors, ...serverErrors }),
+    [errors, serverErrors]
+  );
+
+  useEffect(() => {
+    if (!submitted) {
+      return;
+    }
+
+    const firstErrorField = getFirstListingFieldError(displayErrors);
+    if (firstErrorField) {
+      scrollToListingField(firstErrorField);
+    }
+  }, [submitted, displayErrors]);
+
+  function clearServerError(field) {
+    setServerErrors((prev) => {
+      if (!prev[field]) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
   function handleChange(event) {
     const { name, value } = event.target;
+    clearServerError(name);
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
   function handleUnitChange(field, value) {
+    if (field === "modelWeightUnit") {
+      clearServerError("modelWeight");
+    } else if (field === "modelDimensionUnit") {
+      clearServerError("modelHeight");
+      clearServerError("modelWidth");
+      clearServerError("modelLength");
+    }
+    clearServerError("dimensions");
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function handleDimensionValueChange(field, value) {
+    clearServerError(field);
+    clearServerError("dimensions");
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function handlePhotoChange(event) {
+    clearServerError("photos");
     const selectedFiles = Array.from(event.target.files || []);
     setPhotos((prev) => mergePhotos(prev, selectedFiles));
     event.target.value = "";
   }
 
   function removePhoto(indexToRemove) {
+    clearServerError("photos");
     setPhotos((prev) => prev.filter((_, index) => index !== indexToRemove));
   }
 
@@ -263,6 +318,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   function handleDrop(event) {
     event.preventDefault();
     setIsDragActive(false);
+    clearServerError("photos");
     const droppedFiles = Array.from(event.dataTransfer.files || []);
     setPhotos((prev) => mergePhotos(prev, droppedFiles));
   }
@@ -271,6 +327,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     event.preventDefault();
     setSubmitted(true);
     setSubmitMessage("");
+    setServerErrors({});
     setBoxesUrl(null);
 
     if (!isFormValid) {
@@ -299,6 +356,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
 
       setSubmitMessage(response?.message || "Your listing is ready and queued for backend submission.");
       setBoxesUrl(null);
+      setServerErrors({});
       setForm(defaultForm);
       setPhotos([]);
       setSubmitted(false);
@@ -306,6 +364,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         onSubmissionSuccess();
       }
     } catch (error) {
+      if (error?.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
+        setServerErrors(error.fieldErrors);
+        setSubmitted(true);
+      }
+
       setSubmitMessage(error?.message || "Failed to prepare listing. Please try again.");
       setBoxesUrl(error?.boxesUrl || null);
     } finally {
@@ -316,6 +379,16 @@ export default function SubmitModel({ onSubmissionSuccess }) {
   return (
       <div className="mx-auto w-full max-w-4xl">
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+          {submitted && displayErrors.general ? (
+            <p
+              id="listing-general-error"
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {displayErrors.general}
+            </p>
+          ) : null}
+
           {/* Photo Upload Section */}
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700 transition-colors duration-300">
@@ -344,7 +417,9 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 onChange={handlePhotoChange}
                 className="hidden"
             />
-            {submitted && errors.photos && <p className="mt-2 text-xs text-red-500">{errors.photos}</p>}
+            {submitted && displayErrors.photos && (
+              <p className="mt-2 text-xs text-red-500">{displayErrors.photos}</p>
+            )}
 
             {previewUrls.length > 0 && (
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -376,9 +451,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.modelName}
                   onChange={handleChange}
                   placeholder="Model's name"
-                  className={FIELD_CLASS}
+                  className={fieldClassName(submitted && displayErrors.modelName)}
               />
-              {submitted && errors.modelName && <p className="mt-1 text-xs text-red-500">{errors.modelName}</p>}
+              {submitted && displayErrors.modelName && (
+                <p className="mt-1 text-xs text-red-500">{displayErrors.modelName}</p>
+              )}
             </div>
 
             <div className="group transition-all duration-300 hover:translate-x-1">
@@ -390,9 +467,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.price}
                   onChange={handleChange}
                   placeholder="19.99"
-                  className={FIELD_CLASS}
+                  className={fieldClassName(submitted && displayErrors.price)}
               />
-              {submitted && errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
+              {submitted && displayErrors.price && (
+                <p className="mt-1 text-xs text-red-500">{displayErrors.price}</p>
+              )}
             </div>
 
             <div className="group transition-all duration-300 hover:translate-x-1">
@@ -406,9 +485,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.quantity}
                   onChange={handleChange}
                   placeholder="10"
-                  className={`${FIELD_CLASS} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                  className={`${fieldClassName(submitted && displayErrors.quantity)} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
               />
-              {submitted && errors.quantity && <p className="mt-1 text-xs text-red-500">{errors.quantity}</p>}
+              {submitted && displayErrors.quantity && (
+                <p className="mt-1 text-xs text-red-500">{displayErrors.quantity}</p>
+              )}
             </div>
 
             {/* FIXED: Dropdown Select implementation with strict optgroup nesting */}
@@ -418,12 +499,17 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 id="category"
                 name="category"
                 value={form.category}
-                onChange={(nextValue) => setForm((prev) => ({ ...prev, category: nextValue }))}
+                onChange={(nextValue) => {
+                  clearServerError("category");
+                  setForm((prev) => ({ ...prev, category: nextValue }));
+                }}
                 placeholder="Select a category..."
                 ariaLabel="Category"
                 groups={categoryGroups}
               />
-              {submitted && errors.category && <p className="mt-1 text-xs text-red-500">{errors.category}</p>}
+              {submitted && displayErrors.category && (
+                <p className="mt-1 text-xs text-red-500">{displayErrors.category}</p>
+              )}
               {form.category === "Other" && (
                 <p className="mt-2 text-xs text-red-600 font-semibold">Setting your product category as "Other" makes your products have less sales compared to others.</p>
               )}
@@ -438,10 +524,10 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                   value={form.description}
                   onChange={handleChange}
                   placeholder="Describe size, print settings, material suggestions, and use cases..."
-                  className={`${FIELD_CLASS} resize-none`}
+                  className={`${fieldClassName(submitted && displayErrors.description)} resize-none`}
               />
-              {submitted && errors.description && (
-                  <p className="mt-1 text-xs text-red-500">{errors.description}</p>
+              {submitted && displayErrors.description && (
+                  <p className="mt-1 text-xs text-red-500">{displayErrors.description}</p>
               )}
             </div>
 
@@ -449,9 +535,12 @@ export default function SubmitModel({ onSubmissionSuccess }) {
               form={form}
               onUnitChange={handleUnitChange}
               onDimensionValueChange={handleDimensionValueChange}
-              onDaysToPrepareChange={(value) => setForm((prev) => ({ ...prev, daysToPrepare: value }))}
+              onDaysToPrepareChange={(value) => {
+                clearServerError("daysToPrepare");
+                setForm((prev) => ({ ...prev, daysToPrepare: value }));
+              }}
               showErrors={submitted}
-              errors={errors}
+              errors={displayErrors}
             />
 
             <Tags
@@ -478,7 +567,14 @@ export default function SubmitModel({ onSubmissionSuccess }) {
           </button>
 
           {submitMessage && (
-              <p className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-gray-700 animate-fade-in-up transition-all duration-300 hover:shadow-md hover:scale-[1.01]">
+              <p
+                role="alert"
+                className={`rounded-lg border px-4 py-3 text-sm animate-fade-in-up transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${
+                  Object.keys(serverErrors).length > 0
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-orange-200 bg-orange-50 text-gray-700"
+                }`}
+              >
                 {submitMessage}
                 {boxesUrl && (
                   <>

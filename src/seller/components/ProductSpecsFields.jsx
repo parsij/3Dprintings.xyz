@@ -42,6 +42,9 @@ export default function ProductSpecsFields({
         {showErrors && errors.modelWeight ? (
           <p className="mt-1 text-xs text-red-500">{errors.modelWeight}</p>
         ) : null}
+        {showErrors && !errors.modelWeight && errors.dimensions ? (
+          <p className="mt-1 text-xs text-red-500">{errors.dimensions}</p>
+        ) : null}
       </div>
 
       <div className="sm:col-span-2 rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
