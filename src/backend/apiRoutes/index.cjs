@@ -17,4 +17,5 @@ module.exports = function registerApiRoutes(deps) {
   require('./sellerOnboarding.cjs')(routeDeps);
   require('./sellerBoxes.cjs')(routeDeps);
   require('./sellerBalance.cjs')(routeDeps);
+  require('./chat.cjs')(routeDeps);
 };

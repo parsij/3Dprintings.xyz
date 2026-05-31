@@ -3,6 +3,7 @@ module.exports = function productRoutes(deps) {
   const path = require("path");
   const { resolveShopLogoFromSources } = require("./sellerProfileShared.cjs");
   const { ensureSellerAvatarIfNeeded } = require("./sellerAvatar.cjs");
+  const { ensureChatUserPocketBaseId } = require("./chatShared.cjs");
   const IMAGE_BASE_URL = 'https://3dprintings.xyz/api/imgUploads';
   const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
   const SHOP_LOGO_SQL = `COALESCE(NULLIF(sp.shop_logo_url, ''), NULLIF(u.seller_preferences->>'shopLogoUrl', '')) AS shop_logo_url`;
@@ -38,6 +39,8 @@ module.exports = function productRoutes(deps) {
       tags: parsedTags,
       category,
       seller_id: p.user_id,
+      seller_pocketbase_id: p.seller_pocketbase_id || null,
+      seller_chat_id: p.seller_pocketbase_id || null,
       shop_name: p.shop_name || p.creator_name || '',
       shop_logo_url: resolveShopLogoFromSources(p.shop_logo_url) || null,
     };
@@ -45,6 +48,8 @@ module.exports = function productRoutes(deps) {
 
   const mapShopRow = (row) => ({
     sellerId: Number(row.seller_user_id || row.id),
+    sellerPocketBaseId: row.seller_pocketbase_id || null,
+    sellerChatId: row.seller_pocketbase_id || null,
     username: row.username || '',
     shopName: row.shop_name || row.username || 'Shop',
     shopBio: row.shop_bio || '',
@@ -53,6 +58,24 @@ module.exports = function productRoutes(deps) {
     designSoftware: Array.isArray(row.design_software) ? row.design_software : [],
     externalPortfolioLink: row.external_portfolio_link || '',
   });
+
+  async function attachSellerChatId(productRow) {
+    const sellerUserId = Number(productRow?.user_id);
+    if (!Number.isInteger(sellerUserId) || sellerUserId <= 0) {
+      return productRow;
+    }
+
+    try {
+      const sellerPocketBaseId = await ensureChatUserPocketBaseId(pool, sellerUserId);
+      return {
+        ...productRow,
+        seller_pocketbase_id: sellerPocketBaseId,
+      };
+    } catch (error) {
+      console.error("Failed to ensure seller chat account:", error?.message || error);
+      return productRow;
+    }
+  }
 
   const parsePagination = (query) => {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
@@ -76,6 +99,7 @@ module.exports = function productRoutes(deps) {
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
+                u.pocketbase_id AS seller_pocketbase_id,
                 sp.shop_name,
                 ${SHOP_LOGO_SQL},
                 COALESCE(r.review_count, 0)::int AS reviews_count
@@ -121,6 +145,7 @@ module.exports = function productRoutes(deps) {
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
+                u.pocketbase_id AS seller_pocketbase_id,
                 sp.shop_name,
                 ${SHOP_LOGO_SQL},
                 COALESCE(r.review_count, 0)::int AS reviews_count
@@ -159,6 +184,7 @@ module.exports = function productRoutes(deps) {
 
       const result = await pool.query(
         `SELECT p.*, u.username as creator_name,
+                u.pocketbase_id AS seller_pocketbase_id,
                 sp.shop_name,
                 sp.shop_bio,
                 ${SHOP_LOGO_SQL},
@@ -182,7 +208,8 @@ module.exports = function productRoutes(deps) {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      const product = normalizeProductRow(result.rows[0], true);
+      const productRow = await attachSellerChatId(result.rows[0]);
+      const product = normalizeProductRow(productRow, true);
 
       res.json(product);
     } catch (err) {
@@ -201,6 +228,7 @@ module.exports = function productRoutes(deps) {
       const shopResult = await pool.query(
         `SELECT u.id,
                 u.username,
+                u.pocketbase_id AS seller_pocketbase_id,
                 sp.seller_user_id,
                 sp.shop_name,
                 sp.shop_bio,
@@ -219,7 +247,10 @@ module.exports = function productRoutes(deps) {
         return res.status(404).json({ message: 'Shop not found' });
       }
 
-      const shopRow = shopResult.rows[0];
+      const shopRow = await attachSellerChatId({
+        ...shopResult.rows[0],
+        user_id: shopResult.rows[0].id,
+      });
       const shopName = shopRow.shop_name || shopRow.username || "";
       let shopLogoUrl = resolveShopLogoFromSources(shopRow.shop_logo_url);
 
@@ -238,6 +269,7 @@ module.exports = function productRoutes(deps) {
 
       const productsResult = await pool.query(
         `SELECT p.*, u.username as creator_name,
+                u.pocketbase_id AS seller_pocketbase_id,
                 sp.shop_name,
                 ${SHOP_LOGO_SQL},
                 COALESCE(r.review_count, 0)::int AS reviews_count

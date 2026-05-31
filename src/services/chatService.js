@@ -1,7 +1,8 @@
 import pb from "./pocketbaseClient.js";
+import { ensureChatAuthSession } from "./chatAuthService.js";
 
 export function getChatCurrentUserId(user) {
-  return pb.authStore.model?.id || user?.pocketBaseId || user?.pocketbaseId || (user?.id ? String(user.id) : "");
+  return pb.authStore.model?.id || user?.pocketBaseId || user?.pocketbaseId || "";
 }
 
 export function getConversationTitle(conversation, currentUserId, mode = "customer") {
@@ -31,14 +32,16 @@ export async function listConversationsForUser({ userId, mode = "customer" }) {
 }
 
 export async function getOrCreateConversationWithSeller({ buyerId, sellerId }) {
-  const normalizedBuyerId = String(buyerId || "").trim();
+  await ensureChatAuthSession();
+
+  const normalizedBuyerId = String(buyerId || pb.authStore.model?.id || "").trim();
   const normalizedSellerId = String(sellerId || "").trim();
 
   if (!normalizedBuyerId) {
     throw new Error("Sign in before messaging a shop.");
   }
 
-  if (!normalizedSellerId) {
+  if (!/^[a-z0-9]{15}$/i.test(normalizedSellerId)) {
     throw new Error("This shop is not available for messages yet.");
   }
 

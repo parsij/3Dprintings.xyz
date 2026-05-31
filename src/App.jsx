@@ -6,6 +6,7 @@ import axios from "axios";
 import { ensureCsrfToken } from "./services/csrf.js";
 import { API_BASE, isSellerHostname } from "./config/api.js";
 import { AuthProvider } from "./AuthContext.jsx";
+import { clearChatAuthSession, ensureChatAuthSession } from "./services/chatAuthService.js";
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -26,6 +27,7 @@ const App = () => {
         setUser(response.data.user);
       } catch {
         setUser(null);
+        clearChatAuthSession();
       } finally {
         setLoading(false);
       }
@@ -33,6 +35,17 @@ const App = () => {
 
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      clearChatAuthSession();
+      return;
+    }
+
+    ensureChatAuthSession().catch((error) => {
+      console.error("Failed to initialize chat session:", error);
+    });
+  }, [user]);
 
   // Keep your exact loading animation while the backend responds
   if (loading) return (

@@ -9,6 +9,7 @@ import {
   getConversationTitle,
   listConversationsForUser,
 } from "../services/chatService.js";
+import { ensureChatAuthSession } from "../services/chatAuthService.js";
 import pb from "../services/pocketbaseClient.js";
 
 export default function Messages({ user, mode = "customer" }) {
@@ -28,7 +29,7 @@ export default function Messages({ user, mode = "customer" }) {
   }, []);
 
   useEffect(() => {
-    if (!currentUserId) {
+    if (!user) {
       setConversations([]);
       setLoading(false);
       setError("Chat is not ready for this account.");
@@ -39,34 +40,35 @@ export default function Messages({ user, mode = "customer" }) {
     let unsubscribeFromConversations;
     let unsubscribeFromMessages;
 
-    async function loadConversations() {
+    async function initializeInbox() {
       setLoading(true);
       setError("");
 
       try {
-        const items = await listConversationsForUser({ userId: currentUserId, mode });
+        await ensureChatAuthSession();
+        const resolvedUserId = pb.authStore.model?.id || getChatCurrentUserId(user);
+        if (!resolvedUserId) {
+          if (!active) return;
+          setError("Chat is not ready for this account.");
+          setConversations([]);
+          return;
+        }
+
+        setAuthStoreUserId(resolvedUserId);
+
+        const items = await listConversationsForUser({ userId: resolvedUserId, mode });
         if (!active) return;
         setConversations(items);
 
         if (!selectedConversationId && items[0]?.id) {
           setSearchParams({ conversation: items[0].id }, { replace: true });
         }
-      } catch (loadError) {
-        if (!active || loadError?.isAbort) return;
-        setError("Unable to load messages.");
-        console.error("Failed to load conversations:", loadError);
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
 
-    async function subscribeToConversations() {
-      try {
         unsubscribeFromConversations = await pb.collection("conversations").subscribe("*", (event) => {
           const record = event.record;
           const belongsToUser =
-            String(record?.buyer || "") === String(currentUserId) ||
-            String(record?.seller || "") === String(currentUserId);
+            String(record?.buyer || "") === String(resolvedUserId) ||
+            String(record?.seller || "") === String(resolvedUserId);
 
           if (!active || !belongsToUser) return;
 
@@ -85,15 +87,9 @@ export default function Messages({ user, mode = "customer" }) {
 
         if (!active && unsubscribeFromConversations) {
           await unsubscribeFromConversations();
+          return;
         }
-      } catch (subscribeError) {
-        if (!active) return;
-        console.error("Failed to subscribe to conversations:", subscribeError);
-      }
-    }
 
-    async function subscribeToMessages() {
-      try {
         unsubscribeFromMessages = await pb.collection("messages").subscribe("*", (event) => {
           if (!active || event.action !== "create") return;
 
@@ -120,15 +116,16 @@ export default function Messages({ user, mode = "customer" }) {
         if (!active && unsubscribeFromMessages) {
           await unsubscribeFromMessages();
         }
-      } catch (subscribeError) {
-        if (!active) return;
-        console.error("Failed to subscribe to inbox messages:", subscribeError);
+      } catch (loadError) {
+        if (!active || loadError?.isAbort) return;
+        setError("Unable to load messages.");
+        console.error("Failed to load conversations:", loadError);
+      } finally {
+        if (active) setLoading(false);
       }
     }
 
-    loadConversations();
-    subscribeToConversations();
-    subscribeToMessages();
+    initializeInbox();
 
     return () => {
       active = false;
@@ -143,7 +140,7 @@ export default function Messages({ user, mode = "customer" }) {
         });
       }
     };
-  }, [currentUserId, mode, selectedConversationId, setSearchParams]);
+  }, [user, mode, selectedConversationId, setSearchParams]);
 
   const pageContent = (
     <main className="mx-auto max-w-7xl px-4 pb-12 pt-24 lg:px-[5vw]">
@@ -154,7 +151,7 @@ export default function Messages({ user, mode = "customer" }) {
         <h1 className="mt-2 text-3xl font-black text-gray-900">Conversations</h1>
       </div>
 
-      {!currentUserId ? (
+      {!user || !currentUserId ? (
         <div className="rounded-2xl border border-orange-100 bg-white p-6 shadow-sm">
           <p className="text-gray-700">
             Sign in to your chat account before viewing messages.

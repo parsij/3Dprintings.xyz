@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getChatCurrentUserId, getOrCreateConversationWithSeller } from "../services/chatService.js";
+import { ensureChatAuthSession } from "../services/chatAuthService.js";
 
 export default function MessageShopButton({
   sellerId,
@@ -22,6 +23,7 @@ export default function MessageShopButton({
 
     setIsStarting(true);
     try {
+      await ensureChatAuthSession();
       const conversation = await getOrCreateConversationWithSeller({
         buyerId,
         sellerId,

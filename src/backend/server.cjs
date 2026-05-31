@@ -899,6 +899,17 @@ async function initializeDatabase() {
 
      await pool.query(`
        ALTER TABLE users
+       ADD COLUMN IF NOT EXISTS pocketbase_id VARCHAR(32)
+     `);
+     await pool.query(`
+       CREATE UNIQUE INDEX IF NOT EXISTS users_pocketbase_id_unique_idx
+       ON users (pocketbase_id)
+       WHERE pocketbase_id IS NOT NULL
+     `);
+     console.log("PocketBase chat id column ensured in users table");
+
+     await pool.query(`
+       ALTER TABLE users
        ADD COLUMN IF NOT EXISTS seller_preferences JSONB NOT NULL DEFAULT '{}'::jsonb
      `);
      console.log("seller preferences column ensured in users table");

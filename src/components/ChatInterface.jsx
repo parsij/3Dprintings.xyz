@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import pb from "../services/pocketbaseClient.js";
+import { ensureChatAuthSession } from "../services/chatAuthService.js";
 
 const INITIAL_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -142,6 +143,7 @@ export default function ChatInterface({ conversationId, currentUserId: providedC
     setError("");
 
     try {
+      await ensureChatAuthSession();
       const createdMessage = await pb.collection("messages").create({
         conversation: conversationId,
         senderId,

@@ -15,6 +15,7 @@ import {
   updateAccountAddress,
   updateAccountProfile,
 } from "../services/accountSettingsService.js";
+import { clearChatAuthSession } from "../services/chatAuthService.js";
 
 
 const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -385,6 +386,7 @@ export default function AccountSettings({ user, setUser }) {
     try {
       setIsSigningOut(true);
       await signOutAccount();
+      clearChatAuthSession();
       window.location.replace("/signin");
     } catch (error) {
       setSignOutMessage(error.message || "Sign out failed.");
