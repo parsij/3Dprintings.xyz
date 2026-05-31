@@ -37,10 +37,10 @@ function formatMessageTime(created) {
   });
 }
 
-export default function ChatInterface({ conversationId }) {
+export default function ChatInterface({ conversationId, currentUserId: providedCurrentUserId = "" }) {
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
-  const [currentUserId, setCurrentUserId] = useState(getCurrentUserId);
+  const [authStoreUserId, setAuthStoreUserId] = useState(getCurrentUserId);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +48,7 @@ export default function ChatInterface({ conversationId }) {
 
   useEffect(() => {
     const removeAuthListener = pb.authStore.onChange((_token, model) => {
-      setCurrentUserId(model?.id || getCurrentUserId());
+      setAuthStoreUserId(model?.id || getCurrentUserId());
     }, true);
 
     return removeAuthListener;
@@ -123,11 +123,13 @@ export default function ChatInterface({ conversationId }) {
     };
   }, [conversationId]);
 
+  const currentUserId = providedCurrentUserId || authStoreUserId;
+
   async function sendMessage(event) {
     event.preventDefault();
 
     const trimmedText = messageText.trim();
-    const senderId = getCurrentUserId();
+    const senderId = currentUserId;
 
     if (!conversationId || !trimmedText || isSending) return;
 

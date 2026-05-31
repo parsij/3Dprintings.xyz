@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from "@tailwindcss/vite";
+import process from "node:process";
 
 const backendPort = process.env.VITE_BACKEND_PORT || "3000";
 const backendTarget = `http://localhost:${backendPort}`;

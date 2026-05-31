@@ -37,16 +37,15 @@ const SearchResults = ({ user }) => {
     setSearchInput(query);
     setProducts([]);
     setPage(1);
+    setHasMore(true);
   }
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const handleSortChange = (event) => {
+    setSort(event.target.value);
     setProducts([]);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHasMore(true);
-  }, [sort]);
+  };
 
   useEffect(() => {
     const fetchSearchResults = async () => {
@@ -128,7 +127,7 @@ const SearchResults = ({ user }) => {
             <div className="relative mt-2 sm:mt-0">
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value)}
+                onChange={handleSortChange}
                  className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-xl leading-tight focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 shadow-sm cursor-pointer transition-all duration-300"
               >
                 <option value="relevant">Most Relevant</option>

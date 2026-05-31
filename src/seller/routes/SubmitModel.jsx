@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { submitModelListing } from "../services/modelListingService.js";
 import Tags from "../../components/Tags.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
-import ProductSpecsFields, { validateProductSpecs } from "../components/ProductSpecsFields.jsx";
+import ProductSpecsFields from "../components/ProductSpecsFields.jsx";
+import { validateProductSpecs } from "../services/productSpecsValidation.js";
 import { FieldLabel, FIELD_CLASS, RequiredMark } from "../components/listingFormUi.jsx";
 
 // Your complete, community-specific 3D printing taxonomy

@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 function flattenOptions(options = [], groups = []) {
@@ -32,7 +32,7 @@ export default function CustomSelect({
   const selectedOption = allOptions.find((option) => option.value === value);
   const displayLabel = selectedOption?.label || placeholder;
 
-  const updateMenuPosition = () => {
+  const updateMenuPosition = useCallback(() => {
     const trigger = rootRef.current;
     if (!trigger) return;
 
@@ -58,15 +58,10 @@ export default function CustomSelect({
       zIndex: 9999,
       maxHeight: openUpward ? Math.min(estimatedMenuHeight, rect.top - viewportPadding - 4) : Math.min(240, spaceBelow - viewportPadding),
     });
-  };
+  }, [allOptions.length, compact, groups.length]);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setMenuStyle(null);
-      return undefined;
-    }
-
-    updateMenuPosition();
+    if (!open) return undefined;
 
     window.addEventListener("resize", updateMenuPosition);
     window.addEventListener("scroll", updateMenuPosition, true);
@@ -74,7 +69,7 @@ export default function CustomSelect({
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [open, compact, allOptions.length, groups.length]);
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -104,6 +99,16 @@ export default function CustomSelect({
   function chooseOption(nextValue) {
     onChange(nextValue);
     setOpen(false);
+  }
+
+  function toggleOpen() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+
+    updateMenuPosition();
+    setOpen(true);
   }
 
   const defaultTriggerClass = compact
@@ -166,7 +171,7 @@ export default function CustomSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listboxId}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={toggleOpen}
         className={`${defaultTriggerClass} ${triggerClassName} ${!selectedOption ? "text-gray-500" : ""}`}
       >
         {displayLabel}

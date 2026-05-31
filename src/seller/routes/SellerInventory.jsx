@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Tags from "../../components/Tags.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
-import ProductSpecsFields, { validateProductSpecs } from "../components/ProductSpecsFields.jsx";
+import ProductSpecsFields from "../components/ProductSpecsFields.jsx";
+import { validateProductSpecs } from "../services/productSpecsValidation.js";
 import { FieldLabel, FIELD_CLASS } from "../components/listingFormUi.jsx";
 import {
   getSellerProducts,

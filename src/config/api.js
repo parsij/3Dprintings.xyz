@@ -3,10 +3,6 @@ const DEFAULT_SELLER_ORIGIN = "https://seller.3dprintings.xyz";
 const LOCAL_MARKETPLACE_ORIGIN = "http://localhost:5173";
 const LOCAL_SELLER_ORIGIN = "http://seller.localhost:5173";
 
-function isTruthyEnv(value) {
-  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
-}
-
 function isLocalHostname(hostname = "") {
   const host = String(hostname).toLowerCase();
   return host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");

@@ -12,6 +12,7 @@ import SellerReviews from "./seller/routes/SellerReviews.jsx";
 import SellerOnboarding from "./seller/routes/SellerOnboarding.jsx";
 import SellerBalance from "./seller/routes/SellerBalance.jsx";
 import SellerBoxes from "./seller/routes/SellerBoxes.jsx";
+import Messages from "./routes/Messages.jsx";
 import { BECOME_SELLER_URL } from "./config/api.js";
 import { getSellerOnboardingStatus } from "./seller/services/sellerOnboardingService.js";
 
@@ -215,6 +216,14 @@ const SellerRouter = ({ user, setUser }) => {
           element={
             <ProtectedSellerRoute user={user}>
               <SellerBoxes user={user} />
+            </ProtectedSellerRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedSellerRoute user={user}>
+              <Messages user={user} mode="seller" />
             </ProtectedSellerRoute>
           }
         />

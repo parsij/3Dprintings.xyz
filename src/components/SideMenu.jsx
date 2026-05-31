@@ -11,6 +11,7 @@ function buildCustomerMenuItems(isSeller) {
     { label: "Saved Products", to: "/saved-products" },
     { label: "My Reviews", to: "/your-reviews" },
     { label: "My Orders", to: "/account/orders" },
+    { label: "Messages", to: "/messages" },
   ];
 
   if (isSeller) {
@@ -32,6 +33,7 @@ const seller = [
   { label: "Manage Products", to: "/inventory" },
   { label: "Boxes", to: "/boxes" },
   { label: "Orders", to: "/orders" },
+  { label: "Messages", to: "/messages" },
   { label: "Reviews", to: "/reviews" },
   { label: "Preferences", to: "/preferences" },
   { label: "Back to Marketplace", to: MARKETPLACE_HOME_URL },

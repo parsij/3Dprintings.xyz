@@ -17,6 +17,7 @@ import PaymentSuccess from "./routes/PaymentSuccess.jsx";
 import PaymentCancel from "./routes/PaymentCancel.jsx";
 import BecomeSeller from "./routes/BecomeSeller.jsx";
 import ShopInfo from "./routes/shopInfo.jsx";
+import Messages from "./routes/Messages.jsx";
 
 function SignInRoute({ user, setUser }) {
   if (user) {
@@ -42,6 +43,7 @@ const Router = ({ user, setUser }) => {
         <Route path="/liked-products" element={<LikedProducts user={user} />} />
         <Route path="/saved-products" element={<SavedProducts user={user} />} />
         <Route path="/your-reviews" element={<YourReviews user={user} />} />
+        <Route path="/messages" element={user ? <Messages user={user} /> : <Navigate to="/signin" replace />} />
         <Route path="/product/:id" element={<ProductPage user={user} />} />
         <Route path="/shop/:sellerId" element={<ShopInfo user={user} />} />
         <Route path="/cart" element={<CartPage user={user} />} />

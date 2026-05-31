@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import SellerNavBar from "../components/SellerNavBar.jsx";
@@ -9,6 +9,8 @@ import {
   saveSellerShippingOrigin,
   verifyStripeConnectOnboardingWithRetry,
 } from "../services/sellerOnboardingService.js";
+
+const MotionDiv = motion.div;
 
 const EMPTY_ADDRESS = {
   line1: "",
@@ -64,12 +66,12 @@ export default function SellerOnboarding({ step }) {
     return status?.completionStep || "stripe_connect";
   }, [step, status?.completionStep]);
 
-  const clearStripeReturnParams = () => {
+  const clearStripeReturnParams = useCallback(() => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete("return");
     nextParams.delete("refresh");
     setSearchParams(nextParams, { replace: true });
-  };
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,14 +120,14 @@ export default function SellerOnboarding({ step }) {
     return () => {
       cancelled = true;
     };
-  }, [navigate, step, stripeReturnMode]);
+  }, [clearStripeReturnParams, navigate, step, stripeReturnMode]);
 
   useEffect(() => {
     if (stripeReturnMode !== "refresh") return undefined;
     setShowStripeRefreshNotice(true);
     clearStripeReturnParams();
     return undefined;
-  }, [stripeReturnMode]);
+  }, [clearStripeReturnParams, stripeReturnMode]);
 
   useEffect(() => {
     if (step !== "stripe_connect") return undefined;
@@ -189,7 +191,7 @@ export default function SellerOnboarding({ step }) {
     return () => {
       cancelled = true;
     };
-  }, [loading, navigate, searchParams, setSearchParams, step, stripeReturnMode]);
+  }, [clearStripeReturnParams, loading, navigate, step, stripeReturnMode]);
 
   const handleStripeRemediation = () => {
     const actionUrl = stripeRequiresAction?.actionUrl || stripeActionUrl;
@@ -401,7 +403,7 @@ export default function SellerOnboarding({ step }) {
         {activeStep === "complete" ? (
           <section className="rounded-2xl border border-orange-100 bg-white p-8 text-center shadow-md">
             <AnimatePresence>
-              <motion.div
+              <MotionDiv
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 180, damping: 14 }}
@@ -416,7 +418,7 @@ export default function SellerOnboarding({ step }) {
                 >
                   Go to inventory
                 </button>
-              </motion.div>
+              </MotionDiv>
             </AnimatePresence>
           </section>
         ) : null}

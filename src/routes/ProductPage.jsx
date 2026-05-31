@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import cart from "../assets/Cart.svg"
 import Navbar from "../components/NavBar.jsx";
+import MessageShopButton from "../components/MessageShopButton.jsx";
 import Reviews from "../components/Reviews.jsx";
 import StarRating from "../components/StarRating.jsx";
 import { addToCart } from "../services/cartService.js";
@@ -568,7 +569,7 @@ const ProductPage = ({ user }) => {
             </div>
 
             {/* Creator & Rating */}
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
               <Link
                 to={`/shop/${product.seller_id || product.user_id}`}
                 className="flex min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-orange-50 hover:text-orange-700"
@@ -588,6 +589,12 @@ const ProductPage = ({ user }) => {
                 </span>
                 <span className="min-w-0 truncate">By {getShopDisplayName()}</span>
               </Link>
+              <MessageShopButton
+                user={user}
+                sellerId={product.seller_chat_id || product.seller_pocketbase_id || product.seller_id || product.user_id}
+                iconOnly
+                className="h-12 w-12 bg-gray-950 text-white hover:bg-orange-600 hover:scale-105 active:scale-95"
+              />
               <div className="flex items-center gap-2">
                 <StarRating
                   value={Math.max(0, Math.min(5, Number(product.rating) || 0))}

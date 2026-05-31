@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import Navbar from "../components/NavBar.jsx";
+import MessageShopButton from "../components/MessageShopButton.jsx";
 import ProductCard from "../components/ProductCard.jsx";
 
 import { API_BASE } from "../config/api.js";
@@ -94,16 +95,25 @@ export default function ShopInfo({ user }) {
                       : null}
                   </div>
 
-                  {shop?.externalPortfolioLink ? (
-                    <a
-                      href={shop.externalPortfolioLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-5 inline-flex rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:border-orange-500 hover:text-orange-600"
-                    >
-                      Portfolio
-                    </a>
-                  ) : null}
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <MessageShopButton
+                      user={user}
+                      sellerId={shop?.sellerChatId || shop?.sellerPocketBaseId || shop?.sellerId || sellerId}
+                      label="Message shop"
+                      className="bg-gray-950 px-4 py-2 text-sm text-white hover:bg-orange-600"
+                    />
+
+                    {shop?.externalPortfolioLink ? (
+                      <a
+                        href={shop.externalPortfolioLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:border-orange-500 hover:text-orange-600"
+                      >
+                        Portfolio
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </section>

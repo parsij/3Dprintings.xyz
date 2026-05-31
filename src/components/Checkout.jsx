@@ -258,7 +258,7 @@ const Checkout = () => {
         }, 400);
 
         return () => window.clearTimeout(timer);
-    }, [cartItems, shippingAddressSignature, addressComplete, shippingTier]);
+    }, [cartItems, normalizedShippingAddress, shippingAddressSignature, addressComplete, shippingTier]);
 
     const handleAddressChange = (event) => {
         const { name, value } = event.target;

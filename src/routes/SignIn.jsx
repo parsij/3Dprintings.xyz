@@ -152,7 +152,7 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
         setIsGoogleSubmitting(false);
       }
     },
-    [API_BASE, redirectAfterAuth, setUser]
+    [redirectAfterAuth, setUser]
   );
 
   useEffect(() => {
@@ -178,7 +178,7 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
     return () => {
       isMounted = false;
     };
-  }, [API_BASE]);
+  }, []);
 
   useEffect(() => {
     if (!googleClientId || !googleButtonRef.current) return;
