@@ -14,7 +14,8 @@
     "seller:setup": "node src/backend/scripts/setupSellerDashboard.cjs",
     "seller:address-column": "node src/backend/scripts/ensureSellerAddressColumn.cjs",
     "seller:marketplace-setup": "node src/backend/scripts/ensureSellerMarketplaceColumns.cjs",
-    "db:ensure-schema": "node src/backend/scripts/ensureSellerMarketplaceColumns.cjs"
+    "db:ensure-schema": "node src/backend/scripts/ensureSellerMarketplaceColumns.cjs",
+    "chat:ensure-schema": "node src/backend/scripts/ensureChatSchema.cjs"
   },
   "dependencies": {
     "@easypost/api": "^8.8.0",

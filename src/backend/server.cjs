@@ -953,6 +953,10 @@ async function initializeDatabase() {
      await ensureSellerAddressColumn(pool);
      console.log("Seller marketplace schema ensured.");
 
+     const chatRoutes = require("./apiRoutes/chat.cjs");
+     await chatRoutes.ensureChatConversationContextTable(pool);
+     console.log("Chat conversation context table ensured.");
+
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`
        CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_unique_idx

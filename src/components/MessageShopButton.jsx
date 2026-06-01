@@ -1,14 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getChatCurrentUserId, getOrCreateConversationWithSeller } from "../services/chatService.js";
+import { getOrCreateConversationWithSeller } from "../services/chatService.js";
 import { ensureChatAuthSession } from "../services/chatAuthService.js";
 
 export default function MessageShopButton({
+  sellerDbId,
   sellerId,
   user,
   className = "",
   label = "Message",
   iconOnly = false,
+  productId = null,
+  productName = "",
+  productImage = "",
+  shopName = "",
+  contextType = "shop",
 }) {
   const navigate = useNavigate();
   const [isStarting, setIsStarting] = useState(false);
@@ -19,23 +25,25 @@ export default function MessageShopButton({
       return;
     }
 
-    const buyerId = getChatCurrentUserId(user);
-
     setIsStarting(true);
     try {
       await ensureChatAuthSession();
-      const conversation = await getOrCreateConversationWithSeller({
-        buyerId,
-        sellerId,
+      const result = await getOrCreateConversationWithSeller({
+        sellerDbId: sellerDbId || sellerId,
+        productId,
+        contextType: productId ? "product" : contextType,
+        productName,
+        productImage,
+        shopName,
       });
 
-      navigate(`/messages?conversation=${encodeURIComponent(conversation.id)}`);
+      navigate(`/messages?conversation=${encodeURIComponent(result.conversationId)}`);
     } catch (error) {
-      const status = error?.status;
+      const status = error?.response?.status || error?.status;
       if (status === 403) {
         alert("You are not allowed to start a conversation with this shop.");
       } else {
-        alert(error?.message || "Unable to start this conversation.");
+        alert(error?.response?.data?.message || error?.message || "Unable to start this conversation.");
       }
       console.error("Failed to start shop conversation:", error);
     } finally {
@@ -43,14 +51,16 @@ export default function MessageShopButton({
     }
   }
 
+  const resolvedSellerDbId = sellerDbId || sellerId;
+
   return (
     <button
       type="button"
       onClick={handleMessageShop}
-      disabled={isStarting || !sellerId}
+      disabled={isStarting || !resolvedSellerDbId}
       className={`inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
-      aria-label="Message shop"
-      title="Message shop"
+      aria-label={label}
+      title={label}
     >
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path

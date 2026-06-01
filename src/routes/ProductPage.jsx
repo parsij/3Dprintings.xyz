@@ -591,7 +591,14 @@ const ProductPage = ({ user }) => {
               </Link>
               <MessageShopButton
                 user={user}
-                sellerId={product.seller_chat_id || product.seller_pocketbase_id || product.seller_id || product.user_id}
+                sellerDbId={product.seller_id || product.user_id}
+                productId={product.id}
+                productName={product.name}
+                productImage={Array.isArray(product.images) && product.images.length > 0
+                  ? product.images[0]
+                  : product.image_url}
+                shopName={getShopDisplayName()}
+                contextType="product"
                 iconOnly
                 className="h-12 w-12 bg-gray-950 text-white hover:bg-orange-600 hover:scale-105 active:scale-95"
               />

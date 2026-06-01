@@ -98,7 +98,9 @@ export default function ShopInfo({ user }) {
                   <div className="mt-5 flex flex-wrap gap-3">
                     <MessageShopButton
                       user={user}
-                      sellerId={shop?.sellerChatId || shop?.sellerPocketBaseId || shop?.sellerId || sellerId}
+                      sellerDbId={shop?.sellerId || sellerId}
+                      shopName={shopName}
+                      contextType="shop"
                       label="Message shop"
                       className="bg-gray-950 px-4 py-2 text-sm text-white hover:bg-orange-600"
                     />

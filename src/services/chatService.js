@@ -1,67 +1,104 @@
-import pb from "./pocketbaseClient.js";
+import axios from "axios";
+
+import { API_BASE } from "../config/api.js";
+import { applyCsrfInterceptor } from "./csrf.js";
 import { ensureChatAuthSession } from "./chatAuthService.js";
+import pb from "./pocketbaseClient.js";
+
+const apiClient = applyCsrfInterceptor(axios.create({
+  baseURL: API_BASE,
+  withCredentials: true,
+}));
 
 export function getChatCurrentUserId(user) {
   return pb.authStore.model?.id || user?.pocketBaseId || user?.pocketbaseId || "";
 }
 
-export function getConversationTitle(conversation, currentUserId, mode = "customer") {
-  const isSellerView = mode === "seller";
-  const otherParticipantId = isSellerView ? conversation?.buyer : conversation?.seller;
-
-  if (!otherParticipantId) return "Conversation";
-  if (String(otherParticipantId) === String(currentUserId)) return "Conversation";
-
-  return `${isSellerView ? "Buyer" : "Shop"} ${otherParticipantId}`;
-}
-
-export async function listConversationsForUser({ userId, mode = "customer" }) {
-  if (!userId) return [];
-
-  const filter =
-    mode === "seller"
-      ? pb.filter("seller = {:userId}", { userId })
-      : pb.filter("buyer = {:userId} || seller = {:userId}", { userId });
-
-  const result = await pb.collection("conversations").getList(1, 100, {
-    filter,
-    sort: "-updated",
-  });
-
-  return result.items;
-}
-
-export async function getOrCreateConversationWithSeller({ buyerId, sellerId }) {
-  await ensureChatAuthSession();
-
-  const normalizedBuyerId = String(buyerId || pb.authStore.model?.id || "").trim();
-  const normalizedSellerId = String(sellerId || "").trim();
-
-  if (!normalizedBuyerId) {
-    throw new Error("Sign in before messaging a shop.");
+export function conversationBelongsToMode(conversation, userPbId, mode = "customer") {
+  if (!conversation || !userPbId) {
+    return false;
   }
 
-  if (!/^[a-z0-9]{15}$/i.test(normalizedSellerId)) {
+  if (mode === "seller") {
+    return String(conversation.seller || "") === String(userPbId);
+  }
+
+  return String(conversation.buyer || "") === String(userPbId);
+}
+
+export function getConversationTitle(conversation, mode = "customer") {
+  if (conversation?.title) {
+    return conversation.title;
+  }
+
+  const isSellerView = mode === "seller";
+  return isSellerView ? "Buyer inquiry" : "Shop conversation";
+}
+
+export function getConversationSubtitle(conversation) {
+  if (conversation?.subtitle) {
+    return conversation.subtitle;
+  }
+
+  if (conversation?.contextType === "product" && conversation?.shopName) {
+    return `${conversation.shopName} shop`;
+  }
+
+  return conversation?.shopName ? `${conversation.shopName} shop` : "Marketplace chat";
+}
+
+export async function listConversationsForUser({ mode = "customer" }) {
+  await ensureChatAuthSession();
+
+  const response = await apiClient.get("/api/messages/conversations", {
+    params: { mode },
+  });
+
+  return Array.isArray(response.data?.conversations) ? response.data.conversations : [];
+}
+
+export async function startConversationWithSeller({
+  sellerDbId,
+  productId = null,
+  contextType = "shop",
+  productName = "",
+  productImage = "",
+  shopName = "",
+}) {
+  await ensureChatAuthSession();
+
+  const response = await apiClient.post("/api/messages/conversations/start", {
+    sellerDbId: Number(sellerDbId),
+    productId: productId ? Number(productId) : null,
+    contextType,
+    productName,
+    productImage,
+    shopName,
+  });
+
+  return response.data;
+}
+
+export async function getOrCreateConversationWithSeller({
+  sellerDbId,
+  sellerId,
+  productId,
+  contextType = "shop",
+  productName = "",
+  productImage = "",
+  shopName = "",
+}) {
+  const resolvedSellerDbId = Number(sellerDbId || sellerId);
+  if (!Number.isInteger(resolvedSellerDbId) || resolvedSellerDbId <= 0) {
     throw new Error("This shop is not available for messages yet.");
   }
 
-  if (normalizedBuyerId === normalizedSellerId) {
-    throw new Error("You cannot message your own shop.");
-  }
-
-  const existing = await pb.collection("conversations").getList(1, 1, {
-    filter: pb.filter("buyer = {:buyerId} && seller = {:sellerId}", {
-      buyerId: normalizedBuyerId,
-      sellerId: normalizedSellerId,
-    }),
-  });
-
-  if (existing.items.length > 0) {
-    return existing.items[0];
-  }
-
-  return pb.collection("conversations").create({
-    buyer: normalizedBuyerId,
-    seller: normalizedSellerId,
+  return startConversationWithSeller({
+    sellerDbId: resolvedSellerDbId,
+    productId,
+    contextType,
+    productName,
+    productImage,
+    shopName,
   });
 }
