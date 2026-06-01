@@ -179,6 +179,7 @@ async function ensureChatUserPocketBaseId(pool, userId) {
 
 module.exports = {
   CHAT_POCKETBASE_URL,
+  chatRequest,
   deriveChatPassword,
   ensureChatUserForDbUser,
   ensureChatUserPocketBaseId,
