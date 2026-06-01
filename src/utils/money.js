@@ -9,18 +9,27 @@ export function centsToUsd(cents) {
 
 /**
  * Read a USD dollar amount from checkout API fields.
- * Prefers explicit cent fields; falls back to dollar fields.
+ * The API sends `shipping`/`subtotal`/etc. as dollars and matching *Cents fields.
  */
 export function readCheckoutUsdAmount({ dollars, cents } = {}) {
-    if (cents !== undefined && cents !== null && cents !== '') {
-        const centsValue = Number(cents);
-        if (Number.isFinite(centsValue)) {
+    const dollarsValue = Number(dollars);
+    const centsValue = Number(cents);
+    const hasDollars = dollars !== undefined && dollars !== null && dollars !== '';
+    const hasCents = cents !== undefined && cents !== null && cents !== '';
+
+    if (hasDollars && Number.isFinite(dollarsValue)) {
+        // Legacy payloads duplicated cents into the dollar field (e.g. shipping: 2000, shippingCents: 2000).
+        if (hasCents && Number.isFinite(centsValue) && centsValue > 0 && dollarsValue === centsValue) {
             return centsToUsd(centsValue);
         }
+        return dollarsValue;
     }
 
-    const dollarsValue = Number(dollars);
-    return Number.isFinite(dollarsValue) ? dollarsValue : 0;
+    if (hasCents && Number.isFinite(centsValue)) {
+        return centsToUsd(centsValue);
+    }
+
+    return 0;
 }
 
 /**

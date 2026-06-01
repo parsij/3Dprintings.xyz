@@ -78,6 +78,48 @@ function centsFromDollars(value) {
   return Math.round(numeric * 100);
 }
 
+function extractEasyPostRateDollarString(rate) {
+  const candidates = [
+    rate?.adjusted_rate,
+    rate?.rate,
+    rate?.list_rate,
+    rate?.retail_rate,
+    rate?.base_rate?.amount,
+  ];
+
+  for (const candidate of candidates) {
+    const str = normalizeText(candidate);
+    if (str) return str;
+  }
+
+  return "";
+}
+
+function parseEasyPostRateToCents(rate) {
+  if (Number.isFinite(Number(rate?.rateCents)) && Number(rate.rateCents) > 0) {
+    return Math.round(Number(rate.rateCents));
+  }
+
+  const str = extractEasyPostRateDollarString(rate);
+  if (!str) return 0;
+
+  const numeric = Number(str);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+
+  // EasyPost documents USD rates as decimal dollar strings (e.g. "11.01", "20.00").
+  if (str.includes(".")) {
+    return Math.round(numeric * 100);
+  }
+
+  // Whole-dollar quotes under $100 (e.g. "20" => $20.00).
+  if (numeric < 100) {
+    return Math.round(numeric * 100);
+  }
+
+  // Some payloads return integer cents without a decimal (e.g. 2000 => $20.00).
+  return Math.round(numeric);
+}
+
 function dollarsFromCents(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
@@ -548,7 +590,7 @@ function normalizeRates(rates = []) {
   return rates
     .map((rate) => ({
       ...rate,
-      rateCents: centsFromDollars(rate?.rate),
+      rateCents: parseEasyPostRateToCents(rate),
       deliveryDays: Number.isFinite(Number(rate?.delivery_days))
         ? Number(rate.delivery_days)
         : Number.isFinite(Number(rate?.est_delivery_days))
