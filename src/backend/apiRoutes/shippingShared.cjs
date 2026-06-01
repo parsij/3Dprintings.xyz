@@ -172,6 +172,28 @@ function easyPostAddressToNormalized(easyPostAddress) {
   });
 }
 
+function preserveDisplayCasing(preferred, normalized) {
+  const preferredText = normalizeText(preferred);
+  const normalizedText = normalizeText(normalized);
+  if (!normalizedText) return preferredText;
+  if (!preferredText) return normalizedText;
+  if (preferredText.localeCompare(normalizedText, undefined, { sensitivity: "accent" }) === 0) {
+    return preferredText;
+  }
+  return normalizedText;
+}
+
+function mergeVerifiedAddressDisplay(userAddress, verifiedAddress) {
+  const user = normalizeAddressPayload(userAddress);
+  const verified = normalizeAddressPayload(verifiedAddress);
+  return {
+    ...verified,
+    line1: preserveDisplayCasing(user.line1, verified.line1),
+    line2: preserveDisplayCasing(user.line2, verified.line2),
+    city: preserveDisplayCasing(user.city, verified.city),
+  };
+}
+
 function isDeliverableVerifiedAddress(verifiedAddress) {
   return verifiedAddress?.verifications?.delivery?.success === true;
 }
@@ -352,7 +374,7 @@ async function verifyAddressWithEasyPost(address, fallback = {}, label = "addres
     }
 
     if (isDeliverableVerifiedAddress(verified)) {
-      return easyPostAddressToNormalized(verified);
+      return mergeVerifiedAddressDisplay(normalized, easyPostAddressToNormalized(verified));
     }
 
     if (allowNotFoundSoftPass && isEasyPostNotFoundOnly(verified)) {

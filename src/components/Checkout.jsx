@@ -26,7 +26,42 @@ function formatAddressSummary(address) {
         [address.city, address.state, address.zip].filter(Boolean).join(', '),
     ].filter(Boolean);
 
-    return parts.join(' · ');
+    return parts.join(', ');
+}
+
+function preserveDisplayCasing(preferred, normalized) {
+    const preferredText = String(preferred || '').trim();
+    const normalizedText = String(normalized || '').trim();
+    if (!normalizedText) return preferredText;
+    if (!preferredText) return normalizedText;
+    if (preferredText.localeCompare(normalizedText, undefined, { sensitivity: 'accent' }) === 0) {
+        return preferredText;
+    }
+    return normalizedText;
+}
+
+function mergeVerifiedAddress(userAddress, verifiedAddress) {
+    const verified = normalizeAddress(verifiedAddress);
+    return {
+        ...verified,
+        line1: preserveDisplayCasing(userAddress.line1, verified.line1),
+        line2: preserveDisplayCasing(userAddress.line2, verified.line2),
+        city: preserveDisplayCasing(userAddress.city, verified.city),
+    };
+}
+
+function dollarsFromCents(cents) {
+    const numeric = Number(cents);
+    if (!Number.isFinite(numeric)) return 0;
+    return numeric / 100;
+}
+
+function shippingOptionPriceDollars(option) {
+    if (Number.isFinite(Number(option?.shippingCents))) {
+        return dollarsFromCents(option.shippingCents);
+    }
+    const shipping = Number(option?.shipping);
+    return Number.isFinite(shipping) ? shipping : 0;
 }
 
 function normalizeAddress(address) {
@@ -90,6 +125,11 @@ const Checkout = () => {
     const totalsRequestRef = useRef(0);
     const addressSearchRef = useRef(null);
     const suppressAutocompleteRef = useRef(false);
+    const shippingAddressRef = useRef(shippingAddress);
+
+    useEffect(() => {
+        shippingAddressRef.current = shippingAddress;
+    }, [shippingAddress]);
 
     const clientSubtotal = useMemo(
         () => cartItems.reduce(
@@ -229,16 +269,33 @@ const Checkout = () => {
                 }
 
                 setTotals({
-                    subtotal: Number(data.subtotal) || 0,
-                    tax: Number(data.tax) || 0,
-                    shipping: Number(data.shipping) || 0,
-                    total: Number(data.total) || 0,
+                    subtotal: Number.isFinite(Number(data.subtotalCents))
+                        ? dollarsFromCents(data.subtotalCents)
+                        : Number(data.subtotal) || 0,
+                    tax: Number.isFinite(Number(data.taxCents))
+                        ? dollarsFromCents(data.taxCents)
+                        : Number(data.tax) || 0,
+                    shipping: Number.isFinite(Number(data.shippingCents))
+                        ? dollarsFromCents(data.shippingCents)
+                        : Number(data.shipping) || 0,
+                    total: Number.isFinite(Number(data.totalCents))
+                        ? dollarsFromCents(data.totalCents)
+                        : Number(data.total) || 0,
                 });
                 if (data.verifiedShippingAddress && typeof data.verifiedShippingAddress === 'object') {
-                    const verified = normalizeAddress(data.verifiedShippingAddress);
+                    const verified = mergeVerifiedAddress(
+                        shippingAddressRef.current,
+                        data.verifiedShippingAddress
+                    );
                     if (addressSignature(verified) !== shippingAddressSignature) {
                         setShippingAddress(verified);
-                        setAddressLine(formatAddressSummary(verified));
+                        setAddressLine((current) => {
+                            const nextSummary = formatAddressSummary(verified);
+                            if (current && current.localeCompare(nextSummary, undefined, { sensitivity: 'accent' }) === 0) {
+                                return current;
+                            }
+                            return nextSummary;
+                        });
                     }
                 }
                 setShippingOptions(Array.isArray(data.shippingOptions) ? data.shippingOptions : []);
@@ -264,9 +321,6 @@ const Checkout = () => {
         const { name, value } = event.target;
         let nextValue = value;
 
-        if (name === 'country' || name === 'state') {
-            nextValue = value.toUpperCase();
-        }
         if (name === 'country' || name === 'state' || name === 'zip') {
             nextValue = nextValue.trimStart();
         }
@@ -554,7 +608,7 @@ const Checkout = () => {
                                                 onChange={handleAddressChange}
                                                 maxLength={2}
                                                 placeholder="NY"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 uppercase"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                                                 required
                                             />
                                         </div>
@@ -651,7 +705,7 @@ const Checkout = () => {
                                                     <span className="flex flex-wrap items-center justify-between gap-2">
                                                         <span className="font-semibold text-gray-900">{option.label}</span>
                                                         <span className="font-semibold text-gray-900">
-                                                            ${Number(option.shipping || 0).toFixed(2)}
+                                                            ${shippingOptionPriceDollars(option).toFixed(2)}
                                                         </span>
                                                     </span>
                                                     <span className="mt-1 block text-sm text-gray-600">

@@ -670,7 +670,7 @@ module.exports = function paymentController(deps) {
                 shippingOptions: totals.shippingQuote.shippingOptions.map((option) => ({
                     tier: option.tier,
                     label: option.label,
-                    shipping: option.shipping,
+                    shipping: option.shippingCents / 100,
                     shippingCents: option.shippingCents,
                     deliveryWindow: option.deliveryWindow,
                 })),
