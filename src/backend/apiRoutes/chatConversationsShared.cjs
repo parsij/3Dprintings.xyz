@@ -1,5 +1,12 @@
 const { chatRequest, ensureChatUserForDbUser, ensureChatUserPocketBaseId } = require("./chatShared.cjs");
 const { resolveShopLogoFromSources } = require("./sellerProfileShared.cjs");
+const {
+  formatOrderNumber,
+  loadOrderContextForSeller,
+  collectOrderSellerIds,
+  getTrackingCodeForSeller,
+  UUID_REGEX,
+} = require("./chatOrderContextShared.cjs");
 
 async function ensureChatConversationContextTable(pool) {
   await pool.query(`
@@ -17,9 +24,11 @@ async function ensureChatConversationContextTable(pool) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       CONSTRAINT chat_conversation_context_type_check
-        CHECK (context_type IN ('product', 'shop'))
+        CHECK (context_type IN ('product', 'shop', 'order'))
     )
   `);
+
+  await ensureChatOrderContextColumns(pool);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_chat_context_buyer_db_id
@@ -34,6 +43,41 @@ async function ensureChatConversationContextTable(pool) {
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS chat_context_buyer_seller_product_unique_idx
     ON chat_conversation_context (buyer_db_id, seller_db_id, COALESCE(product_id, 0))
+  `);
+}
+
+async function ensureChatOrderContextColumns(pool) {
+  await pool.query(`
+    ALTER TABLE chat_conversation_context
+    ADD COLUMN IF NOT EXISTS order_id UUID
+  `);
+  await pool.query(`
+    ALTER TABLE chat_conversation_context
+    ADD COLUMN IF NOT EXISTS order_number VARCHAR(32)
+  `);
+  await pool.query(`
+    ALTER TABLE chat_conversation_context
+    ADD COLUMN IF NOT EXISTS order_tracking_code VARCHAR(128)
+  `);
+  await pool.query(`
+    ALTER TABLE chat_conversation_context
+    ADD COLUMN IF NOT EXISTS order_created_at TIMESTAMPTZ
+  `);
+
+  await pool.query(`
+    ALTER TABLE chat_conversation_context
+    DROP CONSTRAINT IF EXISTS chat_conversation_context_type_check
+  `);
+  await pool.query(`
+    ALTER TABLE chat_conversation_context
+    ADD CONSTRAINT chat_conversation_context_type_check
+    CHECK (context_type IN ('product', 'shop', 'order'))
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS chat_context_buyer_seller_order_unique_idx
+    ON chat_conversation_context (buyer_db_id, seller_db_id, order_id)
+    WHERE context_type = 'order' AND order_id IS NOT NULL
   `);
 }
 
@@ -54,7 +98,10 @@ async function ensureChatConversationReadsTable(pool) {
 }
 
 function normalizeContextType(value) {
-  return String(value || "").trim().toLowerCase() === "product" ? "product" : "shop";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "product") return "product";
+  if (normalized === "order") return "order";
+  return "shop";
 }
 
 function isValidPocketBaseId(value) {
@@ -133,6 +180,8 @@ function buildConversationPayload({
   productImage,
   shopName,
   contextType,
+  orderId,
+  orderNumber,
 }) {
   const payload = {
     buyer: buyerPbId,
@@ -142,7 +191,11 @@ function buildConversationPayload({
   const normalizedType = normalizeContextType(contextType);
   const parsedProductId = Number(productId);
 
-  if (normalizedType === "product" && Number.isInteger(parsedProductId) && parsedProductId > 0) {
+  if (normalizedType === "order" && orderId) {
+    payload.context_type = "order";
+    payload.product_id = 0;
+    if (orderNumber) payload.order_number = String(orderNumber).slice(0, 32);
+  } else if (normalizedType === "product" && Number.isInteger(parsedProductId) && parsedProductId > 0) {
     payload.product_id = parsedProductId;
     payload.context_type = "product";
     if (productName) payload.product_name = String(productName).slice(0, 255);
@@ -203,9 +256,24 @@ async function findExistingConversationContext(pool, {
   sellerDbId,
   productId,
   contextType,
+  orderId,
 }) {
   const normalizedType = normalizeContextType(contextType);
   const parsedProductId = Number(productId);
+
+  if (normalizedType === "order" && orderId) {
+    const result = await pool.query(
+      `SELECT *
+       FROM chat_conversation_context
+       WHERE buyer_db_id = $1
+         AND seller_db_id = $2
+         AND context_type = 'order'
+         AND order_id = $3
+       LIMIT 1`,
+      [buyerDbId, sellerDbId, orderId]
+    );
+    return result.rows[0] || null;
+  }
 
   if (normalizedType === "product" && Number.isInteger(parsedProductId) && parsedProductId > 0) {
     const result = await pool.query(
@@ -243,12 +311,17 @@ async function upsertConversationContext(pool, {
   productImage,
   shopName,
   contextType,
+  orderId,
+  orderNumber,
+  orderTrackingCode,
+  orderCreatedAt,
 }) {
   const normalizedType = normalizeContextType(contextType);
   const parsedProductId =
     normalizedType === "product" && Number.isInteger(Number(productId)) && Number(productId) > 0
       ? Number(productId)
       : null;
+  const parsedOrderId = normalizedType === "order" && orderId ? String(orderId) : null;
 
   await pool.query(
     `INSERT INTO chat_conversation_context (
@@ -262,14 +335,23 @@ async function upsertConversationContext(pool, {
        product_image,
        shop_name,
        context_type,
+       order_id,
+       order_number,
+       order_tracking_code,
+       order_created_at,
        updated_at
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
      ON CONFLICT (conversation_id)
      DO UPDATE SET
        product_name = EXCLUDED.product_name,
        product_image = EXCLUDED.product_image,
        shop_name = EXCLUDED.shop_name,
+       order_id = EXCLUDED.order_id,
+       order_number = EXCLUDED.order_number,
+       order_tracking_code = EXCLUDED.order_tracking_code,
+       order_created_at = EXCLUDED.order_created_at,
+       context_type = EXCLUDED.context_type,
        updated_at = NOW()`,
     [
       conversationId,
@@ -282,6 +364,10 @@ async function upsertConversationContext(pool, {
       productImage ? String(productImage).slice(0, 2000) : null,
       shopName ? String(shopName).slice(0, 255) : null,
       normalizedType,
+      parsedOrderId,
+      orderNumber ? String(orderNumber).slice(0, 32) : null,
+      orderTrackingCode ? String(orderTrackingCode).slice(0, 128) : null,
+      orderCreatedAt || null,
     ]
   );
 }
@@ -527,6 +613,10 @@ function mergeConversationRecord(pbConversation, contextRow, extras = {}) {
     productPrice: extras.productPrice ?? null,
     shopName,
     shopLogoUrl: extras.shopLogoUrl || null,
+    orderId: contextRow?.order_id || extras.orderId || null,
+    orderNumber: contextRow?.order_number || extras.orderNumber || null,
+    orderTrackingCode: contextRow?.order_tracking_code || extras.orderTrackingCode || null,
+    orderCreatedAt: contextRow?.order_created_at || extras.orderCreatedAt || null,
     buyerDbId: contextRow?.buyer_db_id || null,
     sellerDbId: contextRow?.seller_db_id || extras.sellerDbId || null,
     otherParticipantLabel: extras.otherParticipantLabel || null,
@@ -608,11 +698,30 @@ async function enrichConversationRows(pool, pbConversations, {
     const shopLabel = extras.shopName || contextRow?.shop_name || "Shop";
     const productLabel = extras.productName || contextRow?.product_name;
     const isProductContext = contextRow?.context_type === "product" && productLabel;
+    const isOrderContext = contextRow?.context_type === "order" && contextRow?.order_id;
+    const orderNumberLabel = contextRow?.order_number || formatOrderNumber(contextRow?.order_id);
+
+    if (isOrderContext) {
+      extras.orderId = contextRow.order_id;
+      extras.orderNumber = orderNumberLabel;
+      extras.orderTrackingCode = contextRow.order_tracking_code || null;
+      extras.orderCreatedAt = contextRow.order_created_at || null;
+    }
 
     if (isSellerView) {
-      extras.title = productLabel || "Buyer inquiry";
-      extras.subtitle = productLabel ? shopLabel : "";
-      extras.otherParticipantLabel = "Buyer";
+      if (isOrderContext) {
+        extras.title = orderNumberLabel;
+        extras.subtitle = "Shipping question";
+        extras.otherParticipantLabel = "Buyer";
+      } else {
+        extras.title = productLabel || "Buyer inquiry";
+        extras.subtitle = productLabel ? shopLabel : "";
+        extras.otherParticipantLabel = "Buyer";
+      }
+    } else if (isOrderContext) {
+      extras.title = orderNumberLabel;
+      extras.subtitle = "Shipping question";
+      extras.otherParticipantLabel = shopLabel;
     } else if (isProductContext) {
       extras.title = productLabel;
       extras.subtitle = `by ${shopLabel}`;
@@ -725,6 +834,93 @@ async function startConversation(pool, {
   };
 }
 
+async function startOrderConversation(pool, { buyerUser, sellerDbId, orderId }) {
+  const buyerDbId = Number(buyerUser.id);
+  const parsedSellerDbId = Number(sellerDbId);
+
+  if (!Number.isInteger(buyerDbId) || buyerDbId <= 0) {
+    throw Object.assign(new Error("Sign in before messaging a shop."), { statusCode: 401 });
+  }
+
+  if (!Number.isInteger(parsedSellerDbId) || parsedSellerDbId <= 0) {
+    throw Object.assign(new Error("This shop is not available for messages yet."), { statusCode: 400 });
+  }
+
+  if (buyerDbId === parsedSellerDbId) {
+    throw Object.assign(new Error("You cannot message your own shop."), { statusCode: 400 });
+  }
+
+  const resolvedOrder = await loadOrderContextForSeller(pool, {
+    orderId,
+    sellerDbId: parsedSellerDbId,
+    buyerDbId,
+  });
+
+  if (!resolvedOrder) {
+    throw Object.assign(new Error("This order is not available for messages."), { statusCode: 404 });
+  }
+
+  const buyerSession = await ensureChatUserForDbUser(pool, buyerUser);
+  const sellerPbId = await ensureChatUserPocketBaseId(pool, parsedSellerDbId);
+
+  if (!sellerPbId) {
+    throw Object.assign(new Error("This shop is not available for messages yet."), { statusCode: 400 });
+  }
+
+  const sellerProfile = await loadSellerProfile(pool, parsedSellerDbId);
+  const resolvedShopName = sellerProfile?.shopName || "Shop";
+
+  const existingContext = await findExistingConversationContext(pool, {
+    buyerDbId,
+    sellerDbId: parsedSellerDbId,
+    contextType: "order",
+    orderId: resolvedOrder.orderId,
+  });
+
+  if (existingContext?.conversation_id) {
+    return {
+      conversationId: existingContext.conversation_id,
+      created: false,
+    };
+  }
+
+  const payload = buildConversationPayload({
+    buyerPbId: buyerSession.pocketbaseId,
+    sellerPbId,
+    shopName: resolvedShopName,
+    contextType: "order",
+    orderId: resolvedOrder.orderId,
+    orderNumber: resolvedOrder.orderNumber,
+  });
+
+  const pbConversation = await createPocketBaseConversation(buyerSession.token, payload);
+  if (!pbConversation?.id) {
+    throw Object.assign(new Error("Unable to start this conversation."), { statusCode: 500 });
+  }
+
+  await upsertConversationContext(pool, {
+    conversationId: pbConversation.id,
+    buyerDbId,
+    sellerDbId: parsedSellerDbId,
+    buyerPbId: buyerSession.pocketbaseId,
+    sellerPbId,
+    productId: null,
+    productName: null,
+    productImage: null,
+    shopName: resolvedShopName,
+    contextType: "order",
+    orderId: resolvedOrder.orderId,
+    orderNumber: resolvedOrder.orderNumber,
+    orderTrackingCode: resolvedOrder.trackingCode,
+    orderCreatedAt: resolvedOrder.orderCreatedAt,
+  });
+
+  return {
+    conversationId: pbConversation.id,
+    created: true,
+  };
+}
+
 async function listConversationsForAccount(pool, buyerUser, mode = "customer") {
   const session = await ensureChatUserForDbUser(pool, buyerUser);
   const pbConversations = await listPocketBaseConversations({
@@ -744,8 +940,11 @@ async function listConversationsForAccount(pool, buyerUser, mode = "customer") {
 module.exports = {
   ensureChatConversationContextTable,
   ensureChatConversationReadsTable,
+  ensureChatOrderContextColumns,
   enrichConversationRows,
   listConversationsForAccount,
+  loadSellerProfiles,
   markConversationRead,
   startConversation,
+  startOrderConversation,
 };

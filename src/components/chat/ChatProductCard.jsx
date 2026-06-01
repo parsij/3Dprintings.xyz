@@ -122,8 +122,33 @@ export function ConversationAvatar({ conversation, mode = "customer" }) {
 
   if (conversation?.contextType === "product" && conversation?.productImage) {
     imageUrl = buildProductImageUrl(conversation.productImage, imageBase);
+  } else if (conversation?.contextType === "order") {
+    imageUrl = "order-context";
   } else if (!isSellerView && conversation?.shopLogoUrl) {
     imageUrl = conversation.shopLogoUrl;
+  }
+
+  if (imageUrl === "order-context") {
+    return (
+      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-blue-100 ring-1 ring-blue-200/80">
+        <span className="flex h-full w-full items-center justify-center text-blue-700">
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12 12 21 7.5M12 12v9M12 12 3 7.5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </div>
+    );
   }
 
   return <Avatar imageUrl={imageUrl} label={label} />;

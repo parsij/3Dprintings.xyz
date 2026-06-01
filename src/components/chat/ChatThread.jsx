@@ -12,6 +12,7 @@ import {
   groupMessagesByDay,
 } from "../../utils/chatFormatting.js";
 import { ChatProductCard, ConversationAvatar } from "./ChatProductCard.jsx";
+import { ChatOrderTrackingCard } from "./ChatOrderTrackingCard.jsx";
 import { enableScrollChaining } from "../../utils/scrollChaining.js";
 
 const INITIAL_MESSAGE_LIMIT = 50;
@@ -53,6 +54,19 @@ function buildProductSnapshot(conversation) {
   };
 }
 
+function buildOrderSnapshot(conversation) {
+  if (!conversation?.orderId) {
+    return null;
+  }
+
+  return {
+    orderId: conversation.orderId,
+    orderNumber: conversation.orderNumber,
+    trackingCode: conversation.orderTrackingCode,
+    orderCreatedAt: conversation.orderCreatedAt,
+  };
+}
+
 function getMessageProductContext(message, conversation, isFirstMessage) {
   const messageProductId = message?.product_id ?? message?.productId;
   if (messageProductId) {
@@ -73,7 +87,39 @@ function getMessageProductContext(message, conversation, isFirstMessage) {
   return null;
 }
 
-async function createChatMessage({ conversationId, senderId, text, productSnapshot }) {
+function getMessageOrderContext(message, conversation, isFirstMessage) {
+  const messageOrderId = message?.order_id ?? message?.orderId;
+  if (messageOrderId) {
+    return {
+      orderId: messageOrderId,
+      orderNumber: message?.order_number ?? message?.orderNumber ?? conversation?.orderNumber,
+      trackingCode: message?.tracking_code ?? message?.trackingCode ?? conversation?.orderTrackingCode,
+      orderCreatedAt: message?.order_created_at ?? message?.orderCreatedAt ?? conversation?.orderCreatedAt,
+    };
+  }
+
+  if (isFirstMessage && conversation?.orderId) {
+    return buildOrderSnapshot(conversation);
+  }
+
+  return null;
+}
+
+function getMessageAttachmentContext(message, conversation, isFirstMessage) {
+  const orderContext = getMessageOrderContext(message, conversation, isFirstMessage);
+  if (orderContext) {
+    return { type: "order", data: orderContext };
+  }
+
+  const productContext = getMessageProductContext(message, conversation, isFirstMessage);
+  if (productContext) {
+    return { type: "product", data: productContext };
+  }
+
+  return null;
+}
+
+async function createChatMessage({ conversationId, senderId, text, productSnapshot, orderSnapshot }) {
   const normalizedText = String(text || "").trim().slice(0, MAX_MESSAGE_LENGTH);
   if (!normalizedText) {
     throw new Error("Message text is required.");
@@ -84,6 +130,21 @@ async function createChatMessage({ conversationId, senderId, text, productSnapsh
     senderId,
     text: normalizedText,
   };
+
+  const normalizedOrderId = String(orderSnapshot?.orderId || "").trim();
+  if (normalizedOrderId) {
+    try {
+      return await pb.collection("messages").create({
+        ...basePayload,
+        order_id: normalizedOrderId,
+        order_number: String(orderSnapshot.orderNumber || "").slice(0, 32),
+        tracking_code: String(orderSnapshot.trackingCode || "Pending").slice(0, 128),
+        order_created_at: orderSnapshot.orderCreatedAt || null,
+      });
+    } catch {
+      return pb.collection("messages").create(basePayload);
+    }
+  }
 
   const parsedProductId = Number(productSnapshot?.productId);
   if (!Number.isInteger(parsedProductId) || parsedProductId <= 0) {
@@ -267,6 +328,10 @@ export default function ChatThread({
     conversation?.contextType === "product"
     && conversation?.shopName
     && mode === "customer";
+  const isOrderConversation = conversation?.contextType === "order";
+  const emptyStateHint = isOrderConversation
+    ? "Ask about shipping, delivery updates, or anything related to this order."
+    : "Ask about print options, timing, sizing, or anything related to this listing.";
 
   async function sendMessage(event) {
     event.preventDefault();
@@ -285,7 +350,16 @@ export default function ChatThread({
     setError("");
 
     const isFirstMessage = messages.length === 0;
-    const productSnapshot = isFirstMessage ? buildProductSnapshot(conversation) : null;
+    let productSnapshot = null;
+    let orderSnapshot = null;
+
+    if (isFirstMessage) {
+      if (conversation?.contextType === "order") {
+        orderSnapshot = buildOrderSnapshot(conversation);
+      } else {
+        productSnapshot = buildProductSnapshot(conversation);
+      }
+    }
 
     try {
       await ensureChatAuthSession();
@@ -294,6 +368,7 @@ export default function ChatThread({
         senderId,
         text: trimmedText,
         productSnapshot,
+        orderSnapshot,
       });
 
       setMessages((currentMessages) => mergeMessages(currentMessages, [createdMessage]));
@@ -350,7 +425,7 @@ export default function ChatThread({
             <div className="max-w-sm rounded-3xl border border-dashed border-orange-200 bg-white/90 px-5 py-6 shadow-sm">
               <p className="text-sm font-semibold text-gray-900">Start the conversation</p>
               <p className="mt-2 text-sm leading-6 text-gray-500">
-                Ask about print options, timing, sizing, or anything related to this listing.
+                {emptyStateHint}
               </p>
               {startedAtLabel ? (
                 <p className="mt-3 text-xs text-gray-400">Started {startedAtLabel}</p>
@@ -380,7 +455,7 @@ export default function ChatThread({
               const message = entry.message;
               const isOwnMessage = message.senderId === currentUserId;
               const isFirstMessage = message.id === firstMessageId;
-              const productContext = getMessageProductContext(message, conversation, isFirstMessage);
+              const attachment = getMessageAttachmentContext(message, conversation, isFirstMessage);
 
               return (
                 <article
@@ -406,9 +481,14 @@ export default function ChatThread({
                       {formatChatTime(message.created)}
                     </time>
                   </div>
-                  {productContext ? (
+                  {attachment?.type === "product" ? (
                     <div className={`max-w-[88%] sm:max-w-[72%] ${isOwnMessage ? "pr-1" : "pl-1"}`}>
-                      <ChatProductCard conversation={productContext} compact />
+                      <ChatProductCard conversation={attachment.data} compact />
+                    </div>
+                  ) : null}
+                  {attachment?.type === "order" ? (
+                    <div className={`max-w-[88%] sm:max-w-[72%] ${isOwnMessage ? "pr-1" : "pl-1"}`}>
+                      <ChatOrderTrackingCard order={attachment.data} compact />
                     </div>
                   ) : null}
                 </article>

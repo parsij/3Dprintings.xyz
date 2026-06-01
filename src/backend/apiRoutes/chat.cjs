@@ -2,9 +2,12 @@ const { ensureChatUserForDbUser } = require("./chatShared.cjs");
 const {
   ensureChatConversationContextTable,
   ensureChatConversationReadsTable,
+  ensureChatOrderContextColumns,
   listConversationsForAccount,
   markConversationRead,
   startConversation,
+  startOrderConversation,
+  loadSellerProfiles,
 } = require("./chatConversationsShared.cjs");
 
 function chatRoutes(deps) {
@@ -121,6 +124,50 @@ function chatRoutes(deps) {
     }
   });
 
+  app.get("/api/orders/:orderId/message-targets", async (req, res) => {
+    try {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser?.id) {
+        return res.status(401).json({ message: "Sign in before viewing order messages." });
+      }
+
+      const orderId = String(req.params.orderId || "").trim();
+      if (!UUID_REGEX.test(orderId)) {
+        return res.status(400).json({ message: "Invalid order id." });
+      }
+
+      const orderResult = await pool.query(
+        `SELECT id, customer_id, tracking, items
+         FROM orders
+         WHERE id = $1
+           AND customer_id = $2
+         LIMIT 1`,
+        [orderId, authUser.id]
+      );
+
+      if (orderResult.rows.length === 0) {
+        return res.status(404).json({ message: "Order not found." });
+      }
+
+      const orderRow = orderResult.rows[0];
+      const sellerIds = collectOrderSellerIds(orderRow);
+      const profiles = await loadSellerProfiles(pool, sellerIds);
+      const targets = sellerIds.map((sellerDbId) => {
+        const profile = profiles.get(Number(sellerDbId));
+        return {
+          sellerDbId,
+          sellerName: profile?.shopName || "Seller",
+          trackingCode: getTrackingCodeForSeller(orderRow.tracking, sellerDbId),
+        };
+      });
+
+      return res.json({ targets });
+    } catch (error) {
+      console.error("Order message targets error:", error?.message || error);
+      return res.status(500).json({ message: "Unable to load order message targets right now." });
+    }
+  });
+
   app.post("/api/messages/conversations/start", async (req, res) => {
     try {
       const authUser = getAuthUserFromRequest(req);
@@ -147,17 +194,24 @@ function chatRoutes(deps) {
         productName,
         productImage,
         shopName,
+        orderId,
       } = req.body || {};
 
-      const result = await startConversation(pool, {
-        buyerUser: userResult.rows[0],
-        sellerDbId,
-        productId,
-        contextType,
-        productName,
-        productImage,
-        shopName,
-      });
+      const result = orderId
+        ? await startOrderConversation(pool, {
+          buyerUser: userResult.rows[0],
+          sellerDbId,
+          orderId,
+        })
+        : await startConversation(pool, {
+          buyerUser: userResult.rows[0],
+          sellerDbId,
+          productId,
+          contextType,
+          productName,
+          productImage,
+          shopName,
+        });
 
       return res.status(result.created ? 201 : 200).json(result);
     } catch (error) {
@@ -174,5 +228,6 @@ function chatRoutes(deps) {
 
 chatRoutes.ensureChatConversationContextTable = ensureChatConversationContextTable;
 chatRoutes.ensureChatConversationReadsTable = ensureChatConversationReadsTable;
+chatRoutes.ensureChatOrderContextColumns = ensureChatOrderContextColumns;
 
 module.exports = chatRoutes;

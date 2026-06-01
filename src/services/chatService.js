@@ -40,11 +40,38 @@ export function getConversationSubtitle(conversation) {
     return conversation.subtitle;
   }
 
+  if (conversation?.contextType === "order") {
+    return "Shipping question";
+  }
+
   if (conversation?.contextType === "product" && conversation?.shopName) {
     return `by ${conversation.shopName}`;
   }
 
   return "";
+}
+
+export async function startOrderConversation({ sellerDbId, orderId }) {
+  const parsedSellerDbId = Number(sellerDbId);
+  const normalizedOrderId = String(orderId || "").trim();
+
+  if (!Number.isInteger(parsedSellerDbId) || parsedSellerDbId <= 0) {
+    throw new Error("This shop is not available for messages yet.");
+  }
+
+  if (!normalizedOrderId) {
+    throw new Error("Missing order.");
+  }
+
+  await ensureChatAuthSession();
+
+  const response = await apiClient.post("/api/messages/conversations/start", {
+    sellerDbId: parsedSellerDbId,
+    orderId: normalizedOrderId,
+    contextType: "order",
+  });
+
+  return response.data;
 }
 
 export async function markConversationRead({ conversationId }) {

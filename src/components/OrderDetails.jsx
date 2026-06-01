@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import CollapsibleTrackingSection from "./CollapsibleTrackingSection.jsx";
 import TrackingSection from "./TrackingSection.jsx";
+import MessageSellerOrderButton from "./MessageSellerOrderButton.jsx";
+import { fetchOrderMessageTargets } from "../services/orderMessagingService.js";
 import { getOrderItemsArray, getTrackingForItem, orderHasMultipleSellers } from "../utils/orderShipping.js";
 
 function toMoney(value) {
@@ -28,6 +30,8 @@ export default function OrderDetails({ user }) {
   const [error, setError] = useState("");
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [messageTargets, setMessageTargets] = useState([]);
+  const [messageTargetsError, setMessageTargetsError] = useState("");
 
   useEffect(() => {
     if (!user || !orderId) return;
@@ -78,6 +82,34 @@ export default function OrderDetails({ user }) {
     loadOrder();
     return () => controller.abort();
   }, [navigate, orderId, user]);
+
+  useEffect(() => {
+    if (!user || !order?.id) {
+      setMessageTargets([]);
+      return undefined;
+    }
+
+    let active = true;
+
+    fetchOrderMessageTargets(order.id)
+      .then((targets) => {
+        if (active) {
+          setMessageTargets(targets);
+          setMessageTargetsError("");
+        }
+      })
+      .catch((targetsError) => {
+        if (!active) return;
+        setMessageTargets([]);
+        setMessageTargetsError(
+          targetsError?.response?.data?.message || "Unable to load seller messaging options."
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [order?.id, user]);
 
   const handlePayment = async () => {
     if (!order || !order.id) return;
@@ -131,6 +163,27 @@ export default function OrderDetails({ user }) {
     items: order?.items,
     tracking: order?.tracking,
   });
+  const messageTargetsBySellerId = useMemo(
+    () => new Map(messageTargets.map((target) => [Number(target.sellerDbId), target])),
+    [messageTargets]
+  );
+
+  function renderMessageSellerButton(sellerDbId, label = "Message seller") {
+    const parsedSellerDbId = Number(sellerDbId);
+    if (!Number.isInteger(parsedSellerDbId) || parsedSellerDbId <= 0 || !order?.id) {
+      return null;
+    }
+
+    return (
+      <MessageSellerOrderButton
+        user={user}
+        sellerDbId={parsedSellerDbId}
+        orderId={order.id}
+        label={label}
+        className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm text-orange-700 hover:bg-orange-100"
+      />
+    );
+  }
 
   if (!user) return <Navigate to="/signin" replace />;
 
@@ -195,6 +248,21 @@ export default function OrderDetails({ user }) {
                 {paymentLoading ? "Processing Payment..." : "Pay Now"}
               </button>
             )}
+
+            {messageTargetsError ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {messageTargetsError}
+              </p>
+            ) : null}
+
+            {!hasMultipleSellers && messageTargets.length === 1 ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-gray-600">
+                  Questions about shipping for order {messageTargets[0]?.sellerName || "this seller"}?
+                </p>
+                {renderMessageSellerButton(messageTargets[0].sellerDbId)}
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
@@ -217,10 +285,14 @@ export default function OrderDetails({ user }) {
                     items: order.items,
                     tracking: order.tracking,
                   });
+                  const resolvedSellerId = Number(itemTracking.shipments?.[0]?.sellerId);
+                  const sellerTarget = Number.isInteger(resolvedSellerId) && resolvedSellerId > 0
+                    ? messageTargetsBySellerId.get(resolvedSellerId)
+                    : null;
                   return (
                     <div key={`${item?.id || item?.name || "item"}-${index}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
                           {imageUrl ? (
                             hasProductLink ? (
                               <Link to={productPath} className="block shrink-0">
@@ -256,6 +328,18 @@ export default function OrderDetails({ user }) {
                         </div>
                         <p className="text-sm font-semibold text-gray-900 shrink-0">{toMoney(safePrice * safeQuantity)}</p>
                       </div>
+
+                      {hasMultipleSellers && sellerTarget ? (
+                        <div className="mt-3 flex flex-col gap-2 border-t border-gray-200 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs text-gray-600">
+                            Message {sellerTarget.sellerName} about this shipment
+                          </p>
+                          {renderMessageSellerButton(
+                            sellerTarget.sellerDbId,
+                            `Message ${sellerTarget.sellerName}`
+                          )}
+                        </div>
+                      ) : null}
 
                       {hasMultipleSellers ? (
                         <CollapsibleTrackingSection tracking={itemTracking} embedded />

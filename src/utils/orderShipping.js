@@ -113,3 +113,37 @@ export function getTrackingForItem(item, { items: itemsPayload, tracking }) {
     lastUpdatedAt: tracking?.lastUpdatedAt || shipment?.updatedAt || null,
   };
 }
+
+export function formatOrderNumber(orderId) {
+  const normalized = String(orderId || "").replace(/-/g, "").toUpperCase();
+  if (normalized.length >= 8) {
+    return `#${normalized.slice(0, 8)}`;
+  }
+  return normalized ? `#${normalized}` : "Order";
+}
+
+export function getOrderMessagingTargets(order) {
+  const targets = new Map();
+
+  const shipments = [
+    ...(Array.isArray(order?.tracking?.shipments) ? order.tracking.shipments : []),
+    ...(Array.isArray(order?.items?.shippingQuote?.shipments) ? order.items.shippingQuote.shipments : []),
+  ];
+
+  for (const shipment of shipments) {
+    const sellerDbId = Number(shipment?.sellerId);
+    if (!Number.isInteger(sellerDbId) || sellerDbId <= 0) {
+      continue;
+    }
+
+    if (!targets.has(sellerDbId)) {
+      targets.set(sellerDbId, {
+        sellerDbId,
+        sellerName: shipment?.sellerName || "Seller",
+        trackingCode: shipment?.trackingCode || null,
+      });
+    }
+  }
+
+  return [...targets.values()];
+}
