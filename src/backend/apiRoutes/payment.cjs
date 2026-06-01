@@ -47,6 +47,25 @@ module.exports = function paymentController(deps) {
         "originalShippingCents",
         "markupRate",
     ]);
+
+    const toCheckoutMoneyFields = (cents) => {
+        const normalizedCents = Math.max(0, Math.round(Number(cents) || 0));
+        return {
+            amount: normalizedCents / 100,
+            cents: normalizedCents,
+        };
+    };
+
+    const toCheckoutShippingOption = (option) => {
+        const shipping = toCheckoutMoneyFields(option?.shippingCents);
+        return {
+            tier: option.tier,
+            label: option.label,
+            shipping: shipping.amount,
+            shippingCents: shipping.cents,
+            deliveryWindow: option.deliveryWindow,
+        };
+    };
     const parseIntInRange = (value, field, min, max) => {
         const parsed = Number.parseInt(value, 10);
         if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
@@ -656,24 +675,23 @@ module.exports = function paymentController(deps) {
             assertCheckoutTotalsAreValid(totals.totalCents);
             await loadSellerStripeAccounts(totals.normalizedItems);
 
+            const subtotal = toCheckoutMoneyFields(totals.subtotalCents);
+            const tax = toCheckoutMoneyFields(totals.taxCents);
+            const shipping = toCheckoutMoneyFields(totals.shippingCents);
+            const total = toCheckoutMoneyFields(totals.totalCents);
+
             res.json({
-                subtotal: totals.subtotalCents / 100,
-                tax: totals.taxCents / 100,
-                shipping: totals.shippingCents / 100,
-                shippingAndHandling: totals.shippingCents / 100,
-                total: totals.totalCents / 100,
-                subtotalCents: totals.subtotalCents,
-                taxCents: totals.taxCents,
-                shippingCents: totals.shippingCents,
-                totalCents: totals.totalCents,
+                subtotal: subtotal.amount,
+                tax: tax.amount,
+                shipping: shipping.amount,
+                shippingAndHandling: shipping.amount,
+                total: total.amount,
+                subtotalCents: subtotal.cents,
+                taxCents: tax.cents,
+                shippingCents: shipping.cents,
+                totalCents: total.cents,
                 shippingTier: totals.shippingTier,
-                shippingOptions: totals.shippingQuote.shippingOptions.map((option) => ({
-                    tier: option.tier,
-                    label: option.label,
-                    shipping: option.shippingCents / 100,
-                    shippingCents: option.shippingCents,
-                    deliveryWindow: option.deliveryWindow,
-                })),
+                shippingOptions: totals.shippingQuote.shippingOptions.map(toCheckoutShippingOption),
                 shippingQuote: {
                     shippingTier: totals.shippingQuote.shippingTier,
                     originalShipping: totals.shippingQuote.originalShipping,
@@ -681,7 +699,6 @@ module.exports = function paymentController(deps) {
                     markupRate: totals.shippingQuote.markupRate,
                     shipments: totals.shippingQuote.shipments,
                 },
-                verifiedShippingAddress: totals.safeAddress,
             });
         } catch (error) {
             console.error(

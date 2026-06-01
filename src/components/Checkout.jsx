@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { getUserFacingError } from '../utils/userFacingError.js';
+import { formatAddressSummary, sanitizeStreetLine } from '../utils/address.js';
+import { formatUsd, readCheckoutUsdAmount } from '../utils/money.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
@@ -19,56 +21,11 @@ const EMPTY_ADDRESS = {
     country: 'US',
 };
 
-function formatAddressSummary(address) {
-    const parts = [
-        address.line1,
-        address.line2,
-        [address.city, address.state, address.zip].filter(Boolean).join(', '),
-    ].filter(Boolean);
-
-    return parts.join(', ');
-}
-
-function preserveDisplayCasing(preferred, normalized) {
-    const preferredText = String(preferred || '').trim();
-    const normalizedText = String(normalized || '').trim();
-    if (!normalizedText) return preferredText;
-    if (!preferredText) return normalizedText;
-    if (preferredText.localeCompare(normalizedText, undefined, { sensitivity: 'accent' }) === 0) {
-        return preferredText;
-    }
-    return normalizedText;
-}
-
-function mergeVerifiedAddress(userAddress, verifiedAddress) {
-    const verified = normalizeAddress(verifiedAddress);
-    return {
-        ...verified,
-        line1: preserveDisplayCasing(userAddress.line1, verified.line1),
-        line2: preserveDisplayCasing(userAddress.line2, verified.line2),
-        city: preserveDisplayCasing(userAddress.city, verified.city),
-    };
-}
-
-function dollarsFromCents(cents) {
-    const numeric = Number(cents);
-    if (!Number.isFinite(numeric)) return 0;
-    return numeric / 100;
-}
-
-function shippingOptionPriceDollars(option) {
-    if (Number.isFinite(Number(option?.shippingCents))) {
-        return dollarsFromCents(option.shippingCents);
-    }
-    const shipping = Number(option?.shipping);
-    return Number.isFinite(shipping) ? shipping : 0;
-}
-
 function normalizeAddress(address) {
     return {
-        line1: String(address.line1 || '').trim().slice(0, MAX_ADDRESS_FIELD_LENGTH),
-        line2: String(address.line2 || '').trim().slice(0, MAX_ADDRESS_FIELD_LENGTH),
-        city: String(address.city || '').trim().slice(0, MAX_ADDRESS_FIELD_LENGTH),
+        line1: sanitizeStreetLine(address.line1).slice(0, MAX_ADDRESS_FIELD_LENGTH),
+        line2: sanitizeStreetLine(address.line2).slice(0, MAX_ADDRESS_FIELD_LENGTH),
+        city: sanitizeStreetLine(address.city).slice(0, MAX_ADDRESS_FIELD_LENGTH),
         state: String(address.state || '').trim().toUpperCase().slice(0, 2),
         zip: String(address.zip || '').trim().slice(0, 10),
         country: String(address.country || 'US').trim().toUpperCase().slice(0, 2),
@@ -89,9 +46,9 @@ function isAddressComplete(address) {
 function addressSignature(address) {
     const normalized = normalizeAddress(address);
     return [
-        normalized.line1,
-        normalized.line2,
-        normalized.city,
+        normalized.line1.toLowerCase(),
+        normalized.line2.toLowerCase(),
+        normalized.city.toLowerCase(),
         normalized.state,
         normalized.zip,
         normalized.country,
@@ -125,11 +82,6 @@ const Checkout = () => {
     const totalsRequestRef = useRef(0);
     const addressSearchRef = useRef(null);
     const suppressAutocompleteRef = useRef(false);
-    const shippingAddressRef = useRef(shippingAddress);
-
-    useEffect(() => {
-        shippingAddressRef.current = shippingAddress;
-    }, [shippingAddress]);
 
     const clientSubtotal = useMemo(
         () => cartItems.reduce(
@@ -269,35 +221,23 @@ const Checkout = () => {
                 }
 
                 setTotals({
-                    subtotal: Number.isFinite(Number(data.subtotalCents))
-                        ? dollarsFromCents(data.subtotalCents)
-                        : Number(data.subtotal) || 0,
-                    tax: Number.isFinite(Number(data.taxCents))
-                        ? dollarsFromCents(data.taxCents)
-                        : Number(data.tax) || 0,
-                    shipping: Number.isFinite(Number(data.shippingCents))
-                        ? dollarsFromCents(data.shippingCents)
-                        : Number(data.shipping) || 0,
-                    total: Number.isFinite(Number(data.totalCents))
-                        ? dollarsFromCents(data.totalCents)
-                        : Number(data.total) || 0,
+                    subtotal: readCheckoutUsdAmount({
+                        dollars: data.subtotal,
+                        cents: data.subtotalCents,
+                    }),
+                    tax: readCheckoutUsdAmount({
+                        dollars: data.tax,
+                        cents: data.taxCents,
+                    }),
+                    shipping: readCheckoutUsdAmount({
+                        dollars: data.shipping,
+                        cents: data.shippingCents,
+                    }),
+                    total: readCheckoutUsdAmount({
+                        dollars: data.total,
+                        cents: data.totalCents,
+                    }),
                 });
-                if (data.verifiedShippingAddress && typeof data.verifiedShippingAddress === 'object') {
-                    const verified = mergeVerifiedAddress(
-                        shippingAddressRef.current,
-                        data.verifiedShippingAddress
-                    );
-                    if (addressSignature(verified) !== shippingAddressSignature) {
-                        setShippingAddress(verified);
-                        setAddressLine((current) => {
-                            const nextSummary = formatAddressSummary(verified);
-                            if (current && current.localeCompare(nextSummary, undefined, { sensitivity: 'accent' }) === 0) {
-                                return current;
-                            }
-                            return nextSummary;
-                        });
-                    }
-                }
                 setShippingOptions(Array.isArray(data.shippingOptions) ? data.shippingOptions : []);
                 if (data.shippingTier && data.shippingTier !== shippingTier) {
                     setShippingTier(data.shippingTier);
@@ -325,10 +265,16 @@ const Checkout = () => {
             nextValue = nextValue.trimStart();
         }
 
-        setShippingAddress((prev) => ({
-            ...prev,
-            [name]: nextValue,
-        }));
+        setShippingAddress((prev) => {
+            const next = {
+                ...prev,
+                [name]: nextValue,
+            };
+            if (showAddressDetails) {
+                setAddressLine(formatAddressSummary(normalizeAddress(next)));
+            }
+            return next;
+        });
     };
 
     const selectAddressSuggestion = useCallback((suggestion) => {
@@ -705,7 +651,10 @@ const Checkout = () => {
                                                     <span className="flex flex-wrap items-center justify-between gap-2">
                                                         <span className="font-semibold text-gray-900">{option.label}</span>
                                                         <span className="font-semibold text-gray-900">
-                                                            ${shippingOptionPriceDollars(option).toFixed(2)}
+                                                            ${formatUsd(readCheckoutUsdAmount({
+                                                                dollars: option.shipping,
+                                                                cents: option.shippingCents,
+                                                            }))}
                                                         </span>
                                                     </span>
                                                     <span className="mt-1 block text-sm text-gray-600">

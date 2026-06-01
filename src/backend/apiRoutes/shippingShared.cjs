@@ -88,6 +88,20 @@ function normalizeText(value) {
   return value === null || value === undefined ? "" : String(value).trim();
 }
 
+function sanitizeStreetLine(value) {
+  return normalizeText(value)
+    .replace(/[\u00B7·]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function addressesMatchIgnoringCase(left, right) {
+  const a = sanitizeStreetLine(left);
+  const b = sanitizeStreetLine(right);
+  if (!a || !b) return a === b;
+  return a.localeCompare(b, undefined, { sensitivity: "base" }) === 0;
+}
+
 function normalizeState(value) {
   return normalizeText(value).toUpperCase();
 }
@@ -99,9 +113,9 @@ function normalizeCountry(value) {
 function normalizeAddressPayload(address = {}) {
   const payload = address && typeof address === "object" ? address : {};
   return {
-    line1: normalizeText(payload.line1 || payload.street1 || payload.street || payload.street_address),
-    line2: normalizeText(payload.line2 || payload.street2),
-    city: normalizeText(payload.city),
+    line1: sanitizeStreetLine(payload.line1 || payload.street1 || payload.street || payload.street_address),
+    line2: sanitizeStreetLine(payload.line2 || payload.street2),
+    city: sanitizeStreetLine(payload.city),
     state: normalizeState(payload.state || payload.state_province),
     zip: normalizeText(payload.zip || payload.postalCode || payload.postal_code),
     country: normalizeCountry(payload.country || payload.country_code),
@@ -173,11 +187,11 @@ function easyPostAddressToNormalized(easyPostAddress) {
 }
 
 function preserveDisplayCasing(preferred, normalized) {
-  const preferredText = normalizeText(preferred);
-  const normalizedText = normalizeText(normalized);
+  const preferredText = sanitizeStreetLine(preferred);
+  const normalizedText = sanitizeStreetLine(normalized);
   if (!normalizedText) return preferredText;
   if (!preferredText) return normalizedText;
-  if (preferredText.localeCompare(normalizedText, undefined, { sensitivity: "accent" }) === 0) {
+  if (addressesMatchIgnoringCase(preferredText, normalizedText)) {
     return preferredText;
   }
   return normalizedText;

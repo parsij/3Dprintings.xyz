@@ -19,6 +19,13 @@ function normalizeText(value) {
   return value ? String(value).trim() : '';
 }
 
+function sanitizeStreetLine(value) {
+  return normalizeText(value)
+    .replace(/[\u00B7·]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function buildGeocodioSuggestion(result) {
   const ac = result?.address_components || {};
   const number = normalizeText(ac.number);
@@ -41,11 +48,11 @@ function buildGeocodioSuggestion(result) {
     return null;
   }
 
-  const formatted = normalizeText(result?.formatted_address);
+  const formatted = sanitizeStreetLine(normalizeText(result?.formatted_address));
   return {
     formatted_address: formatted || [streetAddress, city, state, zip, 'US'].join(', '),
     address: {
-      street_address: streetAddress,
+      street_address: sanitizeStreetLine(streetAddress),
       city,
       state_province: state,
       postal_code: zip,
@@ -67,7 +74,9 @@ function extractFormattedStreetLine(formatted, houseNumber) {
 }
 
 function pickBestStreetLine(...candidates) {
-  const lines = candidates.map((value) => normalizeText(value)).filter(Boolean);
+  const lines = candidates
+    .map((value) => sanitizeStreetLine(value))
+    .filter(Boolean);
   if (lines.length === 0) return '';
   if (lines.length === 1) return lines[0];
 
@@ -107,7 +116,7 @@ function buildGeoapifySuggestion(feature) {
   const postcode = normalizeText(properties.postcode);
   const composedLine = [houseNumber, street].filter(Boolean).join(' ');
   const formattedLine = extractFormattedStreetLine(properties.formatted, houseNumber);
-  const streetLine = pickBestStreetLine(properties.address_line1, composedLine, formattedLine);
+  const streetLine = pickBestStreetLine(composedLine, properties.address_line1, formattedLine);
 
   if (!streetLine || !houseNumber || !street || !city || !state || !postcode) {
     return null;
