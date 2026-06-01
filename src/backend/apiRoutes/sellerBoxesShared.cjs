@@ -1,7 +1,14 @@
 const BOX_SHRINK_FACTOR = 0.95;
 const MIN_BOX_DIMENSION_MM = 0.1;
-const MAX_BOX_DIMENSION_MM = 2000;
-const MAX_BOX_WEIGHT_G = 100000;
+const IN_TO_MM = 25.4;
+const LB_TO_G = 453.592;
+const CARRIER_BOX_LIMITS = {
+  maxWeightLb: 70,
+  maxLongestSideIn: 108,
+  maxLengthPlusGirthIn: 130,
+};
+const MAX_BOX_DIMENSION_MM = Math.round(CARRIER_BOX_LIMITS.maxLongestSideIn * IN_TO_MM * 10) / 10;
+const MAX_BOX_WEIGHT_G = Math.round(CARRIER_BOX_LIMITS.maxWeightLb * LB_TO_G * 10) / 10;
 const { productDimensionsAreValid, convertDimensionToMm, convertWeightToGrams, DIMENSION_UNITS, WEIGHT_UNITS } = require("./productDimensionsShared.cjs");
 const { parseOneDecimalCanonical } = require("./numericInputShared.cjs");
 
@@ -33,6 +40,41 @@ function parseBoxMeasurement(rawValue, canonicalValue, fieldName, convertFn, uni
     throw error;
   }
   return parsed;
+}
+
+function sortedBoxDimensionsMm(widthMm, lengthMm, heightMm) {
+  return [widthMm, lengthMm, heightMm].sort((left, right) => right - left);
+}
+
+function getBoxLengthPlusGirthInches(widthMm, lengthMm, heightMm) {
+  const [longestMm, middleMm, shortestMm] = sortedBoxDimensionsMm(widthMm, lengthMm, heightMm);
+  return (longestMm + (2 * middleMm) + (2 * shortestMm)) / IN_TO_MM;
+}
+
+function assertBoxCarrierLimits({ widthMm, lengthMm, heightMm, maxWeightG }) {
+  if (maxWeightG > MAX_BOX_WEIGHT_G) {
+    const error = new Error(`Max weight cannot exceed ${CARRIER_BOX_LIMITS.maxWeightLb} lb.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const longestSideIn = Math.max(widthMm, lengthMm, heightMm) / IN_TO_MM;
+  if (longestSideIn > CARRIER_BOX_LIMITS.maxLongestSideIn) {
+    const error = new Error(
+      `Longest side cannot exceed ${CARRIER_BOX_LIMITS.maxLongestSideIn} in (9 ft).`
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const lengthPlusGirthIn = getBoxLengthPlusGirthInches(widthMm, lengthMm, heightMm);
+  if (lengthPlusGirthIn > CARRIER_BOX_LIMITS.maxLengthPlusGirthIn) {
+    const error = new Error(
+      "Combined length and girth cannot exceed 130 in (length + 2×width + 2×height)."
+    );
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 function parseBoxPayload(input = {}) {
@@ -75,13 +117,17 @@ function parseBoxPayload(input = {}) {
     weightUnit
   );
 
-  return {
+  const parsedBox = {
     name,
     widthMm,
     lengthMm,
     heightMm,
     maxWeightG,
   };
+
+  assertBoxCarrierLimits(parsedBox);
+
+  return parsedBox;
 }
 
 function normalizeBoxRow(row) {

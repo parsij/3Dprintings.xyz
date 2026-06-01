@@ -17,13 +17,16 @@ import { FieldLabel, SectionTitle, FIELD_CLASS } from "../components/listingForm
 import {
   BOX_DIMENSION_UNITS,
   BOX_WEIGHT_UNITS,
+  CARRIER_BOX_LIMITS,
   boxToFormValues,
   formatBoxDimensions,
   formatBoxWeight,
   toCanonicalBoxPayload,
+  validateBoxCarrierLimits,
   validateBoxDimensionInput,
   validateBoxWeightInput,
 } from "../../utils/boxDimensions.js";
+import { convertDimensionToMm, convertWeightToGrams } from "../../utils/productDimensions.js";
 import {
   createSellerBox,
   deleteSellerBox,
@@ -64,6 +67,10 @@ function BoxFormFields({ form, setForm, submitted, formErrors }) {
         <p className="mt-1 text-xs text-gray-600">
           Inside measurements of the empty box. Use numbers with at most 1 decimal place. Values are checked at 95% capacity.
         </p>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600">
+          <li>Maximum length on longest side: {CARRIER_BOX_LIMITS.maxLongestSideIn} in (9 ft)</li>
+          <li>Maximum size: {CARRIER_BOX_LIMITS.maxLengthPlusGirthIn} in length + girth (length + 2×width + 2×height)</li>
+        </ul>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
             ["width", "Width"],
@@ -91,12 +98,16 @@ function BoxFormFields({ form, setForm, submitted, formErrors }) {
             </div>
           ))}
         </div>
+        {submitted && formErrors.dimensions ? (
+          <p className="mt-2 text-xs text-red-500">{formErrors.dimensions}</p>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-orange-50/30 p-4 shadow-sm">
         <SectionTitle>Maximum weight</SectionTitle>
         <p className="mt-1 text-xs text-gray-600">
           The most weight this box can safely carry. Use a number with at most 1 decimal place.
+          Maximum weight: {CARRIER_BOX_LIMITS.maxWeightLb} lb.
         </p>
         <div className="mt-2 max-w-sm">
           <UnitNumberInput
@@ -192,6 +203,20 @@ export default function SellerBoxes() {
 
     const weightError = validateBoxWeightInput(form.maxWeight, form.weightUnit);
     if (weightError) nextErrors.maxWeight = weightError;
+
+    const hasBasicDimensionValues = !nextErrors.width && !nextErrors.length && !nextErrors.height;
+    const hasBasicWeightValue = !nextErrors.maxWeight;
+    if (hasBasicDimensionValues && hasBasicWeightValue) {
+      const carrierErrors = validateBoxCarrierLimits({
+        widthMm: convertDimensionToMm(form.width, form.dimensionUnit),
+        lengthMm: convertDimensionToMm(form.length, form.dimensionUnit),
+        heightMm: convertDimensionToMm(form.height, form.dimensionUnit),
+        maxWeightG: convertWeightToGrams(form.maxWeight, form.weightUnit),
+        dimensionUnit: form.dimensionUnit,
+        weightUnit: form.weightUnit,
+      });
+      Object.assign(nextErrors, carrierErrors);
+    }
 
     return nextErrors;
   }, [form]);
