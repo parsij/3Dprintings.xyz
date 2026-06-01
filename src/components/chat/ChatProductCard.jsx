@@ -47,7 +47,7 @@ export function ChatProductCard({ conversation, compact = false }) {
           {conversation.productName || "Listed model"}
         </p>
         <p className="truncate text-xs text-gray-500">
-          {conversation.shopName ? `${conversation.shopName} shop` : "View original listing"}
+          {conversation.shopName ? `by ${conversation.shopName}` : "View original listing"}
         </p>
         {priceLabel ? (
           <p className="mt-1 text-sm font-bold text-gray-900">${priceLabel}</p>

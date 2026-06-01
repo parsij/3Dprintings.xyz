@@ -37,6 +37,66 @@ function mergeMessages(existingMessages, incomingMessages) {
   return Array.from(byId.values()).sort((a, b) => getCreatedTime(a) - getCreatedTime(b));
 }
 
+function buildProductSnapshot(conversation) {
+  if (!conversation?.productId) {
+    return null;
+  }
+
+  return {
+    productId: conversation.productId,
+    productName: conversation.productName,
+    productImage: conversation.productImage,
+    productPrice: conversation.productPrice,
+    shopName: conversation.shopName,
+    sellerDbId: conversation.sellerDbId,
+  };
+}
+
+function getMessageProductContext(message, conversation, isFirstMessage) {
+  const messageProductId = message?.product_id ?? message?.productId;
+  if (messageProductId) {
+    return {
+      productId: messageProductId,
+      productName: message?.product_name ?? message?.productName ?? conversation?.productName,
+      productImage: message?.product_image ?? message?.productImage ?? conversation?.productImage,
+      productPrice: message?.product_price ?? message?.productPrice ?? conversation?.productPrice,
+      shopName: message?.shop_name ?? message?.shopName ?? conversation?.shopName,
+      sellerDbId: conversation?.sellerDbId,
+    };
+  }
+
+  if (isFirstMessage && conversation?.productId) {
+    return buildProductSnapshot(conversation);
+  }
+
+  return null;
+}
+
+async function createChatMessage({ conversationId, senderId, text, productSnapshot }) {
+  const basePayload = {
+    conversation: conversationId,
+    senderId,
+    text,
+  };
+
+  if (!productSnapshot?.productId) {
+    return pb.collection("messages").create(basePayload);
+  }
+
+  try {
+    return await pb.collection("messages").create({
+      ...basePayload,
+      product_id: productSnapshot.productId,
+      product_name: productSnapshot.productName || "",
+      product_image: productSnapshot.productImage || "",
+      product_price: productSnapshot.productPrice ?? null,
+      shop_name: productSnapshot.shopName || "",
+    });
+  } catch {
+    return pb.collection("messages").create(basePayload);
+  }
+}
+
 export default function ChatThread({
   conversation,
   conversationId,
@@ -50,7 +110,9 @@ export default function ChatThread({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const resolvedConversationId = conversationId || conversation?.id || "";
+  const firstMessageId = messages[0]?.id || null;
 
   useEffect(() => {
     const removeAuthListener = pb.authStore.onChange((_token, model) => {
@@ -60,9 +122,27 @@ export default function ChatThread({
     return removeAuthListener;
   }, []);
 
+  function scrollToBottom(behavior = "auto") {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior,
+    });
+  }
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, conversation?.id]);
+    if (isLoading) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      scrollToBottom(messages.length > 1 ? "smooth" : "auto");
+    });
+  }, [messages, isLoading, resolvedConversationId]);
 
   useEffect(() => {
     if (!resolvedConversationId) {
@@ -144,16 +224,21 @@ export default function ChatThread({
     setIsSending(true);
     setError("");
 
+    const isFirstMessage = messages.length === 0;
+    const productSnapshot = isFirstMessage ? buildProductSnapshot(conversation) : null;
+
     try {
       await ensureChatAuthSession();
-      const createdMessage = await pb.collection("messages").create({
-        conversation: resolvedConversationId,
+      const createdMessage = await createChatMessage({
+        conversationId: resolvedConversationId,
         senderId,
         text: trimmedText,
+        productSnapshot,
       });
 
       setMessages((currentMessages) => mergeMessages(currentMessages, [createdMessage]));
       setMessageText("");
+      requestAnimationFrame(() => scrollToBottom("smooth"));
     } catch (sendError) {
       if (sendError?.status === 403) {
         setError("You are not allowed to send messages in this conversation.");
@@ -172,34 +257,32 @@ export default function ChatThread({
         <div className="flex items-start gap-3">
           <ConversationAvatar conversation={conversation || {}} mode={mode} />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-lg font-bold text-gray-900">{title}</h2>
-              {conversation?.shopName && mode === "customer" && conversation?.sellerDbId ? (
-                <Link
-                  to={`/shop/${conversation.sellerDbId}`}
-                  className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 transition hover:bg-orange-100"
-                >
-                  {conversation.shopName} shop
-                </Link>
-              ) : null}
-            </div>
-            <p className="mt-0.5 truncate text-sm text-gray-500">{subtitle}</p>
-            {startedAtLabel ? (
-              <p className="mt-1 text-xs text-gray-400">
-                Conversation started {startedAtLabel}
+            <h2 className="truncate text-lg font-bold text-gray-900">{title}</h2>
+            {subtitle ? (
+              <p className="mt-0.5 truncate text-sm text-gray-500">
+                {conversation?.shopName && mode === "customer" && conversation?.sellerDbId ? (
+                  <>
+                    by{" "}
+                    <Link
+                      to={`/shop/${conversation.sellerDbId}`}
+                      className="font-medium text-gray-700 transition hover:text-orange-600"
+                    >
+                      {conversation.shopName}
+                    </Link>
+                  </>
+                ) : (
+                  subtitle
+                )}
               </p>
             ) : null}
           </div>
         </div>
-
-        {conversation?.productId ? (
-          <div className="mt-4">
-            <ChatProductCard conversation={conversation} />
-          </div>
-        ) : null}
       </header>
 
-      <div className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_18%,#f8fafc_100%)] px-3 py-4 sm:px-5">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto overscroll-contain bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_18%,#f8fafc_100%)] px-3 py-4 sm:px-5"
+      >
         {isLoading ? (
           <div className="flex h-full items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
@@ -238,11 +321,13 @@ export default function ChatThread({
 
               const message = entry.message;
               const isOwnMessage = message.senderId === currentUserId;
+              const isFirstMessage = message.id === firstMessageId;
+              const productContext = getMessageProductContext(message, conversation, isFirstMessage);
 
               return (
                 <article
                   key={entry.id}
-                  className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
+                  className={`flex flex-col gap-2 ${isOwnMessage ? "items-end" : "items-start"}`}
                 >
                   <div
                     className={`max-w-[88%] rounded-[22px] px-4 py-3 shadow-sm sm:max-w-[72%] ${
@@ -263,10 +348,15 @@ export default function ChatThread({
                       {formatChatTime(message.created)}
                     </time>
                   </div>
+                  {productContext ? (
+                    <div className={`max-w-[88%] sm:max-w-[72%] ${isOwnMessage ? "pr-1" : "pl-1"}`}>
+                      <ChatProductCard conversation={productContext} compact />
+                    </div>
+                  ) : null}
                 </article>
               );
             })}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-px shrink-0" aria-hidden="true" />
           </div>
         )}
       </div>

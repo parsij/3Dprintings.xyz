@@ -326,10 +326,10 @@ async function enrichConversationRows(pool, pbConversations, { mode, currentUser
       extras.otherParticipantLabel = "Buyer";
     } else if (contextRow?.context_type === "product" && productLabel) {
       extras.title = productLabel;
-      extras.subtitle = `${shopLabel} shop`;
+      extras.subtitle = `by ${shopLabel}`;
       extras.otherParticipantLabel = shopLabel;
     } else {
-      extras.title = `${shopLabel} shop`;
+      extras.title = shopLabel;
       extras.subtitle = "Shop conversation";
       extras.otherParticipantLabel = shopLabel;
     }

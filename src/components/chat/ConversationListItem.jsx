@@ -1,6 +1,5 @@
 import {
   ConversationAvatar,
-  ChatProductCard,
 } from "./ChatProductCard.jsx";
 import {
   getConversationSubtitle,
@@ -40,11 +39,6 @@ export default function ConversationListItem({
             </time>
           </div>
 
-          {conversation.productId ? (
-            <div className="mt-2">
-              <ChatProductCard conversation={conversation} compact />
-            </div>
-          ) : null}
         </div>
       </div>
     </button>

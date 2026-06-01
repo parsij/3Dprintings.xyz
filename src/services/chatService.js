@@ -41,10 +41,14 @@ export function getConversationSubtitle(conversation) {
   }
 
   if (conversation?.contextType === "product" && conversation?.shopName) {
-    return `${conversation.shopName} shop`;
+    return `by ${conversation.shopName}`;
   }
 
-  return conversation?.shopName ? `${conversation.shopName} shop` : "Marketplace chat";
+  if (conversation?.contextType === "shop" && conversation?.shopName) {
+    return "Shop conversation";
+  }
+
+  return conversation?.shopName ? `by ${conversation.shopName}` : "Marketplace chat";
 }
 
 export async function listConversationsForUser({ mode = "customer" }) {

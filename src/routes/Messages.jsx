@@ -75,13 +75,8 @@ export default function Messages({ user, mode = "customer" }) {
         }
 
         setAuthStoreUserId(resolvedUserId);
-        const items = await refreshConversations();
+        await refreshConversations();
         if (!active) return;
-
-        const currentConversationId = new URLSearchParams(window.location.search).get("conversation") || "";
-        if (!currentConversationId && items[0]?.id) {
-          setSearchParams({ conversation: items[0].id }, { replace: true });
-        }
 
         unsubscribeFromConversations = await pb.collection("conversations").subscribe("*", (event) => {
           const record = event.record;
