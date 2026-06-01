@@ -55,11 +55,11 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
       />
 
       <aside
-        className={`fixed left-0 top-0 z-50 h-full w-72 border-r border-orange-100 bg-white text-gray-800 shadow-xl transition-transform duration-300 ease-in-out ${
+        className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-orange-100 bg-white text-gray-800 shadow-xl transition-transform duration-300 ease-in-out ${
           menuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-orange-100 p-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-orange-100 p-4">
           <h2 className="text-lg font-bold">{title}</h2>
           <button
             type="button"
@@ -71,7 +71,7 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
           </button>
         </div>
 
-        <nav className="space-y-1 p-4">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
           {activeItems.map((item, index) => {
             const className = `block cursor-pointer rounded-lg px-3 py-2.5 transition-all duration-200 ease-in-out hover:translate-x-1 hover:bg-orange-50 hover:text-orange-500 ${
               menuOpen ? "translate-x-0 opacity-100" : "-translate-x-2 opacity-0"
