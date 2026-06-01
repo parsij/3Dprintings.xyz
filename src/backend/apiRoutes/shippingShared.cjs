@@ -80,10 +80,10 @@ function centsFromDollars(value) {
 
 function extractEasyPostRateDollarString(rate) {
   const candidates = [
-    rate?.adjusted_rate,
     rate?.rate,
     rate?.list_rate,
     rate?.retail_rate,
+    rate?.adjusted_rate,
     rate?.base_rate?.amount,
   ];
 
@@ -107,17 +107,7 @@ function parseEasyPostRateToCents(rate) {
   if (!Number.isFinite(numeric) || numeric <= 0) return 0;
 
   // EasyPost documents USD rates as decimal dollar strings (e.g. "11.01", "20.00").
-  if (str.includes(".")) {
-    return Math.round(numeric * 100);
-  }
-
-  // Whole-dollar quotes under $100 (e.g. "20" => $20.00).
-  if (numeric < 100) {
-    return Math.round(numeric * 100);
-  }
-
-  // Some payloads return integer cents without a decimal (e.g. 2000 => $20.00).
-  return Math.round(numeric);
+  return Math.round(numeric * 100);
 }
 
 function dollarsFromCents(value) {
@@ -621,6 +611,51 @@ function pickShippingTierRate(rates = [], tier = DEFAULT_SHIPPING_TIER) {
   return fastestRates.sort((left, right) => left.rateCents - right.rateCents)[0] || sorted[0];
 }
 
+function summarizeEasyPostRateForDebug(rate) {
+  if (!rate || typeof rate !== "object") return null;
+
+  const parsedRateCents = parseEasyPostRateToCents(rate);
+  return {
+    id: rate.id || null,
+    carrier: rate.carrier || null,
+    service: rate.service || null,
+    rate: rate.rate ?? null,
+    list_rate: rate.list_rate ?? null,
+    retail_rate: rate.retail_rate ?? null,
+    adjusted_rate: rate.adjusted_rate ?? null,
+    currency: rate.currency ?? null,
+    delivery_days: rate.delivery_days ?? rate.est_delivery_days ?? null,
+    parsedRateCents,
+    parsedRateUsd: dollarsFromCents(parsedRateCents),
+  };
+}
+
+function summarizeEasyPostRatesForDebug(rates = []) {
+  return normalizeRates(rates).map((rate) => summarizeEasyPostRateForDebug(rate));
+}
+
+function buildEasyPostQuoteDebug(shipmentQuotes = []) {
+  return shipmentQuotes.map((quote) => {
+    const selectedRatesByTier = {};
+    for (const tier of SHIPPING_TIER_ORDER) {
+      const selected = pickShippingTierRate(quote.rates, tier);
+      selectedRatesByTier[tier] = selected ? summarizeEasyPostRateForDebug(selected) : null;
+    }
+
+    return {
+      sellerId: quote.sellerId,
+      sellerName: quote.sellerName,
+      easypostShipmentId: quote.easypostShipmentId,
+      parcel: quote.parcel,
+      totalWeightG: quote.totalWeightG,
+      selectedBox: quote.selectedBox,
+      rateCount: Array.isArray(quote.rates) ? quote.rates.length : 0,
+      rates: summarizeEasyPostRatesForDebug(quote.rates),
+      selectedRatesByTier,
+    };
+  });
+}
+
 const MIN_CARRIER_TRANSIT_DAYS = 1;
 const MAX_CARRIER_TRANSIT_DAYS_UNKNOWN = 7;
 const MIN_DELIVERY_WINDOW_SPREAD = 1;
@@ -791,6 +826,24 @@ async function calculateEasyPostShippingQuote({
       throw error;
     }
 
+    const easyPostRateDebug = {
+      sellerId: group.sellerId,
+      sellerName: group.sellerName,
+      easypostShipmentId: shipment.id || null,
+      parcel: packingResult.parcel,
+      totalWeightG: packingResult.totalWeightG,
+      selectedBox: {
+        id: packingResult.box.id,
+        name: packingResult.box.name,
+        widthMm: packingResult.box.widthMm,
+        lengthMm: packingResult.box.lengthMm,
+        heightMm: packingResult.box.heightMm,
+        maxWeightG: packingResult.box.maxWeightG,
+      },
+      rates: summarizeEasyPostRatesForDebug(rates),
+    };
+    console.log("[easypost-rates]", JSON.stringify(easyPostRateDebug, null, 2));
+
     shipmentQuotes.push({
       sellerId: group.sellerId,
       sellerName: group.sellerName,
@@ -880,6 +933,8 @@ async function calculateEasyPostShippingQuote({
   const selectedOption = shippingOptions.find((option) => option.tier === normalizedTier)
     || shippingOptions[0];
 
+  const easyPostQuotes = buildEasyPostQuoteDebug(shipmentQuotes);
+
   return {
     shippingTier: selectedOption.tier,
     shippingOptions,
@@ -890,6 +945,7 @@ async function calculateEasyPostShippingQuote({
     markupRate: SHIPPING_MARKUP_RATE,
     shipments: selectedOption.shipments,
     verifiedDestination: destination,
+    easyPostQuotes,
   };
 }
 

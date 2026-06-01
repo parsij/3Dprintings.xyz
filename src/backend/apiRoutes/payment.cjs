@@ -692,6 +692,7 @@ module.exports = function paymentController(deps) {
                 totalCents: total.cents,
                 shippingTier: totals.shippingTier,
                 shippingOptions: totals.shippingQuote.shippingOptions.map(toCheckoutShippingOption),
+                easyPostQuotes: totals.shippingQuote.easyPostQuotes || [],
                 shippingQuote: {
                     shippingTier: totals.shippingQuote.shippingTier,
                     originalShipping: totals.shippingQuote.originalShipping,

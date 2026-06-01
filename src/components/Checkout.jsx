@@ -239,6 +239,28 @@ const Checkout = () => {
                     }),
                 });
                 setShippingOptions(Array.isArray(data.shippingOptions) ? data.shippingOptions : []);
+                if (Array.isArray(data.easyPostQuotes) && data.easyPostQuotes.length > 0) {
+                    console.group('[checkout] EasyPost shipping quotes');
+                    console.log(JSON.stringify(data.easyPostQuotes, null, 2));
+                    for (const quote of data.easyPostQuotes) {
+                        console.log(
+                            `${quote.sellerName}: parcel`,
+                            quote.parcel,
+                            `(${quote.totalWeightG}g)`,
+                            `${quote.rateCount} rates`
+                        );
+                        if (Array.isArray(quote.rates) && quote.rates.length > 0) {
+                            console.table(quote.rates.map((rate) => ({
+                                carrier: rate.carrier,
+                                service: rate.service,
+                                rate: rate.rate,
+                                parsedUsd: rate.parsedRateUsd,
+                            })));
+                        }
+                        console.log('Selected by tier:', quote.selectedRatesByTier);
+                    }
+                    console.groupEnd();
+                }
                 if (data.shippingTier && data.shippingTier !== shippingTier) {
                     setShippingTier(data.shippingTier);
                 }
