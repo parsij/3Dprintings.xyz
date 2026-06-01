@@ -576,8 +576,32 @@ function assertValidShippingTier(value) {
   return tier;
 }
 
+const FREIGHT_RATE_PATTERN = /freight|ltl|truckload|pallet|intermodal/i;
+
+function isParcelShippingRate(rate) {
+  const carrier = normalizeText(rate?.carrier);
+  const service = normalizeText(rate?.service);
+  if (!carrier && !service) return false;
+
+  const combined = `${carrier} ${service}`;
+  if (FREIGHT_RATE_PATTERN.test(combined)) {
+    return false;
+  }
+
+  const normalizedMode = normalizeText(rate?.mode).toLowerCase();
+  if (normalizedMode === "freight") {
+    return false;
+  }
+
+  return true;
+}
+
+function filterParcelShippingRates(rates = []) {
+  return (Array.isArray(rates) ? rates : []).filter(isParcelShippingRate);
+}
+
 function normalizeRates(rates = []) {
-  return rates
+  return filterParcelShippingRates(rates)
     .map((rate) => ({
       ...rate,
       rateCents: parseEasyPostRateToCents(rate),
@@ -819,10 +843,15 @@ async function calculateEasyPostShippingQuote({
       parcel: packingResult.parcel,
     });
 
-    const rates = shipment?.rates || [];
+    const rates = filterParcelShippingRates(shipment?.rates || []);
     if (rates.length === 0) {
-      const error = new Error(`No EasyPost shipping rates found for ${group.sellerName}.`);
-      error.statusCode = 502;
+      const hadRates = Array.isArray(shipment?.rates) && shipment.rates.length > 0;
+      const error = new Error(
+        hadRates
+          ? `Only freight shipping rates are available for ${group.sellerName}. Parcel shipping is required at checkout.`
+          : `No EasyPost shipping rates found for ${group.sellerName}.`
+      );
+      error.statusCode = hadRates ? 400 : 502;
       throw error;
     }
 
@@ -1548,7 +1577,9 @@ module.exports = {
   ensureSellerOrderLabel,
   extractShippingAddressFromOrderItems,
   fetchLabelBinary,
+  filterParcelShippingRates,
   filterTrackingForSeller,
+  isParcelShippingRate,
   getSellerShipmentFromTracking,
   mergeTrackerWebhookIntoOrders,
   normalizeAddressPayload,

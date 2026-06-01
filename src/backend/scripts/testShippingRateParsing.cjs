@@ -33,6 +33,26 @@ function parseEasyPostRateToCents(rate) {
   return Math.round(numeric * 100);
 }
 
+const FREIGHT_RATE_PATTERN = /freight|ltl|truckload|pallet|intermodal/i;
+
+function isParcelShippingRate(rate) {
+  const carrier = normalizeText(rate?.carrier);
+  const service = normalizeText(rate?.service);
+  if (!carrier && !service) return false;
+
+  const combined = `${carrier} ${service}`;
+  if (FREIGHT_RATE_PATTERN.test(combined)) {
+    return false;
+  }
+
+  const normalizedMode = normalizeText(rate?.mode).toLowerCase();
+  if (normalizedMode === "freight") {
+    return false;
+  }
+
+  return true;
+}
+
 const cases = [
   [{ rate: "20.00", currency: "USD" }, 2000],
   [{ rate: "7.33", currency: "USD" }, 733],
@@ -47,6 +67,23 @@ for (const [rate, expected] of cases) {
   const ok = actual === expected;
   if (!ok) failed += 1;
   console.log(`${ok ? "OK" : "FAIL"} rate=${JSON.stringify(rate)} -> ${actual} (expected ${expected})`);
+}
+
+const parcelCases = [
+  [{ carrier: "USPS", service: "Priority", rate: "12.00", currency: "USD" }, true],
+  [{ carrier: "UPS", service: "Ground", rate: "18.00", currency: "USD" }, true],
+  [{ carrier: "FedEx", service: "FEDEX_GROUND", rate: "20.00", currency: "USD" }, true],
+  [{ carrier: "UPSFreight", service: "LTL", rate: "120.00", currency: "USD" }, false],
+  [{ carrier: "FedEx", service: "FreightEconomy", rate: "95.00", currency: "USD" }, false],
+  [{ carrier: "SAIA", service: "Standard", rate: "80.00", currency: "USD" }, true],
+  [{ carrier: "UPS", service: "Pallet", rate: "70.00", currency: "USD" }, false],
+];
+
+for (const [rate, expected] of parcelCases) {
+  const actual = isParcelShippingRate(rate);
+  const ok = actual === expected;
+  if (!ok) failed += 1;
+  console.log(`${ok ? "OK" : "FAIL"} parcel=${JSON.stringify(rate)} -> ${actual} (expected ${expected})`);
 }
 
 process.exit(failed > 0 ? 1 : 0);
