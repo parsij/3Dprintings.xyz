@@ -1,6 +1,10 @@
 const { chatRequest, ensureChatUserForDbUser, ensureChatUserPocketBaseId } = require("./chatShared.cjs");
 const { resolveShopLogoFromSources } = require("./sellerProfileShared.cjs");
 const {
+  getOrderShipmentTrackingSummary,
+  loadOrderTrackingMap,
+} = require("./shippingShared.cjs");
+const {
   formatOrderNumber,
   loadOrderContextForSeller,
   collectOrderSellerIds,
@@ -615,7 +619,8 @@ function mergeConversationRecord(pbConversation, contextRow, extras = {}) {
     shopLogoUrl: extras.shopLogoUrl || null,
     orderId: contextRow?.order_id || extras.orderId || null,
     orderNumber: contextRow?.order_number || extras.orderNumber || null,
-    orderTrackingCode: contextRow?.order_tracking_code || extras.orderTrackingCode || null,
+    orderTrackingCode: extras.orderTrackingCode || contextRow?.order_tracking_code || null,
+    orderTrackingStatus: extras.orderTrackingStatus || null,
     orderCreatedAt: contextRow?.order_created_at || extras.orderCreatedAt || null,
     buyerDbId: contextRow?.buyer_db_id || null,
     sellerDbId: contextRow?.seller_db_id || extras.sellerDbId || null,
@@ -651,6 +656,12 @@ async function enrichConversationRows(pool, pbConversations, {
   );
   const lastReadMap = await loadLastReadMap(pool, currentUserDbId, ids);
   const messageStatsById = await loadConversationMessageStats(token, ids, userPbId, lastReadMap);
+  const orderTrackingById = await loadOrderTrackingMap(
+    pool,
+    contextResult.rows
+      .filter((row) => row.context_type === "order" && row.order_id)
+      .map((row) => row.order_id)
+  );
 
   const enriched = [];
 
@@ -702,9 +713,14 @@ async function enrichConversationRows(pool, pbConversations, {
     const orderNumberLabel = contextRow?.order_number || formatOrderNumber(contextRow?.order_id);
 
     if (isOrderContext) {
+      const liveTracking = getOrderShipmentTrackingSummary(
+        orderTrackingById.get(String(contextRow.order_id)),
+        sellerDbId
+      );
       extras.orderId = contextRow.order_id;
       extras.orderNumber = orderNumberLabel;
-      extras.orderTrackingCode = contextRow.order_tracking_code || null;
+      extras.orderTrackingCode = liveTracking?.trackingCode || contextRow.order_tracking_code || null;
+      extras.orderTrackingStatus = liveTracking?.status || null;
       extras.orderCreatedAt = contextRow.order_created_at || null;
     }
 

@@ -54,6 +54,14 @@ function buildProductSnapshot(conversation) {
   };
 }
 
+function normalizeMessageTrackingCode(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized || normalized.toLowerCase() === "pending") {
+    return null;
+  }
+  return normalized;
+}
+
 function buildOrderSnapshot(conversation) {
   if (!conversation?.orderId) {
     return null;
@@ -62,7 +70,8 @@ function buildOrderSnapshot(conversation) {
   return {
     orderId: conversation.orderId,
     orderNumber: conversation.orderNumber,
-    trackingCode: conversation.orderTrackingCode,
+    trackingCode: normalizeMessageTrackingCode(conversation.orderTrackingCode),
+    trackingStatus: conversation.orderTrackingStatus || null,
     orderCreatedAt: conversation.orderCreatedAt,
   };
 }
@@ -93,7 +102,10 @@ function getMessageOrderContext(message, conversation, isFirstMessage) {
     return {
       orderId: messageOrderId,
       orderNumber: message?.order_number ?? message?.orderNumber ?? conversation?.orderNumber,
-      trackingCode: message?.tracking_code ?? message?.trackingCode ?? conversation?.orderTrackingCode,
+      trackingCode: normalizeMessageTrackingCode(
+        message?.tracking_code ?? message?.trackingCode ?? conversation?.orderTrackingCode
+      ),
+      trackingStatus: conversation?.orderTrackingStatus || null,
       orderCreatedAt: message?.order_created_at ?? message?.orderCreatedAt ?? conversation?.orderCreatedAt,
     };
   }
@@ -133,14 +145,17 @@ async function createChatMessage({ conversationId, senderId, text, productSnapsh
 
   const normalizedOrderId = String(orderSnapshot?.orderId || "").trim();
   if (normalizedOrderId) {
+    const payload = {
+      ...basePayload,
+      order_id: normalizedOrderId,
+      order_number: String(orderSnapshot.orderNumber || "").slice(0, 32),
+      order_created_at: orderSnapshot.orderCreatedAt || null,
+    };
+    if (orderSnapshot.trackingCode) {
+      payload.tracking_code = String(orderSnapshot.trackingCode).slice(0, 128);
+    }
     try {
-      return await pb.collection("messages").create({
-        ...basePayload,
-        order_id: normalizedOrderId,
-        order_number: String(orderSnapshot.orderNumber || "").slice(0, 32),
-        tracking_code: String(orderSnapshot.trackingCode || "Pending").slice(0, 128),
-        order_created_at: orderSnapshot.orderCreatedAt || null,
-      });
+      return await pb.collection("messages").create(payload);
     } catch {
       return pb.collection("messages").create(basePayload);
     }

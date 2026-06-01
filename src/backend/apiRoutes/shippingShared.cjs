@@ -1357,7 +1357,7 @@ function applyLabelToSellerShipment(tracking, sellerId, labelData, nowIso = new 
   if (shipmentIndex < 0) return null;
 
   const shipment = normalized.shipments[shipmentIndex];
-  const nextShipment = {
+  let nextShipment = {
     ...shipment,
     labelUrl: labelData.labelUrl || shipment.labelUrl || null,
     labelPdfUrl: labelData.labelPdfUrl || shipment.labelPdfUrl || null,
@@ -1369,6 +1369,10 @@ function applyLabelToSellerShipment(tracking, sellerId, labelData, nowIso = new 
     updatedAt: nowIso,
   };
 
+  if (labelData.tracker && typeof labelData.tracker === "object") {
+    nextShipment = mergeTrackerIntoShipment(nextShipment, labelData.tracker, nowIso);
+  }
+
   const nextShipments = [...normalized.shipments];
   nextShipments[shipmentIndex] = nextShipment;
   return {
@@ -1376,6 +1380,131 @@ function applyLabelToSellerShipment(tracking, sellerId, labelData, nowIso = new 
     shipments: nextShipments,
     lastUpdatedAt: nowIso,
   };
+}
+
+async function fetchEasyPostTrackerForShipment(shipment = {}) {
+  let client;
+  try {
+    client = getEasyPostClient();
+  } catch {
+    return null;
+  }
+
+  const trackerId = normalizeText(shipment.trackerId);
+  if (trackerId) {
+    try {
+      return await client.Tracker.retrieve(trackerId);
+    } catch (error) {
+      logInternalError("easypost-tracker-retrieve", error);
+    }
+  }
+
+  const trackingCode = normalizeText(shipment.trackingCode);
+  if (!trackingCode) return null;
+
+  const payload = { tracking_code: trackingCode };
+  const carrier = normalizeText(shipment.carrier);
+  if (carrier) payload.carrier = carrier;
+
+  try {
+    return await client.Tracker.create(payload);
+  } catch (error) {
+    logInternalError("easypost-tracker-sync", error);
+    return null;
+  }
+}
+
+function trackingPayloadChanged(before, after) {
+  return JSON.stringify(before) !== JSON.stringify(after);
+}
+
+async function syncTrackingFromEasyPost(tracking) {
+  const normalized = normalizeTrackingPayload(tracking);
+  const shipments = await Promise.all(
+    normalized.shipments.map(async (shipment) => {
+      if (!normalizeText(shipment.trackingCode) && !normalizeText(shipment.trackerId)) {
+        return shipment;
+      }
+
+      const tracker = await fetchEasyPostTrackerForShipment(shipment);
+      if (!tracker) return shipment;
+      return mergeTrackerIntoShipment(shipment, tracker);
+    })
+  );
+
+  const nextTracking = {
+    ...normalized,
+    shipments,
+    lastUpdatedAt: new Date().toISOString(),
+  };
+
+  return trackingPayloadChanged(normalized, nextTracking) ? nextTracking : normalized;
+}
+
+function getOrderShipmentTrackingSummary(tracking, sellerDbId) {
+  const shipment = getSellerShipmentFromTracking(tracking, sellerDbId);
+  if (!shipment) return null;
+
+  return {
+    trackingCode: normalizeText(shipment.trackingCode) || null,
+    status: normalizeText(shipment.status) || null,
+    statusDetail: normalizeText(shipment.statusDetail) || null,
+  };
+}
+
+async function syncChatOrderTrackingContext(pool, orderId, tracking) {
+  const normalized = normalizeTrackingPayload(tracking);
+  for (const shipment of normalized.shipments) {
+    const sellerDbId = Number(shipment.sellerId);
+    const trackingCode = normalizeText(shipment.trackingCode);
+    if (!Number.isInteger(sellerDbId) || sellerDbId <= 0 || !trackingCode) continue;
+
+    await pool.query(
+      `UPDATE chat_conversation_context
+       SET order_tracking_code = $1,
+           updated_at = NOW()
+       WHERE order_id = $2
+         AND seller_db_id = $3
+         AND context_type = 'order'
+         AND COALESCE(order_tracking_code, '') IS DISTINCT FROM $1`,
+      [trackingCode.slice(0, 128), orderId, sellerDbId]
+    );
+  }
+}
+
+async function refreshAndPersistOrderTracking(pool, orderId) {
+  const result = await pool.query(
+    `SELECT tracking FROM orders WHERE id = $1 LIMIT 1`,
+    [orderId]
+  );
+  if (result.rows.length === 0) return null;
+
+  const synced = await syncTrackingFromEasyPost(result.rows[0].tracking);
+  if (trackingPayloadChanged(result.rows[0].tracking, synced)) {
+    await pool.query(
+      `UPDATE orders SET tracking = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(synced), orderId]
+    );
+    await syncChatOrderTrackingContext(pool, orderId, synced);
+  }
+
+  return synced;
+}
+
+async function loadOrderTrackingMap(pool, orderIds = []) {
+  const normalizedIds = [...new Set(
+    (Array.isArray(orderIds) ? orderIds : [])
+      .map((orderId) => String(orderId || "").trim())
+      .filter(Boolean)
+  )];
+  if (!normalizedIds.length) return new Map();
+
+  const result = await pool.query(
+    `SELECT id, tracking FROM orders WHERE id = ANY($1::uuid[])`,
+    [normalizedIds]
+  );
+
+  return new Map(result.rows.map((row) => [String(row.id), row.tracking]));
 }
 
 async function buyEasyPostShipmentLabel(easypostShipmentId, rateId) {
@@ -1399,6 +1528,7 @@ async function buyEasyPostShipmentLabel(easypostShipmentId, rateId) {
       labelPdfUrl: postageLabel.label_pdf_url || postageLabel.label_url || null,
       trackingCode: bought.tracking_code || null,
       carrier: bought.selected_rate?.carrier || bought.tracker?.carrier || null,
+      tracker: bought.tracker && typeof bought.tracker === "object" ? bought.tracker : null,
     };
   } catch (error) {
     const nextError = new Error(error?.message || "Failed to purchase shipping label.");
@@ -1580,8 +1710,11 @@ module.exports = {
   filterParcelShippingRates,
   filterTrackingForSeller,
   isParcelShippingRate,
+  getOrderShipmentTrackingSummary,
   getSellerShipmentFromTracking,
+  loadOrderTrackingMap,
   mergeTrackerWebhookIntoOrders,
+  refreshAndPersistOrderTracking,
   normalizeAddressPayload,
   normalizeSellerAddressFromRow,
   normalizeShippingTier,

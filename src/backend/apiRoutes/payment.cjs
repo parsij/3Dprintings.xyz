@@ -9,6 +9,7 @@ module.exports = function paymentController(deps) {
         extractShippingAddressFromOrderItems,
         normalizeAddressPayload,
         normalizeSellerAddressFromRow,
+        refreshAndPersistOrderTracking,
         resolveVerifiedShippingAddress,
     } = require("./shippingShared.cjs");
     const {
@@ -547,7 +548,14 @@ module.exports = function paymentController(deps) {
                 return res.status(404).json({ error: "Order not found" });
             }
 
-            res.json(sanitizeOrderItems(result.rows[0]));
+            const orderRow = result.rows[0];
+            try {
+                orderRow.tracking = await refreshAndPersistOrderTracking(pool, orderId) ?? orderRow.tracking;
+            } catch (trackingError) {
+                console.error("Failed to refresh order tracking:", trackingError?.message || trackingError);
+            }
+
+            res.json(sanitizeOrderItems(orderRow));
         } catch (error) {
             console.error('Error fetching order:', error);
             res.status(500).json({ error: 'Internal server error' });

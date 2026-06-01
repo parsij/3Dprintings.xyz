@@ -84,6 +84,20 @@ export default function OrderDetails({ user }) {
   }, [navigate, orderId, user]);
 
   useEffect(() => {
+    if (loading || !order) return undefined;
+
+    if (window.location.hash !== "#tracking") {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      document.getElementById("tracking")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+
+    return () => window.clearTimeout(timer);
+  }, [loading, order]);
+
+  useEffect(() => {
     if (!user || !order?.id) {
       setMessageTargets([]);
       return undefined;
@@ -265,7 +279,10 @@ export default function OrderDetails({ user }) {
             ) : null}
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <div
+            id={hasMultipleSellers ? "tracking" : undefined}
+            className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3${hasMultipleSellers ? " scroll-mt-24" : ""}`}
+          >
             <p className="text-sm font-semibold text-gray-900">Items</p>
             {items.length === 0 ? (
               <p className="text-sm text-gray-600">No items found for this order.</p>
@@ -351,7 +368,11 @@ export default function OrderDetails({ user }) {
             )}
           </div>
 
-          {!hasMultipleSellers ? <TrackingSection tracking={order.tracking} /> : null}
+          {!hasMultipleSellers ? (
+            <div id="tracking" className="scroll-mt-24">
+              <TrackingSection tracking={order.tracking} />
+            </div>
+          ) : null}
 
           {orderTotals && (
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 text-sm">
