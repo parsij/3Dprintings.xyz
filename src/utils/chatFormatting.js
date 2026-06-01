@@ -1,3 +1,5 @@
+import { API_BASE, MARKETPLACE_ORIGIN, isSellerHostname } from "../config/api.js";
+
 export function formatChatTime(value) {
   if (!value) return "";
 
@@ -94,6 +96,14 @@ export function groupMessagesByDay(messages) {
   }
 
   return groups;
+}
+
+export function getChatImageBase() {
+  if (typeof window !== "undefined" && isSellerHostname(window.location.hostname)) {
+    return MARKETPLACE_ORIGIN;
+  }
+
+  return API_BASE;
 }
 
 export function buildProductImageUrl(imagePath, apiBase = "") {

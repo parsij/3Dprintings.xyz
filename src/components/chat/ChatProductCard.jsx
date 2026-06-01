@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
-import { API_BASE, MARKETPLACE_ORIGIN, isSellerHostname } from "../../config/api.js";
-import { buildProductImageUrl, formatProductPrice } from "../../utils/chatFormatting.js";
+import { MARKETPLACE_ORIGIN, isSellerHostname } from "../../config/api.js";
+import {
+  buildProductImageUrl,
+  formatProductPrice,
+  getChatImageBase,
+} from "../../utils/chatFormatting.js";
 
 function Avatar({ imageUrl, label, size = "md" }) {
   const sizeClass = size === "sm" ? "h-10 w-10 text-sm" : "h-12 w-12 text-base";
@@ -70,7 +74,7 @@ export function ChatProductCard({ conversation, compact = false }) {
     return null;
   }
 
-  const imageUrl = buildProductImageUrl(conversation.productImage, API_BASE);
+  const imageUrl = buildProductImageUrl(conversation.productImage, getChatImageBase());
   const priceLabel = formatProductPrice(conversation.productPrice);
   const productHref = buildMarketplaceProductHref(conversation.productId);
   const className = `group flex items-center gap-3 rounded-2xl border border-orange-100 bg-white/90 shadow-sm transition hover:border-orange-300 hover:shadow-md ${
@@ -113,14 +117,13 @@ export function ConversationAvatar({ conversation, mode = "customer" }) {
     ? conversation?.otherParticipantLabel || "Buyer"
     : conversation?.shopName || conversation?.title || "Shop";
 
+  const imageBase = getChatImageBase();
   let imageUrl = "";
 
-  if (!isSellerView) {
-    if (conversation?.contextType === "product" && conversation?.productImage) {
-      imageUrl = buildProductImageUrl(conversation.productImage, API_BASE);
-    } else if (conversation?.shopLogoUrl) {
-      imageUrl = conversation.shopLogoUrl;
-    }
+  if (conversation?.contextType === "product" && conversation?.productImage) {
+    imageUrl = buildProductImageUrl(conversation.productImage, imageBase);
+  } else if (!isSellerView && conversation?.shopLogoUrl) {
+    imageUrl = conversation.shopLogoUrl;
   }
 
   return <Avatar imageUrl={imageUrl} label={label} />;
