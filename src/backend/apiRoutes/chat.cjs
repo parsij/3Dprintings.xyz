@@ -9,6 +9,11 @@ const {
   startOrderConversation,
   loadSellerProfiles,
 } = require("./chatConversationsShared.cjs");
+const {
+  collectOrderSellerIds,
+  getTrackingCodeForSeller,
+  UUID_REGEX,
+} = require("./chatOrderContextShared.cjs");
 
 function chatRoutes(deps) {
   const { app, pool, getAuthUserFromRequest } = deps;
