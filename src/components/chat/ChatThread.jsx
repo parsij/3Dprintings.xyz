@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import pb from "../../services/pocketbaseClient.js";
 import { ensureChatAuthSession } from "../../services/chatAuthService.js";
 import {
-  getConversationSubtitle,
   getConversationTitle,
+  markConversationRead,
 } from "../../services/chatService.js";
 import {
   formatChatTime,
@@ -12,6 +12,7 @@ import {
   groupMessagesByDay,
 } from "../../utils/chatFormatting.js";
 import { ChatProductCard, ConversationAvatar } from "./ChatProductCard.jsx";
+import { enableScrollChaining } from "../../utils/scrollChaining.js";
 
 const INITIAL_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -73,24 +74,30 @@ function getMessageProductContext(message, conversation, isFirstMessage) {
 }
 
 async function createChatMessage({ conversationId, senderId, text, productSnapshot }) {
+  const normalizedText = String(text || "").trim().slice(0, MAX_MESSAGE_LENGTH);
+  if (!normalizedText) {
+    throw new Error("Message text is required.");
+  }
+
   const basePayload = {
     conversation: conversationId,
     senderId,
-    text,
+    text: normalizedText,
   };
 
-  if (!productSnapshot?.productId) {
+  const parsedProductId = Number(productSnapshot?.productId);
+  if (!Number.isInteger(parsedProductId) || parsedProductId <= 0) {
     return pb.collection("messages").create(basePayload);
   }
 
   try {
     return await pb.collection("messages").create({
       ...basePayload,
-      product_id: productSnapshot.productId,
-      product_name: productSnapshot.productName || "",
-      product_image: productSnapshot.productImage || "",
+      product_id: parsedProductId,
+      product_name: String(productSnapshot.productName || "").slice(0, 255),
+      product_image: String(productSnapshot.productImage || "").slice(0, 2000),
       product_price: productSnapshot.productPrice ?? null,
-      shop_name: productSnapshot.shopName || "",
+      shop_name: String(productSnapshot.shopName || "").slice(0, 255),
     });
   } catch {
     return pb.collection("messages").create(basePayload);
@@ -102,6 +109,7 @@ export default function ChatThread({
   conversationId,
   currentUserId: providedCurrentUserId = "",
   mode = "customer",
+  onConversationRead,
 }) {
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
@@ -111,8 +119,12 @@ export default function ChatThread({
   const [error, setError] = useState("");
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const lastReadSignatureRef = useRef("");
+  const onConversationReadRef = useRef(onConversationRead);
   const resolvedConversationId = conversationId || conversation?.id || "";
   const firstMessageId = messages[0]?.id || null;
+
+  onConversationReadRef.current = onConversationRead;
 
   useEffect(() => {
     const removeAuthListener = pb.authStore.onChange((_token, model) => {
@@ -143,6 +155,51 @@ export default function ChatThread({
       scrollToBottom(messages.length > 1 ? "smooth" : "auto");
     });
   }, [messages, isLoading, resolvedConversationId]);
+
+  useEffect(() => {
+    if (isLoading || !scrollContainerRef.current) {
+      return undefined;
+    }
+
+    return enableScrollChaining(scrollContainerRef.current);
+  }, [resolvedConversationId, isLoading]);
+
+  useEffect(() => {
+    lastReadSignatureRef.current = "";
+  }, [resolvedConversationId]);
+
+  useEffect(() => {
+    if (!resolvedConversationId || isLoading) {
+      return undefined;
+    }
+
+    const latestMessage = messages[messages.length - 1];
+    const signature = `${resolvedConversationId}:${latestMessage?.id || "empty"}`;
+
+    if (lastReadSignatureRef.current === signature) {
+      return undefined;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      markConversationRead({ conversationId: resolvedConversationId })
+        .then(() => {
+          if (!active) {
+            return;
+          }
+          lastReadSignatureRef.current = signature;
+          onConversationReadRef.current?.();
+        })
+        .catch((readError) => {
+          console.error("Failed to mark conversation read:", readError);
+        });
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [resolvedConversationId, messages, isLoading]);
 
   useEffect(() => {
     if (!resolvedConversationId) {
@@ -205,8 +262,11 @@ export default function ChatThread({
   const currentUserId = providedCurrentUserId || authStoreUserId;
   const groupedMessages = groupMessagesByDay(messages);
   const title = getConversationTitle(conversation || {}, mode);
-  const subtitle = getConversationSubtitle(conversation || {});
   const startedAtLabel = formatConversationStartedAt(conversation?.created);
+  const showProductShopLine =
+    conversation?.contextType === "product"
+    && conversation?.shopName
+    && mode === "customer";
 
   async function sendMessage(event) {
     event.preventDefault();
@@ -258,20 +318,18 @@ export default function ChatThread({
           <ConversationAvatar conversation={conversation || {}} mode={mode} />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-bold text-gray-900">{title}</h2>
-            {subtitle ? (
+            {showProductShopLine ? (
               <p className="mt-0.5 truncate text-sm text-gray-500">
-                {conversation?.shopName && mode === "customer" && conversation?.sellerDbId ? (
-                  <>
-                    by{" "}
-                    <Link
-                      to={`/shop/${conversation.sellerDbId}`}
-                      className="font-medium text-gray-700 transition hover:text-orange-600"
-                    >
-                      {conversation.shopName}
-                    </Link>
-                  </>
+                by{" "}
+                {conversation?.sellerDbId ? (
+                  <Link
+                    to={`/shop/${conversation.sellerDbId}`}
+                    className="font-medium text-gray-700 transition hover:text-orange-600"
+                  >
+                    {conversation.shopName}
+                  </Link>
                 ) : (
-                  subtitle
+                  <span className="font-medium text-gray-700">{conversation.shopName}</span>
                 )}
               </p>
             ) : null}
@@ -281,7 +339,7 @@ export default function ChatThread({
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto overscroll-contain bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_18%,#f8fafc_100%)] px-3 py-4 sm:px-5"
+        className="flex-1 overflow-y-auto overscroll-auto bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_18%,#f8fafc_100%)] px-3 py-4 sm:px-5"
       >
         {isLoading ? (
           <div className="flex h-full items-center justify-center">

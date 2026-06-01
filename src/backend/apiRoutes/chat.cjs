@@ -1,7 +1,9 @@
 const { ensureChatUserForDbUser } = require("./chatShared.cjs");
 const {
   ensureChatConversationContextTable,
+  ensureChatConversationReadsTable,
   listConversationsForAccount,
+  markConversationRead,
   startConversation,
 } = require("./chatConversationsShared.cjs");
 
@@ -72,6 +74,53 @@ function chatRoutes(deps) {
     }
   });
 
+  app.post("/api/messages/conversations/:conversationId/read", async (req, res) => {
+    try {
+      const authUser = getAuthUserFromRequest(req);
+      if (!authUser?.id) {
+        return res.status(401).json({ message: "Sign in before viewing messages." });
+      }
+
+      const conversationId = String(req.params.conversationId || "").trim();
+      if (!conversationId) {
+        return res.status(400).json({ message: "Missing conversation." });
+      }
+
+      const userResult = await pool.query(
+        `SELECT id, email, username, pocketbase_id
+         FROM users
+         WHERE id = $1
+         LIMIT 1`,
+        [authUser.id]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(401).json({ message: "Sign in before viewing messages." });
+      }
+
+      const session = await ensureChatUserForDbUser(pool, userResult.rows[0]);
+
+      await markConversationRead(pool, {
+        conversationId,
+        userDbId: authUser.id,
+        userPbId: session.pocketbaseId,
+        token: session.token,
+      });
+
+      return res.json({ ok: true });
+    } catch (error) {
+      const statusCode = Number(error?.statusCode) || 500;
+      if (statusCode >= 500) {
+        console.error("Chat conversation read error:", error?.message || error);
+      }
+      return res.status(statusCode).json({
+        message: statusCode === 404
+          ? "Conversation not found."
+          : "Unable to update read status right now.",
+      });
+    }
+  });
+
   app.post("/api/messages/conversations/start", async (req, res) => {
     try {
       const authUser = getAuthUserFromRequest(req);
@@ -124,5 +173,6 @@ function chatRoutes(deps) {
 };
 
 chatRoutes.ensureChatConversationContextTable = ensureChatConversationContextTable;
+chatRoutes.ensureChatConversationReadsTable = ensureChatConversationReadsTable;
 
 module.exports = chatRoutes;

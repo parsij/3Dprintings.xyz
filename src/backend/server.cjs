@@ -955,7 +955,8 @@ async function initializeDatabase() {
 
      const chatRoutes = require("./apiRoutes/chat.cjs");
      await chatRoutes.ensureChatConversationContextTable(pool);
-     console.log("Chat conversation context table ensured.");
+     await chatRoutes.ensureChatConversationReadsTable(pool);
+     console.log("Chat conversation context and read-state tables ensured.");
 
      // Ensure Google identity cannot be linked to multiple users
      await pool.query(`

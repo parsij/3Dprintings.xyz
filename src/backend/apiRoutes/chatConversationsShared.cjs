@@ -1,4 +1,5 @@
 const { chatRequest, ensureChatUserForDbUser, ensureChatUserPocketBaseId } = require("./chatShared.cjs");
+const { resolveShopLogoFromSources } = require("./sellerProfileShared.cjs");
 
 async function ensureChatConversationContextTable(pool) {
   await pool.query(`
@@ -36,8 +37,92 @@ async function ensureChatConversationContextTable(pool) {
   `);
 }
 
+async function ensureChatConversationReadsTable(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_conversation_reads (
+      conversation_id VARCHAR(32) NOT NULL,
+      user_db_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      last_read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (conversation_id, user_db_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_chat_conversation_reads_user
+    ON chat_conversation_reads (user_db_id, last_read_at DESC)
+  `);
+}
+
 function normalizeContextType(value) {
   return String(value || "").trim().toLowerCase() === "product" ? "product" : "shop";
+}
+
+function isValidPocketBaseId(value) {
+  return /^[a-z0-9]{15}$/i.test(String(value || "").trim());
+}
+
+function sanitizeConversationIds(conversationIds) {
+  if (!Array.isArray(conversationIds)) {
+    return [];
+  }
+
+  return [...new Set(
+    conversationIds
+      .map((conversationId) => String(conversationId || "").trim())
+      .filter(isValidPocketBaseId)
+  )];
+}
+
+async function assertUserCanAccessConversation(pool, {
+  conversationId,
+  userDbId,
+  userPbId,
+  token,
+}) {
+  if (!isValidPocketBaseId(conversationId)) {
+    throw Object.assign(new Error("Conversation not found."), { statusCode: 404 });
+  }
+
+  const parsedUserDbId = Number(userDbId);
+  if (!Number.isInteger(parsedUserDbId) || parsedUserDbId <= 0) {
+    throw Object.assign(new Error("Conversation not found."), { statusCode: 404 });
+  }
+
+  const contextResult = await pool.query(
+    `SELECT 1
+     FROM chat_conversation_context
+     WHERE conversation_id = $1
+       AND (buyer_db_id = $2 OR seller_db_id = $2)
+     LIMIT 1`,
+    [conversationId, parsedUserDbId]
+  );
+
+  if (contextResult.rows.length > 0) {
+    return;
+  }
+
+  if (!token || !isValidPocketBaseId(userPbId)) {
+    throw Object.assign(new Error("Conversation not found."), { statusCode: 404 });
+  }
+
+  try {
+    const conversation = await chatRequest(
+      `api/collections/conversations/records/${encodeURIComponent(conversationId)}`,
+      { token }
+    );
+
+    const buyerMatches = String(conversation?.buyer || "") === String(userPbId);
+    const sellerMatches = String(conversation?.seller || "") === String(userPbId);
+
+    if (!buyerMatches && !sellerMatches) {
+      throw Object.assign(new Error("Conversation not found."), { statusCode: 404 });
+    }
+  } catch (error) {
+    if (Number(error?.statusCode) === 404 || Number(error?.status) === 404) {
+      throw Object.assign(new Error("Conversation not found."), { statusCode: 404 });
+    }
+    throw error;
+  }
 }
 
 function buildConversationPayload({
@@ -95,6 +180,10 @@ async function createPocketBaseConversation(token, payload) {
 }
 
 async function listPocketBaseConversations({ token, userPbId, mode }) {
+  if (!isValidPocketBaseId(userPbId)) {
+    return [];
+  }
+
   const filter =
     mode === "seller"
       ? `seller = "${userPbId}"`
@@ -234,26 +323,191 @@ async function loadProductContext(pool, productId) {
   };
 }
 
-async function loadShopName(pool, sellerDbId) {
-  const parsedSellerDbId = Number(sellerDbId);
-  if (!Number.isInteger(parsedSellerDbId) || parsedSellerDbId <= 0) {
-    return null;
+async function loadSellerProfiles(pool, sellerDbIds) {
+  const parsedIds = [...new Set(
+    (Array.isArray(sellerDbIds) ? sellerDbIds : [])
+      .map((sellerDbId) => Number(sellerDbId))
+      .filter((sellerDbId) => Number.isInteger(sellerDbId) && sellerDbId > 0)
+  )];
+
+  if (!parsedIds.length) {
+    return new Map();
   }
 
   const result = await pool.query(
-    `SELECT sp.shop_name, u.username
+    `SELECT sp.shop_name,
+            sp.shop_logo_url,
+            u.id,
+            u.username,
+            u.seller_preferences
      FROM users u
      LEFT JOIN seller_profiles sp ON sp.seller_user_id = u.id
-     WHERE u.id = $1
-     LIMIT 1`,
-    [parsedSellerDbId]
+     WHERE u.id = ANY($1::int[])`,
+    [parsedIds]
   );
 
-  if (result.rows.length === 0) {
-    return null;
+  return new Map(
+    result.rows.map((row) => {
+      const preferences =
+        row.seller_preferences && typeof row.seller_preferences === "object"
+          ? row.seller_preferences
+          : {};
+
+      return [
+        row.id,
+        {
+          shopName: row.shop_name || row.username || null,
+          shopLogoUrl: resolveShopLogoFromSources(row.shop_logo_url, preferences.shopLogoUrl) || null,
+        },
+      ];
+    })
+  );
+}
+
+async function loadSellerProfile(pool, sellerDbId) {
+  const profiles = await loadSellerProfiles(pool, [sellerDbId]);
+  return profiles.get(Number(sellerDbId)) || null;
+}
+
+async function loadLastReadMap(pool, userDbId, conversationIds) {
+  if (!conversationIds.length) {
+    return new Map();
   }
 
-  return result.rows[0].shop_name || result.rows[0].username || null;
+  const result = await pool.query(
+    `SELECT conversation_id, last_read_at
+     FROM chat_conversation_reads
+     WHERE user_db_id = $1
+       AND conversation_id = ANY($2::varchar[])`,
+    [userDbId, conversationIds]
+  );
+
+  return new Map(result.rows.map((row) => [row.conversation_id, row.last_read_at]));
+}
+
+async function markConversationRead(pool, {
+  conversationId,
+  userDbId,
+  userPbId,
+  token,
+}) {
+  await assertUserCanAccessConversation(pool, {
+    conversationId,
+    userDbId,
+    userPbId,
+    token,
+  });
+
+  const parsedUserDbId = Number(userDbId);
+  const resolvedReadAt = new Date();
+
+  await pool.query(
+    `INSERT INTO chat_conversation_reads (conversation_id, user_db_id, last_read_at)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (conversation_id, user_db_id)
+     DO UPDATE SET last_read_at = GREATEST(chat_conversation_reads.last_read_at, EXCLUDED.last_read_at)`,
+    [conversationId, parsedUserDbId, resolvedReadAt.toISOString()]
+  );
+}
+
+async function countUnreadMessages(token, conversationId, userPbId, lastReadAt) {
+  if (!isValidPocketBaseId(conversationId) || !isValidPocketBaseId(userPbId)) {
+    return 0;
+  }
+
+  const readTimestamp = lastReadAt
+    ? new Date(lastReadAt).toISOString()
+    : "1970-01-01T00:00:00.000Z";
+
+  const filter = `conversation = "${conversationId}" && senderId != "${userPbId}" && created > "${readTimestamp}"`;
+  const payload = await chatRequest(
+    `api/collections/messages/records?page=1&perPage=1&filter=${encodeURIComponent(filter)}`,
+    { token }
+  );
+
+  return Number(payload?.totalItems) || 0;
+}
+
+async function loadLastMessageAtMap(token, conversationIds) {
+  const validIds = sanitizeConversationIds(conversationIds);
+  const lastMessageAtById = new Map(
+    validIds.map((conversationId) => [conversationId, null])
+  );
+
+  if (!validIds.length || !token) {
+    return lastMessageAtById;
+  }
+
+  const filter = validIds.map((conversationId) => `conversation = "${conversationId}"`).join(" || ");
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages && page <= 5) {
+    const payload = await chatRequest(
+      `api/collections/messages/records?page=${page}&perPage=500&sort=-created&filter=${encodeURIComponent(filter)}`,
+      { token }
+    );
+
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    totalPages = Number(payload?.totalPages) || 1;
+
+    for (const message of items) {
+      const conversationId = message?.conversation;
+      if (!lastMessageAtById.has(conversationId) || lastMessageAtById.get(conversationId)) {
+        continue;
+      }
+      lastMessageAtById.set(conversationId, message.created || null);
+    }
+
+    if (validIds.every((conversationId) => lastMessageAtById.get(conversationId))) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return lastMessageAtById;
+}
+
+async function loadConversationMessageStats(token, conversationIds, userPbId, lastReadMap) {
+  const validIds = sanitizeConversationIds(conversationIds);
+  const statsById = new Map(
+    validIds.map((conversationId) => [
+      conversationId,
+      { lastMessageAt: null, unreadCount: 0 },
+    ])
+  );
+
+  if (!validIds.length || !token || !isValidPocketBaseId(userPbId)) {
+    return statsById;
+  }
+
+  const lastMessageAtById = await loadLastMessageAtMap(token, validIds);
+  const unreadCounts = await Promise.all(
+    validIds.map(async (conversationId) => {
+      try {
+        const unreadCount = await countUnreadMessages(
+          token,
+          conversationId,
+          userPbId,
+          lastReadMap.get(conversationId)
+        );
+        return [conversationId, unreadCount];
+      } catch (error) {
+        console.error("Failed to count unread chat messages:", error?.message || error);
+        return [conversationId, 0];
+      }
+    })
+  );
+
+  for (const [conversationId, unreadCount] of unreadCounts) {
+    statsById.set(conversationId, {
+      lastMessageAt: lastMessageAtById.get(conversationId) || null,
+      unreadCount,
+    });
+  }
+
+  return statsById;
 }
 
 function mergeConversationRecord(pbConversation, contextRow, extras = {}) {
@@ -272,15 +526,23 @@ function mergeConversationRecord(pbConversation, contextRow, extras = {}) {
     productImage: contextRow?.product_image || pbConversation?.product_image || extras.productImage || null,
     productPrice: extras.productPrice ?? null,
     shopName,
+    shopLogoUrl: extras.shopLogoUrl || null,
     buyerDbId: contextRow?.buyer_db_id || null,
     sellerDbId: contextRow?.seller_db_id || extras.sellerDbId || null,
     otherParticipantLabel: extras.otherParticipantLabel || null,
     title: extras.title || null,
-    subtitle: extras.subtitle || null,
+    subtitle: extras.subtitle ?? null,
+    lastMessageAt: extras.lastMessageAt || pbConversation.updated || pbConversation.created,
+    unreadCount: Number.isFinite(Number(extras.unreadCount)) ? Number(extras.unreadCount) : 0,
   };
 }
 
-async function enrichConversationRows(pool, pbConversations, { mode, currentUserDbId }) {
+async function enrichConversationRows(pool, pbConversations, {
+  mode,
+  currentUserDbId,
+  token,
+  userPbId,
+}) {
   if (!pbConversations.length) {
     return [];
   }
@@ -293,44 +555,71 @@ async function enrichConversationRows(pool, pbConversations, { mode, currentUser
     [ids]
   );
   const contextById = new Map(contextResult.rows.map((row) => [row.conversation_id, row]));
+  const sellerProfilesById = await loadSellerProfiles(
+    pool,
+    contextResult.rows.map((row) => row.seller_db_id)
+  );
+  const lastReadMap = await loadLastReadMap(pool, currentUserDbId, ids);
+  const messageStatsById = await loadConversationMessageStats(token, ids, userPbId, lastReadMap);
 
   const enriched = [];
 
   for (const pbConversation of pbConversations) {
     const contextRow = contextById.get(pbConversation.id) || null;
     let extras = {};
+    const messageStats = messageStatsById.get(pbConversation.id) || {
+      lastMessageAt: null,
+      unreadCount: 0,
+    };
+
+    extras.lastMessageAt = messageStats.lastMessageAt;
+    extras.unreadCount = messageStats.unreadCount;
+
+    const sellerDbId = contextRow?.seller_db_id || null;
+
+    if (sellerDbId) {
+      const sellerProfile = sellerProfilesById.get(Number(sellerDbId)) || null;
+      extras.sellerDbId = sellerDbId;
+      extras.shopName = contextRow?.shop_name || sellerProfile?.shopName || null;
+      extras.shopLogoUrl = sellerProfile?.shopLogoUrl || null;
+    }
 
     if (contextRow?.product_id) {
       const product = await loadProductContext(pool, contextRow.product_id);
       if (product) {
         extras = {
+          ...extras,
           productName: product.productName,
           productImage: product.productImage,
           productPrice: product.productPrice,
-          shopName: product.shopName || contextRow.shop_name,
+          shopName: product.shopName || extras.shopName,
           sellerDbId: product.sellerDbId,
         };
+
+        if (!extras.shopLogoUrl && product.sellerDbId) {
+          const productSellerProfile = sellerProfilesById.get(Number(product.sellerDbId))
+            || await loadSellerProfile(pool, product.sellerDbId);
+          extras.shopLogoUrl = productSellerProfile?.shopLogoUrl || null;
+        }
       }
-    } else if (contextRow?.seller_db_id) {
-      extras.shopName = contextRow.shop_name || await loadShopName(pool, contextRow.seller_db_id);
-      extras.sellerDbId = contextRow.seller_db_id;
     }
 
     const isSellerView = mode === "seller";
     const shopLabel = extras.shopName || contextRow?.shop_name || "Shop";
     const productLabel = extras.productName || contextRow?.product_name;
+    const isProductContext = contextRow?.context_type === "product" && productLabel;
 
     if (isSellerView) {
-      extras.title = productLabel || `Buyer inquiry`;
-      extras.subtitle = productLabel ? shopLabel : "General shop message";
+      extras.title = productLabel || "Buyer inquiry";
+      extras.subtitle = productLabel ? shopLabel : "";
       extras.otherParticipantLabel = "Buyer";
-    } else if (contextRow?.context_type === "product" && productLabel) {
+    } else if (isProductContext) {
       extras.title = productLabel;
       extras.subtitle = `by ${shopLabel}`;
       extras.otherParticipantLabel = shopLabel;
     } else {
       extras.title = shopLabel;
-      extras.subtitle = "Shop conversation";
+      extras.subtitle = "";
       extras.otherParticipantLabel = shopLabel;
     }
 
@@ -338,7 +627,9 @@ async function enrichConversationRows(pool, pbConversations, { mode, currentUser
   }
 
   return enriched.sort((left, right) =>
-    String(right.updated || "").localeCompare(String(left.updated || ""))
+    String(right.lastMessageAt || right.updated || "").localeCompare(
+      String(left.lastMessageAt || left.updated || "")
+    )
   );
 }
 
@@ -383,11 +674,8 @@ async function startConversation(pool, {
     }
   }
 
-  const resolvedShopName =
-    shopName
-    || resolvedProduct?.shopName
-    || await loadShopName(pool, parsedSellerDbId)
-    || "Shop";
+  const sellerProfile = await loadSellerProfile(pool, parsedSellerDbId);
+  const resolvedShopName = resolvedProduct?.shopName || sellerProfile?.shopName || "Shop";
 
   const existingContext = await findExistingConversationContext(pool, {
     buyerDbId,
@@ -406,9 +694,9 @@ async function startConversation(pool, {
   const payload = buildConversationPayload({
     buyerPbId: buyerSession.pocketbaseId,
     sellerPbId,
-    productId: resolvedProduct?.productId || productId,
-    productName: resolvedProduct?.productName || productName,
-    productImage: resolvedProduct?.productImage || productImage,
+    productId: resolvedProduct?.productId || null,
+    productName: resolvedProduct?.productName || null,
+    productImage: resolvedProduct?.productImage || null,
     shopName: resolvedShopName,
     contextType: normalizedType,
   });
@@ -425,8 +713,8 @@ async function startConversation(pool, {
     buyerPbId: buyerSession.pocketbaseId,
     sellerPbId,
     productId: resolvedProduct?.productId || null,
-    productName: resolvedProduct?.productName || productName,
-    productImage: resolvedProduct?.productImage || productImage,
+    productName: resolvedProduct?.productName || null,
+    productImage: resolvedProduct?.productImage || null,
     shopName: resolvedShopName,
     contextType: normalizedType,
   });
@@ -448,12 +736,16 @@ async function listConversationsForAccount(pool, buyerUser, mode = "customer") {
   return enrichConversationRows(pool, pbConversations, {
     mode,
     currentUserDbId: buyerUser.id,
+    token: session.token,
+    userPbId: session.pocketbaseId,
   });
 }
 
 module.exports = {
   ensureChatConversationContextTable,
+  ensureChatConversationReadsTable,
   enrichConversationRows,
   listConversationsForAccount,
+  markConversationRead,
   startConversation,
 };

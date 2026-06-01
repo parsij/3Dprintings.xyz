@@ -208,6 +208,7 @@ export default function Messages({ user, mode = "customer" }) {
                   conversationId={selectedConversationId}
                   currentUserId={currentUserId}
                   mode={mode}
+                  onConversationRead={refreshConversations}
                 />
               </div>
             ) : (

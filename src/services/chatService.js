@@ -44,11 +44,17 @@ export function getConversationSubtitle(conversation) {
     return `by ${conversation.shopName}`;
   }
 
-  if (conversation?.contextType === "shop" && conversation?.shopName) {
-    return "Shop conversation";
+  return "";
+}
+
+export async function markConversationRead({ conversationId }) {
+  if (!conversationId) {
+    return;
   }
 
-  return conversation?.shopName ? `by ${conversation.shopName}` : "Marketplace chat";
+  await ensureChatAuthSession();
+
+  await apiClient.post(`/api/messages/conversations/${encodeURIComponent(conversationId)}/read`);
 }
 
 export async function listConversationsForUser({ mode = "customer" }) {
