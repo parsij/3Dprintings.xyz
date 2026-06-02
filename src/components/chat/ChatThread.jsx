@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { shopPath } from "../../utils/shopName.js";
 import pb from "../../services/pocketbaseClient.js";
 import { ensureChatAuthSession } from "../../services/chatAuthService.js";
 import {
@@ -411,9 +412,9 @@ export default function ChatThread({
             {showProductShopLine ? (
               <p className="mt-0.5 truncate text-sm text-gray-500">
                 by{" "}
-                {conversation?.sellerDbId ? (
+                {conversation?.shopName ? (
                   <Link
-                    to={`/shop/${conversation.sellerDbId}`}
+                    to={shopPath(conversation.shopName) || "#"}
                     className="font-medium text-gray-700 transition hover:text-orange-600"
                   >
                     {conversation.shopName}

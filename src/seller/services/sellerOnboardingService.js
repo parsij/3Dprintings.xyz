@@ -17,6 +17,13 @@ export async function getSellerMarketplaceStatus() {
   return response.data;
 }
 
+export async function checkShopNameAvailability(shopName) {
+  const response = await apiClient.get("/api/seller/onboarding/shop-name-available", {
+    params: { name: shopName },
+  });
+  return response.data;
+}
+
 export async function saveSellerShopOnboarding(payload) {
   const response = await apiClient.post("/api/seller/onboarding/shop", payload);
   return response.data;

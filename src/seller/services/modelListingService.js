@@ -24,7 +24,23 @@ export async function submitModelListing({
   modelLength,
   modelDimensionUnit,
   daysToPrepare,
+  packedWeight,
+  packedWeightUnit,
+  packedHeight,
+  packedWidth,
+  packedLength,
+  packedDimensionUnit,
+  itemType,
+  madeBy,
+  itemKind,
+  materialType,
+  aiUsed,
+  primaryColor,
+  secondaryColor,
+  variations,
+  shippingProfileId,
   photos,
+  videos,
 }) {
   const canonical = toCanonicalDimensions({
     modelWeight,
@@ -33,6 +49,15 @@ export async function submitModelListing({
     modelWidth,
     modelLength,
     modelDimensionUnit,
+  });
+
+  const packedCanonical = toCanonicalDimensions({
+    modelWeight: packedWeight,
+    modelWeightUnit: packedWeightUnit,
+    modelHeight: packedHeight,
+    modelWidth: packedWidth,
+    modelLength: packedLength,
+    modelDimensionUnit: packedDimensionUnit,
   });
 
   const formData = new FormData();
@@ -51,10 +76,53 @@ export async function submitModelListing({
   formData.append("modelHeightMm", String(canonical.modelHeightMm));
   formData.append("modelWidthMm", String(canonical.modelWidthMm));
   formData.append("modelLengthMm", String(canonical.modelLengthMm));
-  formData.append("daysToPrepare", String(daysToPrepare));
+
+  if (daysToPrepare != null) {
+    formData.append("daysToPrepare", String(daysToPrepare));
+  }
+
+  if (packedWeight) {
+    formData.append("packedWeight", String(packedWeight));
+    formData.append("packedWeightUnit", packedWeightUnit);
+    formData.append("packedHeight", String(packedHeight));
+    formData.append("packedWidth", String(packedWidth));
+    formData.append("packedLength", String(packedLength));
+    formData.append("packedDimensionUnit", packedDimensionUnit);
+    formData.append("packedWeightG", String(packedCanonical.modelWeightG));
+    formData.append("packedHeightMm", String(packedCanonical.modelHeightMm));
+    formData.append("packedWidthMm", String(packedCanonical.modelWidthMm));
+    formData.append("packedLengthMm", String(packedCanonical.modelLengthMm));
+  }
 
   if (category?.trim()) {
     formData.append("category", category.trim());
+  }
+
+  if (itemType) {
+    formData.append("itemType", itemType);
+  }
+  if (madeBy) {
+    formData.append("madeBy", madeBy);
+  }
+  if (itemKind) {
+    formData.append("itemKind", itemKind);
+  }
+  if (materialType) {
+    formData.append("materialType", materialType);
+  }
+  formData.append("aiUsed", aiUsed ? "true" : "false");
+
+  if (primaryColor) {
+    formData.append("primaryColor", primaryColor);
+  }
+  if (secondaryColor) {
+    formData.append("secondaryColor", secondaryColor);
+  }
+  if (shippingProfileId) {
+    formData.append("shippingProfileId", String(shippingProfileId));
+  }
+  if (Array.isArray(variations) && variations.length > 0) {
+    formData.append("variations", JSON.stringify(variations));
   }
 
   if (tags?.length) {
@@ -63,6 +131,10 @@ export async function submitModelListing({
 
   photos.forEach((photo) => {
     formData.append("photos", photo);
+  });
+
+  (videos || []).forEach((video) => {
+    formData.append("videos", video);
   });
 
   try {

@@ -11,6 +11,7 @@ import { toggleLike, toggleSave, getProductStatus, toggleReviewLike } from "../s
 import image_test from "../assets/Screenshot_20260322_175244.png";
 
 import { API_BASE } from "../config/api.js";
+import { shopPath } from "../utils/shopName.js";
 
 const ProductPage = ({ user }) => {
   const { id } = useParams();
@@ -571,7 +572,7 @@ const ProductPage = ({ user }) => {
             {/* Creator & Rating */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
               <Link
-                to={`/shop/${product.seller_id || product.user_id}`}
+                to={shopPath(product.shop_name || product.creator_name) || "#"}
                 className="flex min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-orange-50 hover:text-orange-700"
               >
                 <span className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-orange-100">

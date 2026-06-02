@@ -24,9 +24,11 @@ function isSellerOnboardingComplete(completionStep) {
   return normalizeCompletionStep(completionStep) === "completed";
 }
 
-function buildSellerShopUrl(sellerUserId, options = {}) {
+function buildSellerShopUrl(shopName, options = {}) {
   const siteOrigin = options.siteOrigin || getFrontendUrl();
-  return `${siteOrigin}/shop/${Number(sellerUserId)}`;
+  const name = String(shopName || "").trim();
+  if (!name) return null;
+  return `${siteOrigin}/shop/${encodeURIComponent(name)}`;
 }
 
 async function ensureSellerCompletionColumn(pool) {

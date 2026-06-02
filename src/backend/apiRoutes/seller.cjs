@@ -33,6 +33,15 @@ const {
   listSellerBoxes,
 } = require("./sellerBoxesShared.cjs");
 const { productFitsInAnyBox, getProductBoxFitMessage } = require("./sellerBoxPackingShared.cjs");
+const {
+  createSellerShippingProfile,
+  listSellerShippingProfiles,
+} = require("./sellerShippingProfilesShared.cjs");
+const { validateListingCategory } = require("./listingCategoriesShared.cjs");
+const {
+  validateListingTitle,
+  validateTags,
+} = require("./listingExtrasShared.cjs");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
@@ -717,19 +726,43 @@ module.exports = function sellerRoutes(deps) {
         const parsedPrice = Number(req.body?.price);
         const rawQuantity = req.body?.quantity;
         const parsedQuantity = Number(rawQuantity);
+        if (req.body?.tags != null && !Array.isArray(req.body.tags)) {
+          return res.status(400).json({ message: "Tags must be a list." });
+        }
         const nextTags = normalizeTagList(req.body?.tags);
 
-       if (modelName.length < 3 || !/^[a-zA-Z0-9 ]+$/.test(modelName)) {
-         return res.status(400).json({ message: "Model name must be at least 3 characters and contain letters/numbers/spaces only." });
+       const titleError = validateListingTitle(modelName);
+       if (titleError) {
+         return res.status(400).json({ message: titleError });
        }
        if (description.length < 20) {
          return res.status(400).json({ message: "Description must be at least 20 characters." });
        }
+       if (description.length > 5000) {
+         return res.status(400).json({ message: "Description must be 5,000 characters or less." });
+       }
        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
          return res.status(400).json({ message: "Price must be a positive number." });
        }
+       if (!/^\d+(\.\d{1,2})?$/.test(String(req.body?.price || "").trim())) {
+         return res.status(400).json({ message: "Price can include up to 2 decimal places." });
+       }
+       if (parsedPrice > 100000) {
+         return res.status(400).json({ message: "Price cannot exceed $100,000." });
+       }
+       const categoryError = validateListingCategory(category);
+       if (categoryError) {
+         return res.status(400).json({ message: categoryError });
+       }
        if (rawQuantity === "" || rawQuantity === null || rawQuantity === undefined || String(rawQuantity).trim() === "" || !Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
          return res.status(400).json({ message: "Quantity must be a whole number." });
+       }
+       if (parsedQuantity > 100000) {
+         return res.status(400).json({ message: "Quantity cannot exceed 100,000." });
+       }
+       const tagsError = validateTags(nextTags);
+       if (tagsError) {
+         return res.status(400).json({ message: tagsError });
        }
        if (isProfane(modelName) || isProfane(description) || nextTags.some((tag) => isProfane(tag))) {
          return res.status(400).json({ message: "Explicit content is not allowed in title, description, or tags." });
@@ -956,4 +989,33 @@ module.exports = function sellerRoutes(deps) {
        return res.status(500).json({ message: "Failed to save reply." });
      }
    });
+
+  app.get("/api/seller/shipping-profiles", attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
+    try {
+      const profiles = await listSellerShippingProfiles(pool, req.user.id);
+      return res.status(200).json({ profiles });
+    } catch (error) {
+      console.error("Error loading shipping profiles:", error);
+      return res.status(500).json({ message: "Failed to load shipping profiles." });
+    }
+  });
+
+  app.post("/api/seller/shipping-profiles", ensureSellerWriteAuth, attachAuthenticatedUser, isSeller, requireCompletedOnboarding, async (req, res) => {
+    try {
+      const profile = await createSellerShippingProfile(pool, req.user.id, req.body || {});
+      return res.status(201).json({
+        message: "Shipping profile saved.",
+        profile,
+      });
+    } catch (error) {
+      if (error?.fieldErrors) {
+        return res.status(error.statusCode || 400).json({
+          message: error.message || "Invalid shipping profile.",
+          errors: error.fieldErrors,
+        });
+      }
+      console.error("Error creating shipping profile:", error);
+      return res.status(500).json({ message: "Failed to save shipping profile." });
+    }
+  });
  };

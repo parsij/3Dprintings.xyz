@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 
 const {
@@ -10,17 +11,173 @@ const {
 const { productFitsInAnyBox, getProductBoxFitMessage } = require('./sellerBoxPackingShared.cjs');
 const { isSellerOnboardingComplete, getSellerOnboardingState } = require('./sellerOnboardingShared.cjs');
 const { optimizeUploadedProductPhoto } = require('./imageProcessingShared.cjs');
+const { parseListingMetadata, validateListingMetadata } = require('./listingMetadataShared.cjs');
+const {
+  parseListingExtras,
+  validateListingExtras,
+  validateListingTitle,
+  validateTags,
+} = require('./listingExtrasShared.cjs');
+const { getSellerShippingProfile } = require('./sellerShippingProfilesShared.cjs');
+const { validateListingCategory } = require('./listingCategoriesShared.cjs');
+
+const ALLOWED_PHOTO_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif']);
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov']);
+
+function processingTimeToDays(processingTime) {
+  const mapping = {
+    '1_day': 1,
+    '1_2_days': 2,
+    '1_3_days': 3,
+    '2_4_days': 4,
+    '3_7_days': 7,
+  };
+  return mapping[String(processingTime || '').trim()] || 3;
+}
+
+function parsePackedDimensions(body = {}) {
+  return parseAndValidateProductDimensions({
+    modelWeight: body.packedWeight ?? body.packed_weight,
+    modelWeightUnit: body.packedWeightUnit ?? body.packed_weight_unit,
+    modelHeight: body.packedHeight ?? body.packed_height,
+    modelWidth: body.packedWidth ?? body.packed_width,
+    modelLength: body.packedLength ?? body.packed_length,
+    modelDimensionUnit: body.packedDimensionUnit ?? body.packed_dimension_unit,
+    modelWeightG: body.packedWeightG ?? body.packed_weight_g,
+    modelHeightMm: body.packedHeightMm ?? body.packed_height_mm,
+    modelWidthMm: body.packedWidthMm ?? body.packed_width_mm,
+    modelLengthMm: body.packedLengthMm ?? body.packed_length_mm,
+  });
+}
+
+function fileHasExtension(file, allowedExtensions) {
+  const extension = path.extname(file?.originalname || file?.filename || '').toLowerCase();
+  return Boolean(extension) && allowedExtensions.has(extension);
+}
+
+async function uploadedVideoHasExpectedSignature(file) {
+  let handle;
+  try {
+    handle = await fs.promises.open(file.path, 'r');
+    const buffer = Buffer.alloc(16);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+    if (bytesRead < 4) return false;
+
+    const extension = path.extname(file.originalname || file.filename || '').toLowerCase();
+    if (extension === '.webm') {
+      return buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3;
+    }
+
+    if (extension === '.mp4' || extension === '.mov') {
+      return buffer.slice(4, 8).toString('ascii') === 'ftyp';
+    }
+
+    return false;
+  } catch {
+    return false;
+  } finally {
+    await handle?.close();
+  }
+}
+
+async function validateUploadedMedia({ photos, videos, maxPhotos, maxPhotoSize, maxVideos }) {
+  const fieldErrors = {};
+
+  if (photos.length === 0) {
+    fieldErrors.photos = 'Upload at least one printed model photo.';
+  } else if (photos.length > maxPhotos) {
+    fieldErrors.photos = `You can upload up to ${maxPhotos} photos.`;
+  } else if (maxPhotoSize && photos.some((file) => Number(file.size || 0) > maxPhotoSize)) {
+    fieldErrors.photos = 'Each photo must be 50 MB or smaller.';
+  } else if (photos.some((file) => !String(file.mimetype || '').startsWith('image/') || !fileHasExtension(file, ALLOWED_PHOTO_EXTENSIONS))) {
+    fieldErrors.photos = 'Only JPG, PNG, WEBP, GIF, HEIC, and HEIF images are allowed.';
+  }
+
+  if (videos.length > (maxVideos || 1)) {
+    fieldErrors.videos = `You can upload up to ${maxVideos || 1} video.`;
+  } else if (videos.some((file) => !String(file.mimetype || '').startsWith('video/') || !fileHasExtension(file, ALLOWED_VIDEO_EXTENSIONS))) {
+    fieldErrors.videos = 'Only MP4, WEBM, and MOV videos are allowed.';
+  } else {
+    for (const video of videos) {
+      if (!await uploadedVideoHasExpectedSignature(video)) {
+        fieldErrors.videos = 'Video file type does not match its contents.';
+        break;
+      }
+    }
+  }
+
+  return fieldErrors;
+}
+
+function parseTagsInput(rawTags) {
+  if (rawTags == null || rawTags === '') {
+    return [];
+  }
+
+  if (Array.isArray(rawTags)) {
+    return rawTags.map((tag) => String(tag).trim().toLowerCase()).filter(Boolean);
+  }
+
+  if (typeof rawTags !== 'string') {
+    return [];
+  }
+
+  const trimmed = rawTags.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed.map((tag) => String(tag).trim().toLowerCase()).filter(Boolean);
+    }
+  } catch {
+    // Fall back to comma-separated tags for older clients.
+  }
+
+  return trimmed
+    .split(',')
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hasValidMoneyPrecision(value) {
+  return /^\d+(\.\d{1,2})?$/.test(String(value || '').trim());
+}
 
 module.exports = function createRoutes(deps) {
-  const { app, pool, upload, cleanupUploadedFiles, MAX_PHOTOS, isAuthenticatedAnIisValid, enqueueWrite } = deps;
+  const {
+    app,
+    pool,
+    upload,
+    listingMediaUpload,
+    cleanupUploadedFiles,
+    MAX_PHOTOS,
+    MAX_PHOTO_SIZE,
+    MAX_VIDEOS,
+    isAuthenticatedAnIisValid,
+    enqueueWrite,
+  } = deps;
 
-  app.post('/api/create', upload.array('photos', MAX_PHOTOS), async (req, res) => {
-    const photos = req.files || [];
+  const listingUpload = listingMediaUpload || upload.array('photos', MAX_PHOTOS);
+
+  app.post('/api/create', listingUpload, async (req, res) => {
+    const uploadedPhotos = Array.isArray(req.files?.photos)
+      ? req.files.photos
+      : Array.isArray(req.files)
+        ? req.files
+        : [];
+    const uploadedVideos = Array.isArray(req.files?.videos) ? req.files.videos : [];
+    const photos = uploadedPhotos;
 
     try {
       const { isProfane } = await import('../../services/profanityFilter.js');
-      const auth = isAuthenticatedAnIisValid(req, res, "create");
-      if (!auth?.userId) return; // response is already sent in isAuthenticatedAnIisValid or we wait, wait, the response is actually sent inside isAuthenticatedAnIisValid so if it returns an object with user ID it is valid. But if not, it sends res and returns the res object.. Wait, if it fails, it returns res.status().json() which is undefined or object.
+      const auth = isAuthenticatedAnIisValid(req, res, "nothing");
+      if (!auth?.userId) {
+        await cleanupUploadedFiles([...photos, ...uploadedVideos]);
+        return;
+      }
 
       const userId = auth.userId;
 
@@ -29,14 +186,14 @@ module.exports = function createRoutes(deps) {
         [userId]
       );
       if (sellerResult.rows.length === 0) {
-        await cleanupUploadedFiles(photos);
+        await cleanupUploadedFiles([...photos, ...uploadedVideos]);
         return res.status(404).json({
           message: 'User not found.',
           errors: { general: 'Your account could not be found. Please sign in again.' },
         });
       }
       if (sellerResult.rows[0].role !== 'seller') {
-        await cleanupUploadedFiles(photos);
+        await cleanupUploadedFiles([...photos, ...uploadedVideos]);
         return res.status(403).json({
           message: 'Seller access is required to list products.',
           errors: { general: 'Seller access is required to list products.' },
@@ -45,7 +202,7 @@ module.exports = function createRoutes(deps) {
 
       const onboarding = await getSellerOnboardingState(pool, userId);
       if (!isSellerOnboardingComplete(onboarding.completionStep)) {
-        await cleanupUploadedFiles(photos);
+        await cleanupUploadedFiles([...photos, ...uploadedVideos]);
         return res.status(403).json({
           message: 'Complete seller onboarding before listing products.',
           errors: {
@@ -56,18 +213,37 @@ module.exports = function createRoutes(deps) {
       }
 
       const { modelName = '', description = '', price, category = '', tags, quantity } = req.body;
-      let dimensions;
-      try {
-        dimensions = parseAndValidateProductDimensions(req.body);
-      } catch (dimensionError) {
-        await cleanupUploadedFiles(photos);
-        const field = dimensionError.field || 'dimensions';
-        return res.status(dimensionError.statusCode || 400).json({
-          message: 'Validation failed.',
-          errors: {
-            [field]: dimensionError.message || 'Invalid model dimensions.',
-          },
-        });
+      const listingMetadata = parseListingMetadata(req.body);
+      const listingExtras = parseListingExtras(req.body);
+      let dimensions = null;
+      let packedDimensions = null;
+
+      if (listingMetadata.itemType === 'physical') {
+        try {
+          dimensions = parseAndValidateProductDimensions(req.body);
+        } catch (dimensionError) {
+          await cleanupUploadedFiles([...photos, ...uploadedVideos]);
+          const field = dimensionError.field || 'dimensions';
+          return res.status(dimensionError.statusCode || 400).json({
+            message: 'Validation failed.',
+            errors: {
+              [field]: dimensionError.message || 'Invalid model dimensions.',
+            },
+          });
+        }
+
+        try {
+          packedDimensions = parsePackedDimensions(req.body);
+        } catch (dimensionError) {
+          await cleanupUploadedFiles([...photos, ...uploadedVideos]);
+          const field = dimensionError.field || 'packedWeight';
+          return res.status(dimensionError.statusCode || 400).json({
+            message: 'Validation failed.',
+            errors: {
+              [field]: dimensionError.message || 'Invalid packed item dimensions.',
+            },
+          });
+        }
       }
 
       const trimmedModelName = String(modelName).trim();
@@ -78,35 +254,47 @@ module.exports = function createRoutes(deps) {
       const parsedQuantity = Number(rawQuantity);
 
       const fieldErrors = {};
+      Object.assign(fieldErrors, await validateUploadedMedia({
+        photos,
+        videos: uploadedVideos,
+        maxPhotos: MAX_PHOTOS,
+        maxPhotoSize: MAX_PHOTO_SIZE,
+        maxVideos: MAX_VIDEOS,
+      }));
 
-      if (photos.length === 0) {
-        fieldErrors.photos = 'Upload at least one printed model photo.';
-      }
-
-      if (photos.length > MAX_PHOTOS) {
-        fieldErrors.photos = `You can upload up to ${MAX_PHOTOS} photos.`;
-      }
-
-      if (trimmedModelName.length < 3) {
-        fieldErrors.modelName = 'Model name must be at least 3 characters.';
+      if (trimmedModelName.length < 1) {
+        fieldErrors.modelName = 'Title must be at least 1 character.';
+      } else if (trimmedModelName.length > 120) {
+        fieldErrors.modelName = 'Title must be at most 120 characters.';
       } else if (!/^[a-zA-Z0-9 ]+$/.test(trimmedModelName)) {
-        fieldErrors.modelName = 'Model name can only contain letters, numbers, and spaces.';
+        fieldErrors.modelName = 'Title can only contain letters, numbers, and spaces.';
       }
 
       if (trimmedDescription.length < 20) {
         fieldErrors.description = 'Description must be at least 20 characters.';
+      } else if (trimmedDescription.length > 5000) {
+        fieldErrors.description = 'Description must be 5,000 characters or less.';
       }
 
       if (price === undefined || price === null || String(price).trim() === '' || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
         fieldErrors.price = 'Enter a valid price greater than 0.';
+      } else if (!hasValidMoneyPrecision(price)) {
+        fieldErrors.price = 'Price can include up to 2 decimal places.';
       } else if (parsedPrice > 100000) {
         fieldErrors.price = 'Price cannot exceed $100,000.';
       }
 
-      if (!trimmedCategory) {
-        fieldErrors.category = 'Please select a specific category.';
-      } else if (trimmedCategory.length > 100) {
-        fieldErrors.category = 'Category is too long.';
+      const categoryError = validateListingCategory(trimmedCategory);
+      if (categoryError) {
+        fieldErrors.category = categoryError;
+      }
+
+      Object.assign(fieldErrors, validateListingMetadata(listingMetadata));
+      Object.assign(fieldErrors, validateListingExtras(listingExtras, listingMetadata));
+
+      const titleError = validateListingTitle(trimmedModelName);
+      if (titleError) {
+        fieldErrors.modelName = titleError;
       }
 
       if (
@@ -122,24 +310,28 @@ module.exports = function createRoutes(deps) {
         fieldErrors.quantity = 'Quantity cannot exceed 100,000.';
       }
 
-      // Parse tags
-      let parsedTags = [];
-      if (typeof tags === 'string' && tags.trim().length > 0) {
-        try {
-          const rawTags = JSON.parse(tags);
-          if (Array.isArray(rawTags)) {
-            parsedTags = rawTags.map((tag) => String(tag).trim().toLowerCase()).filter(Boolean);
-          }
-        } catch {
-          parsedTags = tags
-            .split(',')
-            .map((tag) => tag.trim().toLowerCase())
-            .filter(Boolean);
-        }
+      const parsedTags = [...new Set(parseTagsInput(tags))];
+
+      const tagError = validateTags(parsedTags);
+      if (tags != null && tags !== '' && typeof tags !== 'string' && !Array.isArray(tags)) {
+        fieldErrors.tags = 'Tags must be a list.';
+      } else if (tagError) {
+        fieldErrors.tags = tagError;
       }
 
-      // Remove duplicates
-      parsedTags = [...new Set(parsedTags)];
+      let shippingProfile = null;
+      if (listingMetadata.itemType === 'physical' && listingExtras.shippingProfileId != null) {
+        shippingProfile = await getSellerShippingProfile(
+          pool,
+          userId,
+          Number(listingExtras.shippingProfileId)
+        );
+        if (!shippingProfile) {
+          fieldErrors.shippingProfileId = 'Select a valid shipping profile.';
+        }
+      } else if (listingMetadata.itemType === 'physical') {
+        fieldErrors.shippingProfileId = 'Select a shipping profile for physical items.';
+      }
 
       const hasBadWords = isProfane(trimmedModelName) || isProfane(trimmedDescription) || parsedTags.some(tag => isProfane(tag));
       if (hasBadWords) {
@@ -147,45 +339,53 @@ module.exports = function createRoutes(deps) {
       }
 
       if (Object.keys(fieldErrors).length > 0) {
-        await cleanupUploadedFiles(photos);
+        await cleanupUploadedFiles([...photos, ...uploadedVideos]);
         return res.status(400).json({
           message: 'Validation failed.',
           errors: fieldErrors,
         });
       }
 
-      const sellerBoxes = await listSellerBoxes(pool, userId);
-      if (sellerBoxes.length === 0) {
-        await cleanupUploadedFiles(photos);
-        return res.status(400).json({
-          message: 'You must add at least one shipping box before listing products.',
-          errors: {
-            general: 'You must add at least one shipping box before listing products.',
+      if (listingMetadata.itemType === 'physical') {
+        const sellerBoxes = await listSellerBoxes(pool, userId);
+        if (sellerBoxes.length === 0) {
+          await cleanupUploadedFiles([...photos, ...uploadedVideos]);
+          return res.status(400).json({
+            message: 'You must add at least one shipping box before listing products.',
+            errors: {
+              general: 'You must add at least one shipping box before listing products.',
+            },
+            boxesUrl: '/boxes',
+          });
+        }
+
+        const fitResult = await productFitsInAnyBox(
+          {
+            name: trimmedModelName,
+            model_weight_g: packedDimensions?.modelWeightG ?? dimensions.modelWeightG,
+            model_height_mm: packedDimensions?.modelHeightMm ?? dimensions.modelHeightMm,
+            model_width_mm: packedDimensions?.modelWidthMm ?? dimensions.modelWidthMm,
+            model_length_mm: packedDimensions?.modelLengthMm ?? dimensions.modelLengthMm,
           },
-          boxesUrl: '/boxes',
-        });
+          sellerBoxes
+        );
+
+        if (!fitResult.fits) {
+          await cleanupUploadedFiles([...photos, ...uploadedVideos]);
+          const fitMessage = getProductBoxFitMessage(fitResult.reason);
+          return res.status(400).json({
+            message: fitMessage,
+            errors: { general: fitMessage },
+            boxesUrl: '/boxes',
+          });
+        }
       }
 
-      const fitResult = await productFitsInAnyBox(
-        {
-          name: trimmedModelName,
-          model_weight_g: dimensions.modelWeightG,
-          model_height_mm: dimensions.modelHeightMm,
-          model_width_mm: dimensions.modelWidthMm,
-          model_length_mm: dimensions.modelLengthMm,
-        },
-        sellerBoxes
-      );
-
-      if (!fitResult.fits) {
-        await cleanupUploadedFiles(photos);
-        const fitMessage = getProductBoxFitMessage(fitResult.reason);
-        return res.status(400).json({
-          message: fitMessage,
-          errors: { general: fitMessage },
-          boxesUrl: '/boxes',
-        });
-      }
+      const daysToPrepare = listingMetadata.itemType === 'physical'
+        ? (shippingProfile
+          ? processingTimeToDays(shippingProfile.processingTime)
+          : dimensions.daysToPrepare)
+        : 1;
 
       const insertProductQuery = `
         INSERT INTO products (
@@ -204,15 +404,37 @@ module.exports = function createRoutes(deps) {
           model_length_mm,
           model_weight_unit,
           model_dimension_unit,
-          days_to_prepare
+          days_to_prepare,
+          item_type,
+          made_by,
+          item_kind,
+          material_type,
+          ai_used,
+          primary_color,
+          secondary_color,
+          variations,
+          shipping_profile_id,
+          packed_weight_g,
+          packed_height_mm,
+          packed_width_mm,
+          packed_length_mm,
+          packed_weight_unit,
+          packed_dimension_unit,
+          video_path
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, $26, $27, $28, $29, $30, $31, $32)
         RETURNING id, name, description, original_price, current_price, rating, user_id, category, tags, quantity,
                   model_weight_g, model_height_mm, model_width_mm, model_length_mm,
-                  model_weight_unit, model_dimension_unit, days_to_prepare
+                  model_weight_unit, model_dimension_unit, days_to_prepare,
+                  item_type, made_by, item_kind, material_type, ai_used,
+                  primary_color, secondary_color, variations, shipping_profile_id,
+                  packed_weight_g, packed_height_mm, packed_width_mm, packed_length_mm,
+                  packed_weight_unit, packed_dimension_unit, video_path
       `;
       const normalizedCategory = trimmedCategory || null;
       const tagsJson = JSON.stringify(parsedTags);
+      const variationsJson = JSON.stringify(listingExtras.variations || []);
+      const videoFileNames = uploadedVideos.map((file) => file.filename);
       const productValues = [
         trimmedModelName,
         trimmedDescription,
@@ -223,13 +445,29 @@ module.exports = function createRoutes(deps) {
         normalizedCategory,
         tagsJson,
         parsedQuantity,
-        dimensions.modelWeightG,
-        dimensions.modelHeightMm,
-        dimensions.modelWidthMm,
-        dimensions.modelLengthMm,
-        dimensions.modelWeightUnit,
-        dimensions.modelDimensionUnit,
-        dimensions.daysToPrepare,
+        dimensions?.modelWeightG ?? null,
+        dimensions?.modelHeightMm ?? null,
+        dimensions?.modelWidthMm ?? null,
+        dimensions?.modelLengthMm ?? null,
+        dimensions?.modelWeightUnit ?? 'lb',
+        dimensions?.modelDimensionUnit ?? 'in',
+        daysToPrepare,
+        listingMetadata.itemType,
+        listingMetadata.madeBy,
+        listingMetadata.itemKind,
+        listingMetadata.itemType === 'physical' ? listingMetadata.materialType : null,
+        listingMetadata.aiUsed,
+        listingExtras.primaryColor || null,
+        listingExtras.secondaryColor || null,
+        variationsJson,
+        shippingProfile?.id || null,
+        packedDimensions?.modelWeightG || null,
+        packedDimensions?.modelHeightMm || null,
+        packedDimensions?.modelWidthMm || null,
+        packedDimensions?.modelLengthMm || null,
+        req.body?.packedWeightUnit || req.body?.packed_weight_unit || 'lb',
+        req.body?.packedDimensionUnit || req.body?.packed_dimension_unit || 'in',
+        videoFileNames.length > 0 ? videoFileNames : null,
       ];
       const productResult = await pool.query(insertProductQuery, productValues);
       const product = productResult.rows[0];
@@ -244,7 +482,8 @@ module.exports = function createRoutes(deps) {
         try {
           await optimizeUploadedProductPhoto(file.path, renamedFilePath);
         } catch (optimizeError) {
-          await cleanupUploadedFiles(photos);
+          await cleanupUploadedFiles([...photos, ...uploadedVideos]);
+          await pool.query('DELETE FROM products WHERE id = $1 AND user_id = $2', [productId, userId]);
           console.error('Photo optimization error:', optimizeError?.message);
           return res.status(400).json({
             message: 'Could not process one of your photos. Try a different image.',
@@ -295,7 +534,7 @@ module.exports = function createRoutes(deps) {
       });
 
     } catch (error) {
-      await cleanupUploadedFiles(photos);
+      await cleanupUploadedFiles([...(req.files?.photos || req.files || []), ...(req.files?.videos || [])]);
       console.error('Create listing error:', {
         message: error?.message,
         code: error?.code,

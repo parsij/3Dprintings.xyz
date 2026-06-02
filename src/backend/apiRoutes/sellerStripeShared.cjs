@@ -119,6 +119,17 @@ async function assertSellerCanReceivePayments(pool, stripe, sellerUserId) {
   return accountId;
 }
 
+async function getSellerShopName(pool, sellerUserId) {
+  const result = await pool.query(
+    `SELECT shop_name
+     FROM seller_profiles
+     WHERE seller_user_id = $1
+     LIMIT 1`,
+    [sellerUserId]
+  );
+  return String(result.rows[0]?.shop_name || "").trim();
+}
+
 async function ensureStripeConnectAccount(stripe, pool, sellerUserId) {
   const profileResult = await pool.query(
     `SELECT stripe_connect_account_id
@@ -139,7 +150,8 @@ async function ensureStripeConnectAccount(stripe, pool, sellerUserId) {
     return existingId;
   }
 
-  const shopUrl = buildSellerShopUrl(sellerUserId);
+  const shopName = await getSellerShopName(pool, sellerUserId);
+  const shopUrl = buildSellerShopUrl(shopName);
   const account = await stripe.accounts.create({
     type: "express",
     country: "US",
@@ -166,8 +178,9 @@ async function ensureStripeConnectAccount(stripe, pool, sellerUserId) {
   return account.id;
 }
 
-async function syncStripeConnectAccountSettings(stripe, accountId, sellerUserId) {
-  const shopUrl = buildSellerShopUrl(sellerUserId);
+async function syncStripeConnectAccountSettings(stripe, accountId, sellerUserId, pool) {
+  const shopName = await getSellerShopName(pool, sellerUserId);
+  const shopUrl = buildSellerShopUrl(shopName);
   await stripe.accounts.update(accountId, {
     business_profile: { url: shopUrl },
     capabilities: {
@@ -360,7 +373,7 @@ async function createStripeConnectRemediationLink(stripe, accountId, returnUrl, 
 
 async function createStripeConnectOnboardingLink(stripe, pool, sellerUserId, returnUrl, refreshUrl) {
   const accountId = await ensureStripeConnectAccount(stripe, pool, sellerUserId);
-  await syncStripeConnectAccountSettings(stripe, accountId, sellerUserId);
+  await syncStripeConnectAccountSettings(stripe, accountId, sellerUserId, pool);
 
   const account = await stripe.accounts.retrieve(accountId);
   const readiness = evaluateStripeConnectReadiness(account);

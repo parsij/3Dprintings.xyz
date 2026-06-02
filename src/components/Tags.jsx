@@ -8,7 +8,7 @@ const axiosWithCredentials = applyCsrfInterceptor(axios.create({
   withCredentials: true,
 }));
 
-const Tags = ({ tags, setTags }) => {
+const Tags = ({ tags, setTags, maxTags = null }) => {
   const [text, setText] = useState("");
   const itemRefs = useRef([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -83,6 +83,11 @@ const Tags = ({ tags, setTags }) => {
   function addTag(tagName) {
     const cleanTag = tagName.trim();
     if (!cleanTag) return;
+
+    if (maxTags != null && tags.length >= maxTags) {
+      setErrorMsg(`You can add up to ${maxTags} tags.`);
+      return;
+    }
 
     if (isProfane(cleanTag)) {
       setErrorMsg("Please avoid using explicit language in tags.");
@@ -160,6 +165,7 @@ const Tags = ({ tags, setTags }) => {
       )}
       <p className="mt-1 text-sm text-gray-500">
         Having accurate tags will help your model.
+        {maxTags != null ? ` Maximum ${maxTags} tags.` : ""}
       </p>
 
       {suggestions.length > 0 && (

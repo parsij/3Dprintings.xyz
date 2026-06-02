@@ -187,7 +187,7 @@ function mergePhotos(existingPhotos, incomingPhotos) {
   return unique.slice(0, MAX_PHOTOS);
 }
 
-export default function SubmitModel({ onSubmissionSuccess }) {
+export default function SubmitModel({ onSubmissionSuccess, listingDetails = null, onBackToDetails }) {
   const [form, setForm] = useState(defaultForm);
   const [photos, setPhotos] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
@@ -235,7 +235,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     }
 
     // NEW VALIDATION: Ensure user picked a valid subcategory option
-    if (!form.category) {
+    if (!listingDetails && !form.category) {
       nextErrors.category = "Please select a specific category.";
     }
 
@@ -252,7 +252,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
     Object.assign(nextErrors, validateProductSpecs(form));
 
     return nextErrors;
-  }, [form, photos]);
+  }, [form, photos, listingDetails]);
 
   const isFormValid = Object.keys(errors).length === 0;
 
@@ -382,7 +382,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         modelName: form.modelName,
         description: form.description,
         price: Number(form.price),
-        category: form.category,
+        category: listingDetails?.category || form.category,
         tags: form.tags,
         quantity: Number(form.quantity),
         modelWeight: form.modelWeight,
@@ -392,6 +392,11 @@ export default function SubmitModel({ onSubmissionSuccess }) {
         modelLength: form.modelLength,
         modelDimensionUnit: form.modelDimensionUnit,
         daysToPrepare: Number(form.daysToPrepare),
+        itemType: listingDetails?.itemType,
+        madeBy: listingDetails?.madeBy,
+        itemKind: listingDetails?.itemKind,
+        materialType: listingDetails?.materialType,
+        aiUsed: listingDetails?.aiUsed,
         photos,
       });
 
@@ -427,6 +432,26 @@ export default function SubmitModel({ onSubmissionSuccess }) {
 
   return (
       <div className="mx-auto w-full max-w-4xl">
+        {listingDetails ? (
+          <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900">Item details saved</p>
+              <p className="truncate text-xs text-gray-600">
+                {listingDetails.category}
+                {listingDetails.itemType === "physical" ? ` · ${listingDetails.materialType}` : " · Digital file"}
+              </p>
+            </div>
+            {onBackToDetails ? (
+              <button
+                type="button"
+                onClick={onBackToDetails}
+                className="shrink-0 text-sm font-semibold text-orange-700 hover:text-orange-800"
+              >
+                Edit details
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
           {submitted && displayErrors.general ? (
             <p
@@ -550,7 +575,8 @@ export default function SubmitModel({ onSubmissionSuccess }) {
               )}
             </div>
 
-            {/* FIXED: Dropdown Select implementation with strict optgroup nesting */}
+            {/* Category is collected on the previous step when listingDetails is provided */}
+            {!listingDetails ? (
             <div className="group transition-all duration-300 hover:translate-x-1">
               <FieldLabel htmlFor="category">Category</FieldLabel>
               <CustomSelect
@@ -572,6 +598,7 @@ export default function SubmitModel({ onSubmissionSuccess }) {
                 <p className="mt-2 text-xs text-red-600 font-semibold">Setting your product category as "Other" makes your products have less sales compared to others.</p>
               )}
             </div>
+            ) : null}
 
             <div className="sm:col-span-2 group transition-all duration-300 hover:translate-x-1">
               <FieldLabel htmlFor="description">Model description</FieldLabel>

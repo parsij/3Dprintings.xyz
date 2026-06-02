@@ -218,13 +218,14 @@ module.exports = function productRoutes(deps) {
     }
   });
 
-  app.get('/api/shops/:sellerId', async (req, res) => {
+  app.get('/api/shops/:shopIdentifier', async (req, res) => {
     try {
-      const sellerId = parseInt(req.params.sellerId, 10);
-      if (!Number.isInteger(sellerId) || sellerId <= 0) {
-        return res.status(400).json({ message: 'Invalid shop ID' });
+      const shopIdentifier = decodeURIComponent(String(req.params.shopIdentifier || "").trim());
+      if (!shopIdentifier) {
+        return res.status(400).json({ message: 'Invalid shop name' });
       }
 
+      const numericId = /^\d+$/.test(shopIdentifier) ? parseInt(shopIdentifier, 10) : null;
       const shopResult = await pool.query(
         `SELECT u.id,
                 u.username,
@@ -238,14 +239,18 @@ module.exports = function productRoutes(deps) {
                 sp.external_portfolio_link
          FROM users u
          LEFT JOIN seller_profiles sp ON sp.seller_user_id = u.id
-         WHERE u.id = $1
+         WHERE lower(sp.shop_name) = lower($1)
+            OR ($2::int IS NOT NULL AND u.id = $2)
+         ORDER BY (lower(sp.shop_name) = lower($1)) DESC
          LIMIT 1`,
-        [sellerId]
+        [shopIdentifier, Number.isInteger(numericId) && numericId > 0 ? numericId : null]
       );
 
       if (shopResult.rows.length === 0) {
         return res.status(404).json({ message: 'Shop not found' });
       }
+
+      const sellerId = Number(shopResult.rows[0].id);
 
       const shopRow = await attachSellerChatId({
         ...shopResult.rows[0],

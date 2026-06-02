@@ -20,6 +20,7 @@ const DESIGN_SOFTWARE_ALIASES = {
 const DEFAULT_IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
 const DEFAULT_SITE_ORIGIN = process.env.SITE_ORIGIN || "https://3dprintings.xyz";
 const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared.cjs");
+const { validateShopName } = require("./shopNameShared.cjs");
 
 function resolveShopLogoUrl(rawUrl, options = {}) {
   const imageBaseUrl = options.imageBaseUrl || DEFAULT_IMAGE_BASE_URL;
@@ -46,7 +47,7 @@ async function ensureSellerProfilesTable(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS seller_profiles (
       seller_user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      shop_name VARCHAR(30) NOT NULL,
+      shop_name VARCHAR(20) NOT NULL,
       shop_bio VARCHAR(500),
       shop_logo_url TEXT,
       primary_printer_specialization VARCHAR(10) NOT NULL,
@@ -57,8 +58,8 @@ async function ensureSellerProfilesTable(pool) {
       sellersaddres JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      CONSTRAINT seller_profiles_shop_name_length_check CHECK (char_length(shop_name) BETWEEN 3 AND 30),
-      CONSTRAINT seller_profiles_shop_name_format_check CHECK (shop_name ~ '^[A-Za-z0-9_ ]+$'),
+      CONSTRAINT seller_profiles_shop_name_length_check CHECK (char_length(shop_name) BETWEEN 3 AND 20),
+      CONSTRAINT seller_profiles_shop_name_format_check CHECK (shop_name ~ '^[A-Za-z0-9]+$'),
       CONSTRAINT seller_profiles_printer_check CHECK (primary_printer_specialization IN ('fdm', 'sla', 'both')),
       CONSTRAINT seller_profiles_design_software_check CHECK (design_software <@ ARRAY['Blender', 'Fusion360', 'ZBrush', 'SolidWorks', 'Onshape', 'Other']::TEXT[]),
       CONSTRAINT seller_profiles_shop_logo_type_check CHECK (
@@ -86,6 +87,51 @@ async function ensureSellerProfilesTable(pool) {
     ALTER TABLE seller_profiles
     ADD COLUMN IF NOT EXISTS stripe_connect_account_id TEXT
   `);
+
+  await pool.query(`
+    ALTER TABLE seller_profiles
+    ALTER COLUMN shop_name TYPE VARCHAR(20)
+  `).catch(() => {});
+
+  await pool.query(`
+    ALTER TABLE seller_profiles
+    DROP CONSTRAINT IF EXISTS seller_profiles_shop_name_length_check
+  `).catch(() => {});
+
+  await pool.query(`
+    ALTER TABLE seller_profiles
+    DROP CONSTRAINT IF EXISTS seller_profiles_shop_name_format_check
+  `).catch(() => {});
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'seller_profiles_shop_name_length_check'
+      ) THEN
+        ALTER TABLE seller_profiles
+        ADD CONSTRAINT seller_profiles_shop_name_length_check
+        CHECK (char_length(shop_name) BETWEEN 3 AND 20);
+      END IF;
+    END $$;
+  `).catch(() => {});
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'seller_profiles_shop_name_format_check'
+      ) THEN
+        ALTER TABLE seller_profiles
+        ADD CONSTRAINT seller_profiles_shop_name_format_check
+        CHECK (shop_name ~ '^[A-Za-z0-9]+$');
+      END IF;
+    END $$;
+  `).catch(() => {});
 }
 
 function normalizeSellerProfile(input = {}) {
@@ -155,11 +201,9 @@ function isAllowedPortfolioUrl(rawUrl) {
 }
 
 function validateSellerProfile(profile) {
-  if (profile.shopName.length < 3 || profile.shopName.length > 30) {
-    return "Shop name must be between 3 and 30 characters.";
-  }
-  if (!/^[A-Za-z0-9_ ]+$/.test(profile.shopName)) {
-    return "Shop name can only contain letters, numbers, spaces, and underscores.";
+  const shopNameError = validateShopName(profile.shopName);
+  if (shopNameError) {
+    return shopNameError;
   }
   if (profile.shopBio.length > 500) {
     return "Shop bio must be 500 characters or less.";

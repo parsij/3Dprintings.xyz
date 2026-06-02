@@ -20,6 +20,7 @@ const {
   getStripeConnectReadiness,
   syncStripeConnectAccountSettings,
 } = require("./sellerStripeShared.cjs");
+const { validateShopName, isShopNameAvailable } = require("./shopNameShared.cjs");
 const { listSellerBoxes } = require("./sellerBoxesShared.cjs");
 const { getSellerFrontendUrl, getFrontendUrl } = require("../envShared.cjs");
 
@@ -115,7 +116,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
         completionStep,
         shopName: state.shopName || "",
         sellerPortalUrl: resolveSellerPortalUrl(completionStep),
-        shopUrl: buildSellerShopUrl(req.user.id),
+        shopUrl: buildSellerShopUrl(state.shopName),
       });
     } catch (error) {
       console.error("Failed to load seller marketplace status:", error);
@@ -141,7 +142,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
         completionStep: state.completionStep,
         isComplete: state.isComplete,
         shopName: state.shopName,
-        shopUrl: buildSellerShopUrl(req.user.id),
+        shopUrl: buildSellerShopUrl(state.shopName),
         stripeReady: stripeReadiness.paymentReady,
         stripeReadiness,
         stripeRequirementSummary,
@@ -150,6 +151,22 @@ module.exports = function sellerOnboardingRoutes(deps) {
     } catch (error) {
       console.error("Failed to load seller onboarding status:", error);
       return res.status(500).json({ message: "Failed to load onboarding status." });
+    }
+  });
+
+  app.get("/api/seller/onboarding/shop-name-available", attachAuthenticatedUser, async (req, res) => {
+    try {
+      const shopName = String(req.query?.name || req.query?.shopName || "").trim();
+      const shopNameError = validateShopName(shopName);
+      if (shopNameError) {
+        return res.status(400).json({ available: false, message: shopNameError });
+      }
+
+      const available = await isShopNameAvailable(pool, shopName, req.user.id);
+      return res.status(200).json({ available, shopName });
+    } catch (error) {
+      console.error("Failed to check shop name availability:", error);
+      return res.status(500).json({ message: "Failed to check shop name availability." });
     }
   });
 
@@ -165,14 +182,17 @@ module.exports = function sellerOnboardingRoutes(deps) {
       const shopName = String(body.shopName || "").trim();
       const termsAccepted = body.termsOfServiceAccepted === true;
 
-      if (shopName.length < 3 || shopName.length > 30) {
-        return res.status(400).json({ message: "Shop name must be between 3 and 30 characters." });
-      }
-      if (!/^[A-Za-z0-9_ ]+$/.test(shopName)) {
-        return res.status(400).json({ message: "Shop name can only contain letters, numbers, spaces, and underscores." });
+      const shopNameError = validateShopName(shopName);
+      if (shopNameError) {
+        return res.status(400).json({ message: shopNameError });
       }
       if (!termsAccepted) {
         return res.status(400).json({ message: "You must agree to the Seller Terms of Service." });
+      }
+
+      const available = await isShopNameAvailable(pool, shopName, req.user.id);
+      if (!available) {
+        return res.status(409).json({ message: "Shop name is already taken." });
       }
 
       if (req.user.role !== "seller") {
@@ -199,7 +219,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
           message: "Seller onboarding already completed.",
           user: req.user,
           completionStep: "completed",
-          shopUrl: buildSellerShopUrl(req.user.id),
+          shopUrl: buildSellerShopUrl(onboarding.shopName),
         });
       }
 
@@ -230,7 +250,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
         message: "Shop details saved.",
         user: req.user,
         completionStep: nextState.completionStep,
-        shopUrl: buildSellerShopUrl(req.user.id),
+        shopUrl: buildSellerShopUrl(nextState.shopName),
       });
     } catch (error) {
       if (error?.code === "23505") {
@@ -259,7 +279,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
 
       return res.status(200).json({
         url: link.url,
-        shopUrl: buildSellerShopUrl(req.user.id),
+        shopUrl: buildSellerShopUrl(state.shopName),
       });
     } catch (error) {
       return sendJsonError(res, error, "Failed to start Stripe Connect onboarding.", {
@@ -284,7 +304,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
         });
       }
 
-      await syncStripeConnectAccountSettings(stripe, accountId, req.user.id);
+      await syncStripeConnectAccountSettings(stripe, accountId, req.user.id, pool);
       const account = await assertStripeAccountOwnedBySeller(stripe, pool, req.user.id, accountId);
       const readiness = evaluateStripeConnectReadiness(account);
 

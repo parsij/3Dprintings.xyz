@@ -3,6 +3,7 @@ const { ensureSellerBoxesTable } = require("./sellerBoxesShared.cjs");
 const { ensureSellerPayoutSchedulesTable } = require("./sellerBalanceShared.cjs");
 const { ensureSellerTransfersColumn } = require("./sellerOrderTransfers.cjs");
 const { ensureProductsTable } = require("./productsTableShared.cjs");
+const { ensureSellerShippingProfilesTable } = require("./sellerShippingProfilesShared.cjs");
 
 async function ensureSellerMarketplaceSchema(pool) {
   await ensureProductsTable(pool);
@@ -10,6 +11,7 @@ async function ensureSellerMarketplaceSchema(pool) {
   await ensureSellerBoxesTable(pool);
   await ensureSellerPayoutSchedulesTable(pool);
   await ensureSellerTransfersColumn(pool);
+  await ensureSellerShippingProfilesTable(pool);
 
   await pool.query(`
     ALTER TABLE seller_profiles
@@ -54,6 +56,86 @@ async function ensureSellerMarketplaceSchema(pool) {
   await pool.query(`
     ALTER TABLE products
     ADD COLUMN IF NOT EXISTS days_to_prepare INTEGER NOT NULL DEFAULT 1
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS item_type VARCHAR(16)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS made_by VARCHAR(32)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS item_kind VARCHAR(32)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS material_type VARCHAR(64)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS ai_used BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS primary_color VARCHAR(64)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS secondary_color VARCHAR(64)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS variations JSONB NOT NULL DEFAULT '[]'::jsonb
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS shipping_profile_id INTEGER
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS packed_weight_g NUMERIC(10,2)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS packed_height_mm NUMERIC(10,2)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS packed_width_mm NUMERIC(10,2)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS packed_length_mm NUMERIC(10,2)
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS packed_weight_unit VARCHAR(2) NOT NULL DEFAULT 'lb'
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS packed_dimension_unit VARCHAR(2) NOT NULL DEFAULT 'in'
+  `);
+
+  await pool.query(`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS video_path TEXT[]
   `);
 
   await pool.query(`

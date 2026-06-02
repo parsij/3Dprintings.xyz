@@ -101,6 +101,16 @@ export async function updateSellerRecurringPayout(payload) {
   return response.data;
 }
 
+export async function getSellerShippingProfiles() {
+  const response = await apiClient.get("/api/seller/shipping-profiles");
+  return response.data;
+}
+
+export async function createSellerShippingProfile(payload) {
+  const response = await apiClient.post("/api/seller/shipping-profiles", payload);
+  return response.data;
+}
+
 export async function getSellerBoxes() {
   const response = await apiClient.get("/api/seller/boxes");
   return response.data;

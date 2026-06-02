@@ -1,0 +1,26 @@
+export const FILAMENT_TYPES = [
+  { value: "PLA", label: "PLA" },
+  { value: "PLA+", label: "PLA+" },
+  { value: "PETG", label: "PETG" },
+  { value: "ABS", label: "ABS" },
+  { value: "ASA", label: "ASA" },
+  { value: "TPU", label: "TPU" },
+  { value: "TPE", label: "TPE" },
+  { value: "Nylon (PA)", label: "Nylon (PA)" },
+  { value: "PC (Polycarbonate)", label: "PC (Polycarbonate)" },
+  { value: "HIPS", label: "HIPS" },
+  { value: "PVA", label: "PVA" },
+  { value: "PET", label: "PET" },
+  { value: "PP", label: "PP" },
+  { value: "POM", label: "POM" },
+  { value: "Carbon Fiber Filled", label: "Carbon Fiber Filled" },
+  { value: "Glass Fiber Filled", label: "Glass Fiber Filled" },
+  { value: "Wood-filled", label: "Wood-filled" },
+  { value: "Metal-filled", label: "Metal-filled" },
+  { value: "Standard Resin", label: "Standard Resin" },
+  { value: "Tough Resin", label: "Tough Resin" },
+  { value: "Flexible Resin", label: "Flexible Resin" },
+  { value: "Mix", label: "Mix" },
+];
+
+export const FILAMENT_TYPE_VALUES = new Set(FILAMENT_TYPES.map((entry) => entry.value));

@@ -42,6 +42,9 @@ const STRIPE_WEBHOOK_SECRET_PATTERN = /whsec_[a-zA-Z0-9]+/;
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_SIZE = 50 * 1024 * 1024;
+const MAX_VIDEOS = 1;
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+const ALLOWED_VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".mov"]);
 const MAX_REVIEW_CONTENT_LENGTH = 5000;
 const ALLOWED_UPLOAD_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -312,6 +315,53 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+const listingMediaUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const originalExt = path.extname(file.originalname || "").toLowerCase();
+      const safeName = sanitizeFileName(path.basename(file.originalname || "media", originalExt)) || "media";
+      const ext = originalExt || (file.fieldname === "videos" ? ".mp4" : ".jpg");
+      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}${ext}`;
+      cb(null, uniqueName);
+    },
+  }),
+  limits: {
+    files: MAX_PHOTOS + MAX_VIDEOS,
+    fileSize: MAX_VIDEO_SIZE,
+  },
+  fileFilter: (req, file, cb) => {
+    const extension = path.extname(file.originalname || "").toLowerCase();
+
+    if (file.fieldname === "photos") {
+      if (!file.mimetype.startsWith("image/")) {
+        return cb(new Error("Only image files are allowed."));
+      }
+      if (extension && !ALLOWED_UPLOAD_EXTENSIONS.has(extension)) {
+        return cb(new Error("Only JPG, PNG, WEBP, and GIF images are allowed."));
+      }
+      return cb(null, true);
+    }
+
+    if (file.fieldname === "videos") {
+      if (!file.mimetype.startsWith("video/")) {
+        return cb(new Error("Only video files are allowed."));
+      }
+      if (extension && !ALLOWED_VIDEO_EXTENSIONS.has(extension)) {
+        return cb(new Error("Only MP4, WEBM, and MOV videos are allowed."));
+      }
+      return cb(null, true);
+    }
+
+    return cb(new Error("Invalid upload field."));
+  },
+}).fields([
+  { name: "photos", maxCount: MAX_PHOTOS },
+  { name: "videos", maxCount: MAX_VIDEOS },
+]);
 
 const defaultAllowedOrigins = [
   "https://3dprintings.xyz",
@@ -783,6 +833,7 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   app,
   pool,
   upload,
+  listingMediaUpload,
   cleanupUploadedFiles,
   JWT_SECRET,
   createAuthToken,
@@ -801,6 +852,7 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   accountPasswordRateLimiter,
   MAX_PHOTOS,
   MAX_PHOTO_SIZE,
+  MAX_VIDEOS,
 });
 
 
@@ -821,10 +873,10 @@ const { resolveClientError } = require("./apiErrorShared.cjs");
 function getClientErrorResponse(error) {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
-      return { statusCode: 400, message: "One of your photos could not be processed. Try another image." };
+      return { statusCode: 400, message: "One of your uploaded files is too large. Photos must be 50 MB or smaller and videos must be 100 MB or smaller." };
     }
     if (error.code === "LIMIT_FILE_COUNT") {
-      return { statusCode: 400, message: `You can upload up to ${MAX_PHOTOS} photos.` };
+      return { statusCode: 400, message: `You can upload up to ${MAX_PHOTOS} photos and ${MAX_VIDEOS} video.` };
     }
     return { statusCode: 400, message: "Invalid upload." };
   }
@@ -835,6 +887,18 @@ function getClientErrorResponse(error) {
 
   if (error?.message === "Only JPG, PNG, WEBP, and GIF images are allowed.") {
     return { statusCode: 400, message: "Only JPG, PNG, WEBP, and GIF images are allowed." };
+  }
+
+  if (error?.message === "Only video files are allowed.") {
+    return { statusCode: 400, message: "Only video files are allowed." };
+  }
+
+  if (error?.message === "Only MP4, WEBM, and MOV videos are allowed.") {
+    return { statusCode: 400, message: "Only MP4, WEBM, and MOV videos are allowed." };
+  }
+
+  if (error?.message === "Invalid upload field.") {
+    return { statusCode: 400, message: "Invalid upload field." };
   }
 
   if (typeof error?.message === "string" && error.message.startsWith("CORS blocked for origin:")) {

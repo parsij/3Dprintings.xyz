@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import image_test from "../assets/Screenshot_20260322_175244.png";
 import { addToCart } from "../services/cartService.js";
+import { shopPath } from "../utils/shopName.js";
 
 const ProductCard = ({
   productId,
@@ -12,7 +13,6 @@ const ProductCard = ({
   currentPrice,
   originalPrice,
   imageUrl,
-  sellerId,
   shopName,
   shopLogoUrl,
   quantity,
@@ -62,8 +62,9 @@ const ProductCard = ({
 
   const handleShopClick = (event) => {
     event.stopPropagation();
-    if (sellerId) {
-      navigate(`/shop/${sellerId}`);
+    const path = shopPath(shopName);
+    if (path) {
+      navigate(path);
     }
   };
 
@@ -103,7 +104,7 @@ const ProductCard = ({
           <button
             type="button"
             onClick={handleShopClick}
-            disabled={!sellerId}
+            disabled={!shopName}
             className="no-button-motion flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:text-orange-600 disabled:cursor-default disabled:hover:text-gray-500"
           >
             <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-gray-100">

@@ -17,7 +17,13 @@ import { getUserFacingError } from "../utils/userFacingError.js";
 import {
   getSellerMarketplaceStatus,
   saveSellerShopOnboarding,
+  checkShopNameAvailability,
 } from "../seller/services/sellerOnboardingService.js";
+import {
+  SHOP_NAME_MAX_LENGTH,
+  validateShopName,
+  shopPath,
+} from "../utils/shopName.js";
 
 const ONBOARDING_STEPS = [
   {
@@ -63,6 +69,8 @@ export default function BecomeSeller({ user, setUser }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [shopName, setShopName] = useState("");
+  const [shopNameError, setShopNameError] = useState("");
+  const [checkingShopName, setCheckingShopName] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [sellerStatus, setSellerStatus] = useState(null);
 
@@ -96,6 +104,42 @@ export default function BecomeSeller({ user, setUser }) {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    const trimmed = shopName.trim();
+    const validationError = validateShopName(trimmed);
+    if (!trimmed || validationError) {
+      setShopNameError(validationError);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setCheckingShopName(true);
+      try {
+        const result = await checkShopNameAvailability(trimmed);
+        if (cancelled) return;
+        if (!result?.available) {
+          setShopNameError("Shop name is already taken.");
+        } else {
+          setShopNameError("");
+        }
+      } catch {
+        if (!cancelled) {
+          setShopNameError("");
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingShopName(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [shopName]);
+
   const isSeller = sellerStatus?.isSeller === true;
   const onboardingComplete = sellerStatus?.onboardingComplete === true;
   const sellerPortalUrl = useMemo(
@@ -103,8 +147,18 @@ export default function BecomeSeller({ user, setUser }) {
     [sellerStatus?.sellerPortalUrl]
   );
 
+  const shopNameIsValid = !validateShopName(shopName) && !shopNameError && !checkingShopName;
+
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const validationError = validateShopName(shopName);
+    if (validationError) {
+      setShopNameError(validationError);
+      return;
+    }
+    if (shopNameError) {
+      return;
+    }
     setSubmitting(true);
     setError("");
 
@@ -210,7 +264,7 @@ export default function BecomeSeller({ user, setUser }) {
                     <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Shop URL</p>
                       <p className="mt-1 truncate text-sm font-medium text-gray-800">
-                        {sellerStatus?.shopUrl || "Available after setup"}
+                        {sellerStatus?.shopUrl || (sellerStatus?.shopName ? shopPath(sellerStatus.shopName) : "Available after setup")}
                       </p>
                     </div>
                   </div>
@@ -287,16 +341,27 @@ export default function BecomeSeller({ user, setUser }) {
                       <input
                         id="shopName"
                         value={shopName}
-                        onChange={(event) => setShopName(event.target.value)}
-                        maxLength={30}
-                        placeholder="My 3D Shop"
+                        onChange={(event) => {
+                          const nextValue = event.target.value.replace(/[^A-Za-z0-9]/g, "");
+                          setShopName(nextValue.slice(0, SHOP_NAME_MAX_LENGTH));
+                          setShopNameError("");
+                        }}
+                        maxLength={SHOP_NAME_MAX_LENGTH}
+                        placeholder="My3DShop"
                         autoComplete="organization"
                         className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                         required
                       />
                       <p className="mt-2 text-xs text-gray-500">
-                        3–30 characters. Letters, numbers, spaces, and underscores only.
+                        3–20 characters. Letters and numbers only. Your shop URL will be /shop/{shopName.trim() || "YourShopName"}.
                       </p>
+                      {shopNameError ? (
+                        <p className="mt-2 text-xs text-red-600">{shopNameError}</p>
+                      ) : checkingShopName ? (
+                        <p className="mt-2 text-xs text-gray-500">Checking availability...</p>
+                      ) : shopNameIsValid ? (
+                        <p className="mt-2 text-xs text-green-700">Shop name is available.</p>
+                      ) : null}
                     </div>
 
                     <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-700">
@@ -314,7 +379,7 @@ export default function BecomeSeller({ user, setUser }) {
 
                     <button
                       type="submit"
-                      disabled={submitting || !termsAccepted || shopName.trim().length < 3}
+                      disabled={submitting || !termsAccepted || !shopNameIsValid}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 px-6 py-4 text-base font-semibold text-white shadow-lg transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {submitting ? "Creating your shop..." : "Continue to Stripe Connect"}

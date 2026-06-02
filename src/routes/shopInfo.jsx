@@ -14,7 +14,8 @@ const printerLabels = {
 };
 
 export default function ShopInfo({ user }) {
-  const { sellerId } = useParams();
+  const { shopName: shopNameParam } = useParams();
+  const shopIdentifier = decodeURIComponent(String(shopNameParam || "").trim());
   const [shop, setShop] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +28,7 @@ export default function ShopInfo({ user }) {
       setLoading(true);
       setError("");
       try {
-        const response = await axios.get(`${API_BASE}/api/shops/${sellerId}`);
+        const response = await axios.get(`${API_BASE}/api/shops/${encodeURIComponent(shopIdentifier)}`);
         if (cancelled) return;
         setShop(response.data?.shop || null);
         setProducts(response.data?.products || []);
@@ -43,7 +44,7 @@ export default function ShopInfo({ user }) {
     return () => {
       cancelled = true;
     };
-  }, [sellerId]);
+  }, [shopIdentifier]);
 
   const shopName = shop?.shopName || "Shop";
   const printerType = printerLabels[shop?.primaryPrinterSpecialization] || "";
@@ -98,7 +99,7 @@ export default function ShopInfo({ user }) {
                   <div className="mt-5 flex flex-wrap gap-3">
                     <MessageShopButton
                       user={user}
-                      sellerDbId={shop?.sellerId || sellerId}
+                      sellerDbId={shop?.sellerId}
                       shopName={shopName}
                       contextType="shop"
                       label="Message shop"

@@ -10,7 +10,10 @@ import {
   getSellerProducts,
   updateSellerProduct,
 } from "../services/sellerPortalService.js";
-import SubmitModel, { CATEGORY_DATA } from "./SubmitModel.jsx";
+import ListingItemDetails from "./ListingItemDetails.jsx";
+import ListingMoreDetails from "./ListingMoreDetails.jsx";
+import { CATEGORY_DATA } from "./SubmitModel.jsx";
+import { DEFAULT_LISTING_DETAILS } from "../services/listingDetailsValidation.js";
 import SideMenu from "../../components/SideMenu.jsx";
 import SellerNavBar from "../components/SellerNavBar.jsx";
 import {
@@ -52,6 +55,8 @@ export default function SellerInventory() {
   const [editSubmitted, setEditSubmitted] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [listingStep, setListingStep] = useState("details");
+  const [listingDetails, setListingDetails] = useState(DEFAULT_LISTING_DETAILS);
   const [editingProduct, setEditingProduct] = useState(null);
 
   const reloadProducts = async () => {
@@ -105,7 +110,7 @@ export default function SellerInventory() {
   }, []);
 
   const formattedProductsCount = useMemo(() => sellerProducts.length, [sellerProducts.length]);
-  const canAddProducts = !boxesLoading && Number(boxCount || 0) > 0;
+  const canAddProducts = !boxesLoading;
 
   const editingForm = editingProduct ? editForms[editingProduct.id] : null;
 
@@ -237,7 +242,11 @@ export default function SellerInventory() {
           <button
             type="button"
             onClick={() => {
-              if (canAddProducts) setIsModalOpen(true);
+              if (canAddProducts) {
+                setListingStep("details");
+                setListingDetails(DEFAULT_LISTING_DETAILS);
+                setIsModalOpen(true);
+              }
             }}
             disabled={!canAddProducts}
             className={`font-bold px-5 py-2.5 rounded-xl transition-all duration-300 ease-in-out transform-gpu shadow-md whitespace-nowrap ${
@@ -252,7 +261,7 @@ export default function SellerInventory() {
 
         {!boxesLoading && Number(boxCount || 0) === 0 ? (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Add at least one shipping box before creating product listings.{" "}
+            Physical listings need at least one shipping box before they can be published. Digital listings can still be created.{" "}
             <Link to="/boxes?new=1" className="font-semibold text-orange-700 hover:underline">
               Add a box
             </Link>
@@ -382,10 +391,39 @@ export default function SellerInventory() {
 
       {isModalOpen && canAddProducts ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="relative bg-white text-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-100 max-h-[90vh] overflow-y-auto pt-14">
+          <div className="relative bg-[#fff8f2] text-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl p-6 border border-orange-100 max-h-[92vh] overflow-y-auto pt-14">
+            <div className="mb-5 flex items-center gap-3 px-1">
+              {[
+                { key: "details", label: "About your item" },
+                { key: "listing", label: "Add more details" },
+              ].map((step, index) => {
+                const active = listingStep === step.key;
+                const complete = listingStep === "listing" && step.key === "details";
+                return (
+                  <div key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        active || complete
+                          ? "bg-orange-500 text-white"
+                          : "bg-white text-gray-500 ring-1 ring-gray-200"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+                    <span className={`truncate text-sm font-semibold ${active ? "text-gray-900" : "text-gray-500"}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false);
+                setListingStep("details");
+                setListingDetails(DEFAULT_LISTING_DETAILS);
+              }}
               className="absolute top-4 left-4 text-gray-400 hover:text-orange-500 transition-colors cursor-pointer p-1.5 rounded-xl hover:bg-gray-100 flex items-center justify-center"
               aria-label="Close form popup"
             >
@@ -394,12 +432,28 @@ export default function SellerInventory() {
               </svg>
             </button>
 
-            <SubmitModel
-              onSubmissionSuccess={() => {
-                reloadProducts();
-                setIsModalOpen(false);
-              }}
-            />
+            {listingStep === "details" ? (
+              <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+                <ListingItemDetails
+                  initialDetails={listingDetails}
+                  onContinue={(nextDetails) => {
+                    setListingDetails(nextDetails);
+                    setListingStep("listing");
+                  }}
+                />
+              </div>
+            ) : (
+              <ListingMoreDetails
+                listingDetails={listingDetails}
+                onBackToDetails={() => setListingStep("details")}
+                onSubmissionSuccess={() => {
+                  reloadProducts();
+                  setIsModalOpen(false);
+                  setListingStep("details");
+                  setListingDetails(DEFAULT_LISTING_DETAILS);
+                }}
+              />
+            )}
           </div>
         </div>
       ) : null}
