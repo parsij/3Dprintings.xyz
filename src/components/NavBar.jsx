@@ -99,7 +99,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                   />
                   <button
                       type="submit"
-                      className="absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center"
+                      className="theme-light-control absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center"
                   >
                     <img src={Search} alt="Search" className="h-4 w-4 md:h-5 md:w-5" />
                   </button>

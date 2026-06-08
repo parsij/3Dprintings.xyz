@@ -178,7 +178,7 @@ export default function ListingItemDetails({ initialDetails = DEFAULT_LISTING_DE
           onChange={(event) => updateField("aiUsed", event.target.checked)}
           className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
         />
-        <span>Have you used AI or any form of LLM to make this product?</span>
+        <span>This model was made with help of Ai or any form of LLM.</span>
       </label>
 
       <button

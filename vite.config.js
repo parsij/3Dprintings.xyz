@@ -7,6 +7,9 @@ const backendPort = process.env.VITE_BACKEND_PORT || "3000";
 const backendTarget = `http://localhost:${backendPort}`;
 
 export default defineConfig({
+  optimizeDeps: {
+    include: ['react-spinners'],
+  },
   server: {
     host: true,
     port: 5173,

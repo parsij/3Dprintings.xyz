@@ -1,7 +1,8 @@
 @import "tailwindcss";
+@import "konsta/react/theme.css";
 
 @layer base {
-  button, .btn {
+   button, .btn {
     @apply cursor-pointer;
   }
   input:not([type="checkbox"]):not([type="radio"]), textarea {

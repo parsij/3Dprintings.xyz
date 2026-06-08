@@ -1,8 +1,175 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
+:root {
+  --page-bg: #fff7ed;
+  --page-bg-muted: #f2f2f2;
+  --surface: #ffffff;
+  --surface-elevated: #fff8f2;
+  --surface-muted: #f9fafb;
+  --surface-soft: #f6f1ea;
+  --surface-accent: #fff7ed;
+  --surface-accent-strong: #ffedd5;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-subtle: #9ca3af;
+  --border-muted: #e5e7eb;
+  --border-soft: #f3f4f6;
+  --border-accent: #fed7aa;
+  --border-accent-soft: #ffedd5;
+}
+
+html[data-theme="dark"] {
+  --page-bg: #09090b;
+  --page-bg-muted: #09090b;
+  --surface: #18181b;
+  --surface-elevated: #18181b;
+  --surface-muted: #27272a;
+  --surface-soft: #1f1f23;
+  --surface-accent: #1f1f23;
+  --surface-accent-strong: #27272a;
+  --text-primary: #f9fafb;
+  --text-secondary: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --text-subtle: #71717a;
+  --border-muted: #3f3f46;
+  --border-soft: #27272a;
+  --border-accent: #3f3f46;
+  --border-accent-soft: #27272a;
+}
+
+html {
+  background-color: var(--page-bg);
+}
+
 body {
-  background-color: #fff7ed;
-  color: #1f2937;
+  background-color: var(--page-bg);
+  color: var(--text-secondary);
   font-family: "Inter", sans-serif;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+html[data-theme="dark"] .bg-\[\#f2f2f2\],
+html[data-theme="dark"] .bg-\[\#fffefc\] {
+  background-color: var(--page-bg-muted);
+}
+
+html[data-theme="dark"] .bg-\[\#F6F1EA\],
+html[data-theme="dark"] .bg-\[\#f6f1ea\] {
+  background-color: var(--surface-soft);
+}
+
+html[data-theme="dark"] .bg-\[\#fff8f2\] {
+  background-color: var(--surface-elevated);
+}
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] [class*="bg-white/"] {
+  background-color: var(--surface);
+}
+
+html[data-theme="dark"] .theme-light-control,
+html[data-theme="dark"] .theme-toggle-thumb {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+html[data-theme="dark"] .theme-light-control:hover {
+  background-color: #f97316;
+}
+
+html[data-theme="dark"] .bg-gray-50,
+html[data-theme="dark"] [class*="bg-gray-50/"],
+html[data-theme="dark"] .hover\:bg-gray-50:hover {
+  background-color: var(--surface-muted);
+}
+
+html[data-theme="dark"] .bg-gray-100,
+html[data-theme="dark"] .hover\:bg-gray-100:hover,
+html[data-theme="dark"] .bg-gray-200,
+html[data-theme="dark"] .hover\:bg-gray-200:hover {
+  background-color: #27272a;
+}
+
+html[data-theme="dark"] .bg-gray-300,
+html[data-theme="dark"] .disabled\:bg-gray-300:disabled {
+  background-color: #3f3f46;
+}
+
+html[data-theme="dark"] .bg-orange-50,
+html[data-theme="dark"] [class*="bg-orange-50/"],
+html[data-theme="dark"] .hover\:bg-orange-50:hover,
+html[data-theme="dark"] [class*="hover:bg-orange-50/"]:hover {
+  background-color: var(--surface-accent);
+}
+
+html[data-theme="dark"] .bg-orange-100,
+html[data-theme="dark"] [class*="bg-orange-100/"],
+html[data-theme="dark"] .hover\:bg-orange-100:hover,
+html[data-theme="dark"] [class*="hover:bg-orange-100/"]:hover {
+  background-color: var(--surface-accent-strong);
+}
+
+html[data-theme="dark"] .text-black,
+html[data-theme="dark"] .text-gray-950,
+html[data-theme="dark"] .text-gray-900,
+html[data-theme="dark"] .text-gray-800 {
+  color: var(--text-primary);
+}
+
+html[data-theme="dark"] .text-gray-700,
+html[data-theme="dark"] .text-gray-600,
+html[data-theme="dark"] .hover\:text-gray-700:hover {
+  color: var(--text-secondary);
+}
+
+html[data-theme="dark"] .text-gray-500,
+html[data-theme="dark"] .text-gray-400 {
+  color: var(--text-muted);
+}
+
+html[data-theme="dark"] .text-orange-900,
+html[data-theme="dark"] .text-orange-800,
+html[data-theme="dark"] .text-orange-700,
+html[data-theme="dark"] .hover\:text-orange-700:hover,
+html[data-theme="dark"] .hover\:text-orange-600:hover {
+  color: #fb923c;
+}
+
+html[data-theme="dark"] .border-black\/10,
+html[data-theme="dark"] .border-gray-100,
+html[data-theme="dark"] .border-gray-200,
+html[data-theme="dark"] [class*="border-gray-200/"],
+html[data-theme="dark"] .border-gray-300,
+html[data-theme="dark"] .hover\:border-gray-300:hover,
+html[data-theme="dark"] .ring-gray-200,
+html[data-theme="dark"] [class*="ring-gray-200/"] {
+  border-color: var(--border-muted);
+  --tw-ring-color: var(--border-muted);
+}
+
+html[data-theme="dark"] .border-orange-100,
+html[data-theme="dark"] .border-orange-200,
+html[data-theme="dark"] .hover\:border-orange-200:hover,
+html[data-theme="dark"] .hover\:border-orange-300:hover {
+  border-color: var(--border-accent);
+}
+
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background-color: var(--surface);
+  border-color: var(--border-muted);
+  color: var(--text-primary);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: var(--text-subtle);
+}
+
+html[data-theme="dark"] select option {
+  background-color: var(--surface);
+  color: var(--text-primary);
 }

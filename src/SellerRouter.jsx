@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import SignIn from "./routes/SignIn.jsx";
 import SignUp from "./routes/SignUp.jsx";
 import ForgotPassword from "./routes/ForgotPassword.jsx";
@@ -15,6 +15,30 @@ import SellerBoxes from "./seller/routes/SellerBoxes.jsx";
 import Messages from "./routes/Messages.jsx";
 import { BECOME_SELLER_URL } from "./config/api.js";
 import { getSellerOnboardingStatus } from "./seller/services/sellerOnboardingService.js";
+import { useTheme } from "./ThemeContext.jsx";
+
+const ROUTE_BACKGROUNDS = {
+  light: "#fff7ed",
+  dark: "#09090b",
+};
+
+function ThemeLayout() {
+  const { theme } = useTheme();
+
+  useEffect(() => {
+    const backgroundColor = ROUTE_BACKGROUNDS[theme];
+
+    document.documentElement.style.backgroundColor = backgroundColor;
+    document.body.style.backgroundColor = backgroundColor;
+
+    return () => {
+      document.documentElement.style.backgroundColor = "";
+      document.body.style.backgroundColor = "";
+    };
+  }, [theme]);
+
+  return <Outlet />;
+}
 
 function hasSellerRole(user) {
   return String(user?.role || "").trim().toLowerCase() === "seller";
@@ -115,120 +139,122 @@ const SellerRouter = ({ user, setUser }) => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route element={<ThemeLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        <Route path="/signin" element={<SignInRoute user={user} setUser={setUser} />} />
-        <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <SignUp setUser={setUser} />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword setUser={setUser} />} />
+          <Route path="/signin" element={<SignInRoute user={user} setUser={setUser} />} />
+          <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <SignUp setUser={setUser} />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword setUser={setUser} />} />
 
-        <Route
-          path="/onboarding/shop"
-          element={
-            <ProtectedSellerRoute user={user} allowIncomplete>
-              <Navigate to="/onboarding/stripe" replace />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/onboarding/stripe"
-          element={
-            <ProtectedSellerRoute user={user} allowIncomplete>
-              <SellerOnboarding step="stripe_connect" />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/onboarding/shipping"
-          element={
-            <ProtectedSellerRoute user={user} allowIncomplete>
-              <SellerOnboarding step="shipping_origin" />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/onboarding/box"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <Navigate to="/boxes?new=1" replace />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/onboarding/complete"
-          element={
-            <ProtectedSellerRoute user={user} allowIncomplete>
-              <SellerOnboarding step="complete" />
-            </ProtectedSellerRoute>
-          }
-        />
+          <Route
+            path="/onboarding/shop"
+            element={
+              <ProtectedSellerRoute user={user} allowIncomplete>
+                <Navigate to="/onboarding/stripe" replace />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/onboarding/stripe"
+            element={
+              <ProtectedSellerRoute user={user} allowIncomplete>
+                <SellerOnboarding step="stripe_connect" />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/onboarding/shipping"
+            element={
+              <ProtectedSellerRoute user={user} allowIncomplete>
+                <SellerOnboarding step="shipping_origin" />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/onboarding/box"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <Navigate to="/boxes?new=1" replace />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/onboarding/complete"
+            element={
+              <ProtectedSellerRoute user={user} allowIncomplete>
+                <SellerOnboarding step="complete" />
+              </ProtectedSellerRoute>
+            }
+          />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <SellerDashboard user={user} />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/inventory"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <SellerInventory user={user} />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/preferences"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <SellerPreferences user={user} />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/reviews"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <SellerReviews user={user} />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/orders"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <SellerOrders user={user} />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/balance"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <SellerBalance user={user} />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/boxes"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <SellerBoxes user={user} />
-            </ProtectedSellerRoute>
-          }
-        />
-        <Route
-          path="/messages"
-          element={
-            <ProtectedSellerRoute user={user}>
-              <Messages user={user} mode="seller" />
-            </ProtectedSellerRoute>
-          }
-        />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <SellerDashboard user={user} />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/inventory"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <SellerInventory user={user} />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/preferences"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <SellerPreferences user={user} />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/reviews"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <SellerReviews user={user} />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <SellerOrders user={user} />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/balance"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <SellerBalance user={user} />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/boxes"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <SellerBoxes user={user} />
+              </ProtectedSellerRoute>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <ProtectedSellerRoute user={user}>
+                <Messages user={user} mode="seller" />
+              </ProtectedSellerRoute>
+            }
+          />
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

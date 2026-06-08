@@ -20,7 +20,11 @@ const {
   getStripeConnectReadiness,
   syncStripeConnectAccountSettings,
 } = require("./sellerStripeShared.cjs");
-const { validateShopName, isShopNameAvailable } = require("./shopNameShared.cjs");
+const {
+  generateAvailableShopNameAlternatives,
+  validateShopName,
+  isShopNameAvailable,
+} = require("./shopNameShared.cjs");
 const { listSellerBoxes } = require("./sellerBoxesShared.cjs");
 const { getSellerFrontendUrl, getFrontendUrl } = require("../envShared.cjs");
 
@@ -163,7 +167,18 @@ module.exports = function sellerOnboardingRoutes(deps) {
       }
 
       const available = await isShopNameAvailable(pool, shopName, req.user.id);
-      return res.status(200).json({ available, shopName });
+      const rawCandidates = []
+        .concat(req.query?.candidate || [])
+        .concat(req.query?.candidates || [])
+        .concat(req.query?.["candidates[]"] || []);
+      const alternatives = available
+        ? []
+        : await generateAvailableShopNameAlternatives(pool, shopName, {
+          excludeSellerUserId: req.user.id,
+          candidates: rawCandidates,
+        });
+
+      return res.status(200).json({ available, shopName, alternatives });
     } catch (error) {
       console.error("Failed to check shop name availability:", error);
       return res.status(500).json({ message: "Failed to check shop name availability." });
@@ -192,7 +207,10 @@ module.exports = function sellerOnboardingRoutes(deps) {
 
       const available = await isShopNameAvailable(pool, shopName, req.user.id);
       if (!available) {
-        return res.status(409).json({ message: "Shop name is already taken." });
+        const alternatives = await generateAvailableShopNameAlternatives(pool, shopName, {
+          excludeSellerUserId: req.user.id,
+        });
+        return res.status(409).json({ message: "Shop name is already taken.", alternatives });
       }
 
       if (req.user.role !== "seller") {
@@ -254,7 +272,11 @@ module.exports = function sellerOnboardingRoutes(deps) {
       });
     } catch (error) {
       if (error?.code === "23505") {
-        return res.status(409).json({ message: "Shop name is already taken." });
+        const shopName = String(req.body?.shopName || "").trim();
+        const alternatives = await generateAvailableShopNameAlternatives(pool, shopName, {
+          excludeSellerUserId: req.user?.id,
+        });
+        return res.status(409).json({ message: "Shop name is already taken.", alternatives });
       }
       console.error("Failed to save seller shop onboarding:", error);
       return res.status(500).json({ message: "Failed to save shop details." });
