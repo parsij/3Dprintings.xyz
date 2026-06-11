@@ -88,17 +88,17 @@ const ProductCard = ({
           />
           <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-emerald-950/35 via-transparent to-transparent opacity-80" />
           {discountPercent > 0 && (
-            <span className="absolute left-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white shadow-lg">
+            <span className="absolute left-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-lg">
               {discountPercent}% off
             </span>
           )}
           {isLowStock && (
-            <span className="absolute bottom-3 left-3 rounded-full bg-white/92 px-3 py-1 text-xs font-black text-red-700 shadow-lg">
+            <span className="absolute bottom-3 left-3 rounded-full bg-white/92 px-3 py-1 text-xs font-bold text-red-700 shadow-lg">
               Only {stockCount} left
             </span>
           )}
           {isSoldOut && (
-            <span className="absolute bottom-3 left-3 rounded-full bg-emerald-950 px-3 py-1 text-xs font-black text-white shadow-lg">
+            <span className="absolute bottom-3 left-3 rounded-full bg-emerald-950 px-3 py-1 text-xs font-bold text-white shadow-lg">
               Sold out
             </span>
           )}
@@ -108,7 +108,7 @@ const ProductCard = ({
       <section className="flex flex-1 flex-col gap-3 p-4 text-left sm:p-5">
         <div className="min-w-0">
           <Link to={productUrl} className="focus-ring rounded-xl">
-            <h3 className="line-clamp-2 min-h-[3rem] text-pretty font-display text-base font-black leading-6 text-emerald-950 transition-colors duration-150 group-hover:text-red-700">
+            <h3 className="line-clamp-2 min-h-[3rem] text-pretty font-display text-base font-bold leading-6 text-emerald-950 transition-colors duration-150 group-hover:text-red-700">
               {displayName}
             </h3>
           </Link>
@@ -133,7 +133,7 @@ const ProductCard = ({
                     aria-hidden="true"
                   />
                 ) : (
-                  <span className="flex h-full w-full items-center justify-center bg-emerald-100 text-xs font-black text-emerald-900">
+                  <span className="flex h-full w-full items-center justify-center bg-emerald-100 text-xs font-bold text-emerald-900">
                     {displayShopName.slice(0, 1).toUpperCase()}
                   </span>
                 )}
@@ -142,14 +142,14 @@ const ProductCard = ({
             </Link>
           ) : (
             <div className="flex min-w-0 items-center gap-2 text-sm font-bold text-stone-600">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-black text-emerald-900">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-bold text-emerald-900">
                 {displayShopName.slice(0, 1).toUpperCase()}
               </span>
               <span className="min-w-0 truncate">{displayShopName}</span>
             </div>
           )}
 
-          <div className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-700" aria-label={`${Number(rating || 0).toFixed(1)} stars from ${reviewNumber || 0} reviews`}>
+          <div className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700" aria-label={`${Number(rating || 0).toFixed(1)} stars from ${reviewNumber || 0} reviews`}>
             {Number(rating || 0).toFixed(1)} stars
           </div>
         </div>
@@ -157,7 +157,7 @@ const ProductCard = ({
         <div className="mt-auto flex items-end justify-between gap-3 pt-1">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-2">
-              <span className="font-display text-2xl font-black text-emerald-950 tabular-nums">
+              <span className="font-display text-2xl font-bold text-emerald-950 tabular-nums">
                 {formatPrice(currentPrice)}
               </span>
               {discountPercent > 0 && (
@@ -180,7 +180,7 @@ const ProductCard = ({
           type="button"
           onClick={handleAddToCart}
           disabled={isLoading || success || isSoldOut}
-          className={`focus-ring relative w-full overflow-hidden rounded-2xl px-4 py-3 text-sm font-black transition-[background-color,color,opacity] duration-150 disabled:cursor-not-allowed ${
+          className={`focus-ring relative w-full overflow-hidden rounded-2xl px-4 py-3 text-sm font-bold transition-[background-color,color,opacity] duration-150 disabled:cursor-not-allowed ${
             success
               ? "bg-emerald-600 text-white"
               : isSoldOut

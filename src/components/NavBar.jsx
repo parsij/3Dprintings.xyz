@@ -81,12 +81,12 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             aria-label="3Dprintings.xyz Home"
             translate="no"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br from-red-500 to-emerald-800 text-sm font-black text-white shadow-lg shadow-emerald-950/25">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br from-red-500 to-emerald-800 text-sm font-bold text-white shadow-lg shadow-emerald-950/25">
               3D
             </span>
             <span className="hidden leading-none sm:block">
               <span className="block font-display text-base font-bold tracking-tight">3Dprintings</span>
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-red-100">Models</span>
+              <span className="block text-[11px] font-medium uppercase tracking-[0.24em] text-red-100">Models</span>
             </span>
           </Link>
 
@@ -114,7 +114,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 placeholder="Search models, parts, STL files..."
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                className="w-full bg-transparent px-4 py-3 pr-13 text-sm font-semibold text-white placeholder:text-white/52 focus:outline-none"
+                className="w-full bg-transparent px-4 py-3 pr-13 text-sm font-medium text-white placeholder:text-white/52 focus:outline-none"
               />
               <button
                 type="submit"
@@ -149,7 +149,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             ) : (
               <Link
                 to="/signup"
-                className="hidden rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-gray-950 transition-colors duration-200 hover:bg-red-300 focus-ring sm:inline-flex"
+                className="hidden rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-gray-950 transition-colors duration-200 hover:bg-red-300 focus-ring sm:inline-flex"
               >
                 Sign up
               </Link>

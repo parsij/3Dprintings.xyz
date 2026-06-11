@@ -121,10 +121,10 @@ const Home = ({ user }) => {
 
           <div className="relative mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
             <div className="max-w-4xl">
-              <p className="inline-flex rounded-full border border-red-500/25 bg-emerald-950 px-4 py-2 text-sm font-extrabold text-white shadow-sm">
+              <p className="inline-flex rounded-full border border-red-500/25 bg-emerald-950 px-4 py-2 text-sm font-bold text-white shadow-sm">
                 Marketplace for prints and model files
               </p>
-              <h1 id="home-hero-heading" className="mt-5 text-balance font-display text-5xl font-black leading-[0.95] tracking-[-0.045em] text-emerald-950 sm:text-6xl lg:text-7xl xl:text-8xl">
+              <h1 id="home-hero-heading" className="mt-5 text-balance font-display text-5xl font-bold leading-[0.95] tracking-[-0.045em] text-emerald-950 sm:text-6xl lg:text-7xl xl:text-8xl">
                 Find 3D models you can actually use.
               </h1>
               <p className="mt-6 max-w-2xl text-pretty text-lg font-bold leading-8 text-stone-700 sm:text-xl">
@@ -132,10 +132,10 @@ const Home = ({ user }) => {
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link to="/products" className="focus-ring inline-flex items-center justify-center rounded-full bg-emerald-950 px-7 py-4 text-base font-black text-white shadow-[0_16px_40px_rgba(6,78,59,0.22)] transition-colors duration-150 hover:bg-red-600">
+                <Link to="/products" className="focus-ring inline-flex items-center justify-center rounded-full bg-emerald-950 px-7 py-4 text-base font-bold text-white shadow-[0_16px_40px_rgba(6,78,59,0.22)] transition-colors duration-150 hover:bg-red-600">
                   Browse models
                 </Link>
-                <Link to="/become-seller" className="focus-ring inline-flex items-center justify-center rounded-full border border-emerald-900/20 bg-white/85 px-7 py-4 text-base font-black text-emerald-950 shadow-sm backdrop-blur transition-colors duration-150 hover:border-red-500 hover:text-red-700">
+                <Link to="/become-seller" className="focus-ring inline-flex items-center justify-center rounded-full border border-emerald-900/20 bg-white/85 px-7 py-4 text-base font-bold text-emerald-950 shadow-sm backdrop-blur transition-colors duration-150 hover:border-red-500 hover:text-red-700">
                   Sell your prints
                 </Link>
               </div>
@@ -143,10 +143,10 @@ const Home = ({ user }) => {
 
             <aside className="rounded-[2rem] border border-emerald-950/15 bg-emerald-900 p-4 shadow-[0_20px_70px_rgba(6,78,59,0.2)]" aria-label="Popular marketplace searches">
               <div className="rounded-[1.5rem] bg-emerald-950 p-5 text-white">
-                <p className="text-sm font-black text-red-200">Popular right now</p>
+                <p className="text-sm font-bold text-red-200">Popular right now</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {quickLinks.map((item) => (
-                    <Link key={item} to={`/search?q=${encodeURIComponent(item)}`} className="focus-ring rounded-full bg-white/10 px-3 py-2 text-sm font-extrabold text-white transition-colors duration-150 hover:bg-red-500">
+                    <Link key={item} to={`/search?q=${encodeURIComponent(item)}`} className="focus-ring rounded-full bg-white/10 px-3 py-2 text-sm font-bold text-white transition-colors duration-150 hover:bg-red-500">
                       {item}
                     </Link>
                   ))}
@@ -154,15 +154,15 @@ const Home = ({ user }) => {
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                 <div className="rounded-2xl bg-white px-3 py-4">
-                  <p className="font-display text-3xl font-black text-emerald-950">Prints</p>
+                  <p className="font-display text-3xl font-bold text-emerald-950">Prints</p>
                   <p className="text-xs font-bold text-emerald-700">shipped</p>
                 </div>
                 <div className="rounded-2xl bg-red-600 px-3 py-4">
-                  <p className="font-display text-3xl font-black text-white">Files</p>
+                  <p className="font-display text-3xl font-bold text-white">Files</p>
                   <p className="text-xs font-bold text-red-100">downloaded</p>
                 </div>
                 <div className="rounded-2xl bg-emerald-700 px-3 py-4">
-                  <p className="font-display text-3xl font-black text-white">Shops</p>
+                  <p className="font-display text-3xl font-bold text-white">Shops</p>
                   <p className="text-xs font-bold text-emerald-100">maker-run</p>
                 </div>
               </div>
@@ -185,8 +185,8 @@ const Home = ({ user }) => {
         <section className="px-4 py-12 sm:px-6 lg:px-[5vw]" aria-labelledby="why-shop-heading">
           <div className="mx-auto max-w-7xl">
             <div className="max-w-3xl">
-              <p className="text-sm font-black text-red-700">Why this marketplace exists</p>
-              <h2 id="why-shop-heading" className="mt-3 text-balance font-display text-4xl font-black tracking-tight text-emerald-950 sm:text-5xl">
+              <p className="text-sm font-bold text-red-700">Why this marketplace exists</p>
+              <h2 id="why-shop-heading" className="mt-3 text-balance font-display text-4xl font-bold tracking-tight text-emerald-950 sm:text-5xl">
                 Small models solve real problems.
               </h2>
             </div>
@@ -194,7 +194,7 @@ const Home = ({ user }) => {
             <div className="mt-7 grid gap-4 md:grid-cols-3">
               {shopReasons.map((item) => (
                 <article key={item.title} className="rounded-[2rem] border border-emerald-950/10 bg-white/82 p-6 shadow-[0_14px_45px_rgba(6,78,59,0.08)] backdrop-blur">
-                  <h3 className="font-display text-2xl font-black tracking-tight text-emerald-950">{item.title}</h3>
+                  <h3 className="font-display text-2xl font-bold tracking-tight text-emerald-950">{item.title}</h3>
                   <p className="mt-3 text-sm font-bold leading-7 text-stone-600">{item.copy}</p>
                 </article>
               ))}
@@ -205,20 +205,20 @@ const Home = ({ user }) => {
         <section className="px-4 py-12 sm:px-6 lg:px-[5vw]" aria-labelledby="seller-heading">
           <div className="mx-auto grid max-w-7xl gap-6 overflow-hidden rounded-[2.25rem] border border-emerald-900/15 bg-emerald-950 p-6 text-white shadow-[0_28px_80px_rgba(6,78,59,0.22)] md:grid-cols-[1fr_0.8fr] md:p-8 lg:p-10">
             <div>
-              <p className="text-sm font-black text-red-200">For makers</p>
-              <h2 id="seller-heading" className="mt-3 text-balance font-display text-4xl font-black tracking-tight sm:text-5xl">
+              <p className="text-sm font-bold text-red-200">For makers</p>
+              <h2 id="seller-heading" className="mt-3 text-balance font-display text-4xl font-bold tracking-tight sm:text-5xl">
                 Put your models where buyers can find them.
               </h2>
               <p className="mt-5 max-w-2xl text-pretty text-base font-bold leading-8 text-white/75">
                 Open a shop for finished prints, downloadable files, or both. Keep the listing clear: photos, price, material, size, stock, and shipping.
               </p>
-              <Link to="/become-seller" className="focus-ring mt-7 inline-flex rounded-full bg-red-500 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition-colors duration-150 hover:bg-red-400">
+              <Link to="/become-seller" className="focus-ring mt-7 inline-flex rounded-full bg-red-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-950/20 transition-colors duration-150 hover:bg-red-400">
                 Open a maker shop
               </Link>
             </div>
             <div className="grid gap-3 self-center">
               {makerNotes.map((item) => (
-                <div key={item} className="rounded-3xl border border-white/10 bg-white/8 p-5 text-lg font-black text-white backdrop-blur">
+                <div key={item} className="rounded-3xl border border-white/10 bg-white/8 p-5 text-lg font-bold text-white backdrop-blur">
                   {item}
                 </div>
               ))}
@@ -229,8 +229,8 @@ const Home = ({ user }) => {
         <section className="px-4 py-12 sm:px-6 lg:px-[5vw]" aria-labelledby="faq-heading">
           <div className="mx-auto max-w-7xl">
             <div className="max-w-3xl">
-              <p className="text-sm font-black text-red-700">Quick answers</p>
-              <h2 id="faq-heading" className="mt-3 text-balance font-display text-4xl font-black tracking-tight text-emerald-950 sm:text-5xl">
+              <p className="text-sm font-bold text-red-700">Quick answers</p>
+              <h2 id="faq-heading" className="mt-3 text-balance font-display text-4xl font-bold tracking-tight text-emerald-950 sm:text-5xl">
                 Before you buy or sell.
               </h2>
             </div>
@@ -238,7 +238,7 @@ const Home = ({ user }) => {
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               {marketplaceFaqs.map((item) => (
                 <article key={item.question} className="rounded-[2rem] border border-emerald-950/10 bg-white/82 p-6 shadow-[0_14px_45px_rgba(6,78,59,0.08)] backdrop-blur">
-                  <h3 className="font-display text-2xl font-black tracking-tight text-emerald-950">{item.question}</h3>
+                  <h3 className="font-display text-2xl font-bold tracking-tight text-emerald-950">{item.question}</h3>
                   <p className="mt-3 text-sm font-bold leading-7 text-stone-600">{item.answer}</p>
                 </article>
               ))}

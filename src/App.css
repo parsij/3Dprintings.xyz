@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --font-body: "Nunito", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces", "Nunito", ui-serif, Georgia, serif;
+  --font-body: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
   --page-bg: #e7f3df;
   --page-bg-muted: #d8e9cd;
   --surface: #ffffff;

@@ -143,8 +143,8 @@ const Products = ({
         <div className="mb-8 overflow-hidden rounded-[2rem] border border-emerald-950/15 bg-emerald-950 p-5 text-white shadow-[0_18px_60px_rgba(6,78,59,0.18)] sm:p-7 lg:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-sm font-black text-red-200">{eyebrow}</p>
-              <HeadingTag id="products-heading" className="mt-3 text-balance font-display text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
+              <p className="text-sm font-bold text-red-200">{eyebrow}</p>
+              <HeadingTag id="products-heading" className="mt-3 text-balance font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
                 {title}
               </HeadingTag>
               <p className="mt-4 max-w-2xl text-pretty text-base font-bold leading-7 text-emerald-50/80">
@@ -153,7 +153,7 @@ const Products = ({
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white">
+              <div className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white">
                 {products.length > 0 ? `${products.length} shown` : "Fresh listings"}
               </div>
               <label className="sr-only" htmlFor={embedded ? "home-product-sort" : "product-sort"}>
@@ -164,7 +164,7 @@ const Products = ({
                   id={embedded ? "home-product-sort" : "product-sort"}
                   value={sort}
                   onChange={(event) => setSort(event.target.value)}
-                  className="focus-ring appearance-none rounded-2xl border border-white/20 bg-white px-4 py-3 pr-11 text-sm font-black text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-400"
+                  className="focus-ring appearance-none rounded-2xl border border-white/20 bg-white px-4 py-3 pr-11 text-sm font-bold text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-400"
                 >
                   {sortOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -206,13 +206,13 @@ const Products = ({
         {loading && (
           <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
             <div className="h-12 w-12 rounded-full border-4 border-solid border-emerald-800/25 border-t-emerald-800" />
-            <p className="mt-4 text-sm font-black text-stone-500">Loading listings...</p>
+            <p className="mt-4 text-sm font-bold text-stone-500">Loading listings...</p>
           </div>
         )}
 
         {!loading && products.length === 0 && !loadError && (
           <div className="rounded-[2rem] border border-dashed border-emerald-900/20 bg-white/70 px-6 py-16 text-center">
-            <h2 className="font-display text-2xl font-black text-emerald-950">No listings yet</h2>
+            <h2 className="font-display text-2xl font-bold text-emerald-950">No listings yet</h2>
             <p className="mx-auto mt-3 max-w-md text-sm font-bold leading-6 text-stone-600">
               Listings will appear here as sellers publish physical prints and downloadable files.
             </p>
@@ -220,7 +220,7 @@ const Products = ({
         )}
 
         {!hasMore && products.length > 0 && (
-          <div className="py-12 text-center text-sm font-black text-stone-400">
+          <div className="py-12 text-center text-sm font-bold text-stone-400">
             End of current listings
           </div>
         )}
