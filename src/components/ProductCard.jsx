@@ -71,7 +71,7 @@ const ProductCard = ({
   };
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[1.7rem] border border-emerald-950/10 bg-white shadow-[0_14px_42px_rgba(6,78,59,0.08)] transition-[box-shadow,border-color] duration-150 hover:border-emerald-800/30 hover:shadow-[0_20px_56px_rgba(6,78,59,0.13)]">
+    <article className="group flex h-full flex-col overflow-hidden rounded-[1.7rem] border border-emerald-950/15 bg-white shadow-[0_14px_42px_rgba(6,78,59,0.1)] transition-[box-shadow,border-color] duration-150 hover:border-red-500/35 hover:shadow-[0_20px_56px_rgba(6,78,59,0.16)]">
       <Link to={productUrl} className="focus-ring block" aria-label={`View ${displayName}`}>
         <div className="relative aspect-[4/3] overflow-hidden bg-emerald-50">
           <img
@@ -149,7 +149,7 @@ const ProductCard = ({
             </div>
           )}
 
-          <div className="shrink-0 rounded-full bg-lime-50 px-2.5 py-1 text-xs font-black text-emerald-950" aria-label={`${Number(rating || 0).toFixed(1)} stars from ${reviewNumber || 0} reviews`}>
+          <div className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-700" aria-label={`${Number(rating || 0).toFixed(1)} stars from ${reviewNumber || 0} reviews`}>
             {Number(rating || 0).toFixed(1)} stars
           </div>
         </div>

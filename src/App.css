@@ -3,14 +3,14 @@
 :root {
   --font-body: "Nunito", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", "Nunito", ui-serif, Georgia, serif;
-  --page-bg: #f6f1e7;
-  --page-bg-muted: #eee6d8;
+  --page-bg: #e7f3df;
+  --page-bg-muted: #d8e9cd;
   --surface: #ffffff;
-  --surface-elevated: #fffaf0;
+  --surface-elevated: #f5fbef;
   --surface-muted: #f9fafb;
-  --surface-soft: #efe5d5;
-  --surface-accent: #edf7ed;
-  --surface-accent-strong: #dff0d8;
+  --surface-soft: #dcebd2;
+  --surface-accent: #e3f3da;
+  --surface-accent-strong: #cde8bf;
   --text-primary: #111827;
   --text-secondary: #374151;
   --text-muted: #6b7280;
@@ -23,7 +23,7 @@
   --brand-orange: #d93a2f;
   --brand-orange-strong: #b72a24;
   --brand-amber: #85a947;
-  --brand-cream: #f6f1e7;
+  --brand-cream: #e7f3df;
   --brand-clay: #6b2d22;
   --shadow-soft: 0 24px 80px rgba(17, 24, 39, 0.12);
   --shadow-card: 0 18px 45px rgba(17, 24, 39, 0.1);
@@ -77,9 +77,10 @@ h3,
 
 .site-shell {
   background:
-    radial-gradient(circle at top left, rgba(6, 78, 59, 0.16), transparent 34rem),
-    radial-gradient(circle at 85% 10%, rgba(217, 58, 47, 0.14), transparent 24rem),
-    linear-gradient(180deg, #f6f1e7 0%, #fffaf0 42%, #e9f2df 100%);
+    radial-gradient(circle at top left, rgba(6, 78, 59, 0.34), transparent 32rem),
+    radial-gradient(circle at 85% 8%, rgba(217, 58, 47, 0.24), transparent 26rem),
+    radial-gradient(circle at 50% 58%, rgba(34, 197, 94, 0.16), transparent 34rem),
+    linear-gradient(180deg, #dcefd2 0%, #eef8e7 42%, #cfe5c2 100%);
 }
 
 .maker-grid {

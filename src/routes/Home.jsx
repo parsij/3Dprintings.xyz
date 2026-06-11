@@ -104,7 +104,7 @@ const homeJsonLd = [
 
 const Home = ({ user }) => {
   return (
-    <div className="site-shell min-h-screen overflow-hidden text-stone-900">
+    <div className="site-shell min-h-screen overflow-hidden text-emerald-950">
       <Seo
         title="Shop 3D Prints, Parts & Model Files"
         description="Browse physical 3D printed products, replacement parts, maker gifts, and downloadable model files from independent sellers on 3Dprintings.xyz."
@@ -116,12 +116,12 @@ const Home = ({ user }) => {
       <main id="main-content">
         <section className="relative px-4 pb-10 pt-28 sm:px-6 lg:px-[5vw] lg:pt-32" aria-labelledby="home-hero-heading">
           <div className="absolute inset-0 maker-grid opacity-60" aria-hidden="true" />
-          <div className="absolute left-[-8rem] top-20 h-72 w-72 rounded-full bg-emerald-700/15 blur-3xl" aria-hidden="true" />
-          <div className="absolute right-[-7rem] top-40 h-80 w-80 rounded-full bg-red-500/14 blur-3xl" aria-hidden="true" />
+          <div className="absolute left-[-8rem] top-20 h-80 w-80 rounded-full bg-emerald-800/28 blur-3xl" aria-hidden="true" />
+          <div className="absolute right-[-7rem] top-40 h-80 w-80 rounded-full bg-red-600/22 blur-3xl" aria-hidden="true" />
 
           <div className="relative mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
             <div className="max-w-4xl">
-              <p className="inline-flex rounded-full border border-emerald-800/15 bg-white/80 px-4 py-2 text-sm font-extrabold text-emerald-950 shadow-sm backdrop-blur">
+              <p className="inline-flex rounded-full border border-red-500/25 bg-emerald-950 px-4 py-2 text-sm font-extrabold text-white shadow-sm">
                 Marketplace for prints and model files
               </p>
               <h1 id="home-hero-heading" className="mt-5 text-balance font-display text-5xl font-black leading-[0.95] tracking-[-0.045em] text-emerald-950 sm:text-6xl lg:text-7xl xl:text-8xl">
@@ -141,7 +141,7 @@ const Home = ({ user }) => {
               </div>
             </div>
 
-            <aside className="rounded-[2rem] border border-emerald-950/10 bg-white/84 p-4 shadow-[0_20px_70px_rgba(6,78,59,0.12)] backdrop-blur" aria-label="Popular marketplace searches">
+            <aside className="rounded-[2rem] border border-emerald-950/15 bg-emerald-900 p-4 shadow-[0_20px_70px_rgba(6,78,59,0.2)]" aria-label="Popular marketplace searches">
               <div className="rounded-[1.5rem] bg-emerald-950 p-5 text-white">
                 <p className="text-sm font-black text-red-200">Popular right now</p>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -153,17 +153,17 @@ const Home = ({ user }) => {
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-2xl bg-emerald-50 px-3 py-4">
+                <div className="rounded-2xl bg-white px-3 py-4">
                   <p className="font-display text-3xl font-black text-emerald-950">Prints</p>
-                  <p className="text-xs font-bold text-stone-600">shipped</p>
+                  <p className="text-xs font-bold text-emerald-700">shipped</p>
                 </div>
-                <div className="rounded-2xl bg-red-50 px-3 py-4">
-                  <p className="font-display text-3xl font-black text-red-700">Files</p>
-                  <p className="text-xs font-bold text-stone-600">downloaded</p>
+                <div className="rounded-2xl bg-red-600 px-3 py-4">
+                  <p className="font-display text-3xl font-black text-white">Files</p>
+                  <p className="text-xs font-bold text-red-100">downloaded</p>
                 </div>
-                <div className="rounded-2xl bg-lime-50 px-3 py-4">
-                  <p className="font-display text-3xl font-black text-emerald-950">Shops</p>
-                  <p className="text-xs font-bold text-stone-600">maker-run</p>
+                <div className="rounded-2xl bg-emerald-700 px-3 py-4">
+                  <p className="font-display text-3xl font-black text-white">Shops</p>
+                  <p className="text-xs font-bold text-emerald-100">maker-run</p>
                 </div>
               </div>
             </aside>

@@ -140,20 +140,20 @@ const Products = ({
   const content = (
     <ContentTag id={embedded ? undefined : "main-content"} className={`${embedded ? "" : "px-4 pb-16 pt-28 sm:px-6 lg:px-[5vw]"}`}>
       <section className={`${embedded ? "" : "mx-auto max-w-7xl"}`} aria-labelledby="products-heading">
-        <div className="mb-8 overflow-hidden rounded-[2rem] border border-emerald-950/10 bg-white/84 p-5 shadow-[0_18px_60px_rgba(6,78,59,0.08)] backdrop-blur sm:p-7 lg:p-8">
+        <div className="mb-8 overflow-hidden rounded-[2rem] border border-emerald-950/15 bg-emerald-950 p-5 text-white shadow-[0_18px_60px_rgba(6,78,59,0.18)] sm:p-7 lg:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-sm font-black text-red-700">{eyebrow}</p>
-              <HeadingTag id="products-heading" className="mt-3 text-balance font-display text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl lg:text-5xl">
+              <p className="text-sm font-black text-red-200">{eyebrow}</p>
+              <HeadingTag id="products-heading" className="mt-3 text-balance font-display text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
                 {title}
               </HeadingTag>
-              <p className="mt-4 max-w-2xl text-pretty text-base font-bold leading-7 text-stone-600">
+              <p className="mt-4 max-w-2xl text-pretty text-base font-bold leading-7 text-emerald-50/80">
                 {description}
               </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-950">
+              <div className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white">
                 {products.length > 0 ? `${products.length} shown` : "Fresh listings"}
               </div>
               <label className="sr-only" htmlFor={embedded ? "home-product-sort" : "product-sort"}>
@@ -164,7 +164,7 @@ const Products = ({
                   id={embedded ? "home-product-sort" : "product-sort"}
                   value={sort}
                   onChange={(event) => setSort(event.target.value)}
-                  className="focus-ring appearance-none rounded-2xl border border-emerald-900/20 bg-white px-4 py-3 pr-11 text-sm font-black text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-400"
+                  className="focus-ring appearance-none rounded-2xl border border-white/20 bg-white px-4 py-3 pr-11 text-sm font-black text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-400"
                 >
                   {sortOptions.map((option) => (
                     <option key={option.value} value={option.value}>
