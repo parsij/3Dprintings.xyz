@@ -1,55 +1,86 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
 import Navbar from "../components/NavBar.jsx";
+import Seo from "../components/Seo.jsx";
 import { API_BASE } from "../config/api.js";
 
-const Products = ({ user, NoNavBarLimit }) => {
+const sortOptions = [
+  { value: "relevant", label: "Most Relevant" },
+  { value: "price_asc", label: "Price: Low To High" },
+  { value: "price_desc", label: "Price: High To Low" },
+  { value: "sales", label: "Best Selling" },
+];
+
+function getCardProps(product) {
+  return {
+    productId: product.id,
+    creatorName: product.creator_name,
+    productName: product.name,
+    rating: product.rating,
+    currentPrice: product.current_price,
+    originalPrice: product.original_price,
+    reviewNumber: product.reviews_count || 0,
+    imageUrl: product.image_url,
+    sellerId: product.seller_id || product.user_id,
+    shopName: product.shop_name,
+    shopLogoUrl: product.shop_logo_url,
+    quantity: product.quantity,
+  };
+}
+
+const Products = ({
+  user,
+  NoNavBarLimit,
+  embedded = false,
+  title = "Shop 3D Prints & Files",
+  eyebrow = "Marketplace",
+  description = "Browse physical 3D printed goods, replacement parts, display pieces, and downloadable files listed by independent makers.",
+}) => {
   const [products, setProducts] = useState([]);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState("relevant");
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [hasMore, setHasMore] = useState(true);
-  
-  const observer = useRef();
-  
-  const lastProductElementRef = useCallback(node => {
-    if (loading) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        setPage(prevPage => prevPage + 1);
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore]);
+  const observer = useRef(null);
+
+  const lastProductElementRef = useCallback(
+    (node) => {
+      if (loading) return;
+      if (observer.current) observer.current.disconnect();
+
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setPage((prevPage) => prevPage + 1);
+        }
+      });
+
+      if (node) observer.current.observe(node);
+    },
+    [loading, hasMore]
+  );
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
+
     try {
-      // Ensure backend matches: https://3dprintings.xyz/api/products?page=...&limit=12
-      console.log('[Products fetchProducts] Fetching page:', page, 'with sort:', sort);
       const response = await axios.get(`${API_BASE}/api/products`, {
         params: { page, limit: 12, sort },
       });
       const data = response.data;
-      console.log('[Products fetchProducts] Received', data.products.length, 'products');
 
       setProducts((prev) => {
-        // Prevent duplicate products in the list
-        const existingIds = new Set(prev.map((p) => p.id));
+        const existingIds = new Set(prev.map((product) => product.id));
         const newProducts = (data.products || []).filter(
-          (p) => !existingIds.has(p.id)
+          (product) => !existingIds.has(product.id)
         );
-        console.log('[Products fetchProducts] Adding', newProducts.length, 'new products');
         return [...prev, ...newProducts];
       });
-      setHasMore(!!data.hasMore);
+      setHasMore(Boolean(data.hasMore));
     } catch (error) {
-      console.error(
-        "[Products fetchProducts] Error:",
-        error?.response?.data || error?.message || error
-      );
+      setLoadError(error?.response?.data?.message || "Products Could Not Load. Try Refreshing The Page.");
     } finally {
       setLoading(false);
     }
@@ -65,78 +96,124 @@ const Products = ({ user, NoNavBarLimit }) => {
     fetchProducts();
   }, [fetchProducts]);
 
-  return (
-    <div className="min-h-screen bg-[#f2f2f2]">
-      <Navbar isSignedIn={!!user} NoNavBarLimit={NoNavBarLimit} />
-      <main className="px-4 lg:px-[5vw] pt-24 pb-12">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Our Models</h1>
-          <div className="relative">
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-xl leading-tight focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 shadow-sm cursor-pointer transition-all duration-300"
-            >
-              <option value="relevant">Most Relevant</option>
-              <option value="price_asc">Price: Low to High</option>
-              <option value="price_desc">Price: High to Low</option>
-              <option value="sales">Most Sales</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700">
-              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+  useEffect(() => {
+    return () => {
+      if (observer.current) observer.current.disconnect();
+    };
+  }, []);
+
+  const ContentTag = embedded ? "div" : "main";
+  const HeadingTag = embedded ? "h2" : "h1";
+
+  const content = (
+    <ContentTag id={embedded ? undefined : "main-content"} className={`${embedded ? "" : "px-4 pb-16 pt-28 sm:px-6 lg:px-[5vw]"}`}>
+      <section className={`${embedded ? "" : "mx-auto max-w-7xl"}`} aria-labelledby="products-heading">
+        <div className="mb-8 overflow-hidden rounded-[2rem] border border-orange-100/80 bg-white/82 p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)] backdrop-blur sm:p-7 lg:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-700">{eyebrow}</p>
+              <HeadingTag id="products-heading" className="mt-3 text-balance font-display text-3xl font-black tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                {title}
+              </HeadingTag>
+              <p className="mt-4 max-w-2xl text-pretty text-base font-semibold leading-7 text-gray-600">
+                {description}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="rounded-2xl bg-orange-50 px-4 py-3 text-sm font-black text-orange-900">
+                {products.length > 0 ? `${products.length} Loaded` : "Fresh Listings"}
+              </div>
+              <label className="sr-only" htmlFor={embedded ? "home-product-sort" : "product-sort"}>
+                Sort Products
+              </label>
+              <div className="relative">
+                <select
+                  id={embedded ? "home-product-sort" : "product-sort"}
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value)}
+                  className="focus-ring appearance-none rounded-2xl border border-orange-200 bg-white px-4 py-3 pr-11 text-sm font-black text-gray-800 shadow-sm transition-colors duration-200 hover:border-orange-400"
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <svg className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 fill-current text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M5.293 7.293a1 1 0 0 1 1.414 0L10 10.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-4 4a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 0-1.414z" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-           {products.map((product, index) => {
-             const isLastElement = products.length === index + 1;
-              const cardProps = {
-                productId: product.id,
-                creatorName: product.creator_name,
-                productName: product.name,
-                rating: product.rating,
-                currentPrice: product.current_price,
-                originalPrice: product.original_price,
-                reviewNumber: product.reviews_count || 0,
-                imageUrl: product.image_url,
-                sellerId: product.seller_id || product.user_id,
-                shopName: product.shop_name,
-                shopLogoUrl: product.shop_logo_url,
-                quantity: product.quantity,
-              };
+        {loadError && (
+          <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {loadError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-live="polite">
+          {products.map((product, index) => {
+            const isLastElement = products.length === index + 1;
+            const card = <ProductCard {...getCardProps(product)} />;
 
             return isLastElement ? (
-              <div ref={lastProductElementRef} key={product.id} style={{ animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both` }}>
-                <ProductCard {...cardProps} />
+              <div ref={lastProductElementRef} key={product.id} className="animate-fade-in-up">
+                {card}
               </div>
             ) : (
-              <div key={product.id} style={{ animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both` }}>
-                <ProductCard {...cardProps} />
+              <div key={product.id} className="animate-fade-in-up">
+                {card}
               </div>
             );
           })}
         </div>
-        
+
         {loading && (
-          <div className="flex flex-col items-center justify-center py-10">
-            <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-orange-500 border-t-transparent"></div>
-            <p className="mt-4 text-lg font-semibold text-gray-600 animate-pulse">Loading products...</p>
-          </div>
-        )}
-        
-        {!hasMore && products.length > 0 && (
-          <div className="text-center py-12 text-gray-400 font-medium animate-fade-in-up transition-all duration-300 hover:text-gray-600">
-            You've seen all the listings.
+          <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
+            <div className="h-14 w-14 animate-spin rounded-full border-4 border-solid border-orange-500 border-t-transparent" />
+            <p className="mt-4 text-sm font-black uppercase tracking-[0.22em] text-gray-500">Loading Listings…</p>
           </div>
         )}
 
-        {products.length === 0 && !loading && (
-          <div className="text-center py-20 text-gray-500 animate-bounce transition-all duration-300 hover:text-gray-700">
-            No products found.
+        {!loading && products.length === 0 && !loadError && (
+          <div className="rounded-[2rem] border border-dashed border-orange-200 bg-white/70 px-6 py-16 text-center">
+            <h2 className="font-display text-2xl font-black text-gray-950">No Listings Yet</h2>
+            <p className="mx-auto mt-3 max-w-md text-sm font-semibold leading-6 text-gray-600">
+              Listings will appear here as sellers publish physical prints and downloadable files.
+            </p>
           </div>
         )}
-      </main>
+
+        {!hasMore && products.length > 0 && (
+          <div className="py-12 text-center text-sm font-black uppercase tracking-[0.22em] text-gray-400">
+            End Of Current Listings
+          </div>
+        )}
+      </section>
+    </ContentTag>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="site-shell min-h-screen">
+      <Seo
+        title="Shop 3D Prints & Model Files"
+        description="Browse physical 3D printed products and downloadable files from independent creators on 3Dprintings.xyz."
+        path="/products"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "3D Printed Products And Files",
+          description,
+          url: "https://3dprintings.xyz/products",
+        }}
+      />
+      <Navbar isSignedIn={Boolean(user)} NoNavBarLimit={NoNavBarLimit} />
+      {content}
     </div>
   );
 };

@@ -17,14 +17,17 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
 
   const showNavBar = useCallback(() => {
     const currentScrollY = window.scrollY;
+    const shouldReactToScroll = currentScrollY > window.innerHeight || NoNavBarLimit;
 
-    if (currentScrollY > window.innerHeight || NoNavBarLimit) {
-      if (currentScrollY - lastScrollY.current > 7) {
-        setShowNavbar(false);
-      } else if (currentScrollY - lastScrollY.current < -7) {
-        setShowNavbar(true);
-      }
-    } else {
+    if (!shouldReactToScroll) {
+      setShowNavbar(true);
+      lastScrollY.current = currentScrollY;
+      return;
+    }
+
+    if (currentScrollY - lastScrollY.current > 7) {
+      setShowNavbar(false);
+    } else if (currentScrollY - lastScrollY.current < -7) {
       setShowNavbar(true);
     }
 
@@ -32,135 +35,149 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
   }, [NoNavBarLimit]);
 
   useEffect(() => {
-    window.addEventListener("scroll", showNavBar);
+    window.addEventListener("scroll", showNavBar, { passive: true });
     return () => {
       window.removeEventListener("scroll", showNavBar);
     };
   }, [showNavBar]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchInput.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchInput)}`);
-      setSearchInput("");
-    }
+  const handleSearch = (event) => {
+    event.preventDefault();
+    const query = searchInput.trim();
+    if (!query) return;
+
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setSearchInput("");
   };
 
   return (
-      <>
-        <header
-            className={`fixed top-0 left-0 w-full z-50 bg-black/65 backdrop-blur-xs shadow-sm border-b border-white/20 text-white transition-transform duration-300 ${
-                showNavbar ? "translate-y-0" : "-translate-y-full"
-            }`}
-        >
-          {/* Adjusted padding to use fluid 5vw on desktops to align perfectly with the edge of the screen */}
-          <nav className="flex items-center justify-between w-full px-2 lg:px-[5vw] py-3">
+    <>
+      <a href="#main-content" className="skip-link">
+        Skip To Content
+      </a>
 
-            {/* LEFT CONTAINER: Menu Button is isolated and stays completely on the far left */}
-            <div className="flex items-center flex-1 min-w-0">
+      <header
+        className={`fixed left-0 top-0 z-50 w-full px-3 pt-3 transition-transform duration-300 sm:px-5 lg:px-[5vw] ${
+          showNavbar ? "translate-y-0" : "-translate-y-full"
+        }`}
+      >
+        <nav className="mx-auto flex max-w-7xl items-center gap-3 rounded-[1.75rem] border border-white/55 bg-gray-950/78 px-3 py-2.5 text-white shadow-[0_18px_60px_rgba(17,24,39,0.2)] backdrop-blur-xl sm:px-4">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-orange-300/70 hover:bg-orange-500/15 focus-ring"
+            aria-label="Open Menu"
+          >
+            <span className="flex flex-col gap-1.5" aria-hidden="true">
+              <span className="h-0.5 w-5 rounded-full bg-white transition-transform duration-200 group-hover:translate-x-1 group-hover:bg-orange-300" />
+              <span className="h-0.5 w-5 rounded-full bg-white/80 transition-colors duration-200 group-hover:bg-white" />
+              <span className="h-0.5 w-5 rounded-full bg-white transition-transform duration-200 group-hover:-translate-x-1 group-hover:bg-orange-300" />
+            </span>
+          </button>
+
+          <Link
+            to="/home"
+            className="group flex min-w-0 shrink-0 items-center gap-2 rounded-2xl px-1 py-1 transition-transform duration-200 hover:-translate-y-0.5 focus-ring"
+            aria-label="3Dprintings.xyz Home"
+            translate="no"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br from-orange-400 to-orange-700 text-sm font-black text-white shadow-lg shadow-orange-950/25">
+              3D
+            </span>
+            <span className="hidden leading-none sm:block">
+              <span className="block font-display text-base font-bold tracking-tight">3Dprintings</span>
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-orange-200">Marketplace</span>
+            </span>
+          </Link>
+
+          <div className="hidden items-center gap-1 text-sm font-bold text-white/80 lg:flex">
+            <Link to="/products" className="rounded-full px-4 py-2 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-ring">
+              Shop Prints
+            </Link>
+            <Link to="/become-seller" className="rounded-full px-4 py-2 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-ring">
+              Sell Designs
+            </Link>
+          </div>
+
+          <form onSubmit={handleSearch} role="search" className="min-w-0 flex-1">
+            <label htmlFor="site-search" className="sr-only">
+              Search 3D printed products and files
+            </label>
+            <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 transition-colors duration-200 focus-within:border-orange-300/80 focus-within:bg-white/15">
+              <input
+                id="site-search"
+                name="q"
+                type="search"
+                inputMode="search"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Search useful parts, decor, STL files…"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                className="w-full bg-transparent px-4 py-3 pr-13 text-sm font-semibold text-white placeholder:text-white/52 focus:outline-none"
+              />
               <button
-                  onClick={() => setMenuOpen((prev) => !prev)}
-                  className="group flex cursor-pointer flex-col items-center justify-center gap-1 shrink-0 h-7.5 w-7.5 md:h-9 md:w-9 -m-1"
-                  aria-label="Open menu"
+                type="submit"
+                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-white text-gray-950 transition-colors duration-200 hover:bg-orange-400 focus-ring"
+                aria-label="Search"
               >
-                <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-                <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
-                <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
+                <img src={Search} alt="" className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
+          </form>
 
-            {/* MIDDLE CONTAINER: Logo, Links, and Search Bar sit comfortably in the center */}
-            <div className="flex items-center justify-center gap-4 md:gap-6 flex-[3] max-w-4xl min-w-0">
-              {/* Logo */}
+          <div className="flex shrink-0 items-center gap-2">
+            {isSignedIn ? (
               <Link
-                  to="/home"
-                  className="w-10 h-10 flex items-center justify-center rounded-full border-2 border-white text-xl font-extrabold transition hover:text-orange-500 hover:border-orange-500 shrink-0"
-              >
-                3z
-              </Link>
-
-              {/* Products */}
-              <Link
-                  to={"/products"}
-                  className="font-bold hidden md:block transition hover:text-orange-500 shrink-0"
-              >
-                Products
-              </Link>
-
-              {/* Search Bar */}
-              <div className="w-full max-w-xl min-w-0">
-                <form onSubmit={handleSearch} className="relative w-full overflow-hidden rounded-full border-2 border-gray-300 transition focus-within:border-orange-500 bg-black/20">
-                  <input
-                      type="text"
-                      placeholder="Search"
-                      value={searchInput}
-                      onChange={(e) => setSearchInput(e.target.value)}
-                      className="w-full bg-transparent text-white placeholder:text-gray-300 px-4 py-2 pr-14 md:pr-16 outline-none"
-                  />
-                  <button
-                      type="submit"
-                      className="theme-light-control absolute right-0 top-0 h-full bg-white px-3 transition hover:bg-orange-500 cursor-pointer flex items-center justify-center"
-                  >
-                    <img src={Search} alt="Search" className="h-4 w-4 md:h-5 md:w-5" />
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* RIGHT CONTAINER: Profile and Cart elements stay anchored to the far right */}
-            <div className="flex items-center justify-end gap-3 md:gap-5 flex-1 shrink-0">
-              <div className="shrink-0 flex items-center justify-center">
-                {isSignedIn ? (
-                    <Link
-                        to="/account"
-                        className="group relative inline-flex h-7.5 w-7.5 md:h-9 md:w-9 items-center justify-center cursor-pointer"
-                        aria-label="Account"
-                    >
-                      <img
-                          src={accountLogo}
-                          alt="account"
-                          className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
-                      />
-                      <img
-                          src={accountLogoHover}
-                          alt="account hover"
-                          className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                      />
-                    </Link>
-                ) : (
-                    <Link
-                        to="/signup"
-                        className="border-2 font-bold border-orange-300 rounded-2xl px-4 py-0.5 transition hover:border-orange-500 hover:text-orange-500 shrink-0 whitespace-nowrap"
-                    >
-                      Sign Up
-                    </Link>
-                )}
-              </div>
-
-              <Link
-                  to="/cart"
-                  className="group relative cursor-pointer flex items-center justify-center shrink-0 h-7.5 w-7.5 md:h-9 md:w-9"
-                  aria-label="Cart"
+                to="/account"
+                className="group relative hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-orange-300/70 hover:bg-orange-500/15 focus-ring sm:inline-flex"
+                aria-label="Account"
               >
                 <img
-                    src={Cart}
-                    alt="Cart"
-                    className="absolute inset-0 h-full w-full object-contain opacity-100 transition-opacity duration-300 group-hover:opacity-0"
+                  src={accountLogo}
+                  alt=""
+                  className="absolute h-7 w-7 object-contain opacity-100 transition-opacity duration-200 group-hover:opacity-0"
+                  aria-hidden="true"
                 />
                 <img
-                    src={CartHover}
-                    alt="Cart hover"
-                    className="absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  src={accountLogoHover}
+                  alt=""
+                  className="absolute h-7 w-7 object-contain opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                  aria-hidden="true"
                 />
               </Link>
-            </div>
+            ) : (
+              <Link
+                to="/signup"
+                className="hidden rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-gray-950 transition-colors duration-200 hover:bg-orange-300 focus-ring sm:inline-flex"
+              >
+                Join
+              </Link>
+            )}
 
-          </nav>
-        </header>
+            <Link
+              to="/cart"
+              className="group relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-orange-300/70 hover:bg-orange-500/15 focus-ring"
+              aria-label="Cart"
+            >
+              <img
+                src={Cart}
+                alt=""
+                className="absolute h-7 w-7 object-contain opacity-100 transition-opacity duration-200 group-hover:opacity-0"
+                aria-hidden="true"
+              />
+              <img
+                src={CartHover}
+                alt=""
+                className="absolute h-7 w-7 object-contain opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                aria-hidden="true"
+              />
+            </Link>
+          </div>
+        </nav>
+      </header>
 
-        <div />
-
-        <SideMenu />
-      </>
+      <SideMenu />
+    </>
   );
 }

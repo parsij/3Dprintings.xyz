@@ -3,6 +3,7 @@ import { useState } from "react";
 import PasswordEye from "../assets/PasswordEye.svg"
 import SmallNavBar from "../components/SmallNavBar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
+import Seo from "../components/Seo.jsx";
 import axios from "axios";
 import { API_BASE } from "../config/api.js";
 
@@ -140,19 +141,25 @@ export default function SignUp({ setUser }) {
 
   return (
     <>
+      <Seo
+        title="Create Account"
+        description="Create a 3Dprintings.xyz account to buy physical 3D printed products, save listings, message sellers, and download model files."
+        path="/signup"
+        noIndex
+      />
       <SmallNavBar />
       <SideMenu />
-      <main className="min-h-screen bg-orange-50 text-gray-900 flex items-center justify-center px-4">
-        <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-6 sm:p-8 shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] animate-fade-in-up">
+      <main id="main-content" className="site-shell min-h-screen text-gray-900 flex items-center justify-center px-4 py-28">
+        <section className="w-full max-w-md rounded-[2rem] border border-orange-100 bg-white/88 p-6 shadow-[0_24px_80px_rgba(17,24,39,0.12)] backdrop-blur sm:p-8 animate-fade-in-up">
           <div className="mb-6 text-center group">
-            <h1 className="text-3xl font-extrabold tracking-tight transition-all duration-300 group-hover:translate-y-[-2px]">
+            <h1 className="font-display text-3xl font-black tracking-tight">
               Join{" "}
               <span className="text-orange-500 group-hover:text-orange-600 transition-colors duration-300">
                 3Dprintings.xyz
               </span>
             </h1>
-            <p className="mt-2 text-sm text-gray-600 transition-colors duration-300 group-hover:text-gray-700">
-              Create your account and join the fun.
+            <p className="mt-2 text-sm font-semibold leading-6 text-gray-600">
+              Buy physical prints, save files, message makers, and track orders from one account.
             </p>
           </div>
 
@@ -287,8 +294,20 @@ export default function SignUp({ setUser }) {
                   : "bg-gray-300 cursor-not-allowed opacity-70"
               }`}
             >
-              {isSubmitting ? "Creating account..." : "Create Account"}
+              {isSubmitting ? "Creating Account…" : "Create Account"}
             </button>
+
+            <p className="text-center text-xs font-semibold leading-5 text-gray-500">
+              By creating an account, you agree to the{" "}
+              <Link to="/terms" className="font-black text-orange-600 underline underline-offset-4 hover:text-orange-800">
+                Terms
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="font-black text-orange-600 underline underline-offset-4 hover:text-orange-800">
+                Privacy Policy
+              </Link>
+              .
+            </p>
 
             {submitMessage && (
               <p

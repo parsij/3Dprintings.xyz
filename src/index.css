@@ -4,6 +4,7 @@
 @layer base {
    button, .btn {
     @apply cursor-pointer;
+    touch-action: manipulation;
   }
   input:not([type="checkbox"]):not([type="radio"]), textarea {
     @apply transition-all duration-300 cursor-text;
@@ -28,11 +29,16 @@
     @apply outline-none ring-0 ring-offset-0 shadow-none;
   }
   a {
-    @apply cursor-pointer transition-all duration-300;
+    @apply cursor-pointer transition-colors duration-300;
+    touch-action: manipulation;
   }
 }
 
 @layer utilities {
+  .skip-link {
+    @apply fixed left-4 top-3 z-[100] -translate-y-20 rounded-full bg-gray-950 px-5 py-3 text-sm font-bold text-white shadow-xl transition-transform duration-200 focus:translate-y-0 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-400/40;
+  }
+
   .animate-fade-in-up {
     animation: fadeInUp 0.5s ease-out forwards;
   }

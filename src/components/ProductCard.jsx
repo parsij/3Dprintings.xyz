@@ -1,8 +1,29 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import image_test from "../assets/Screenshot_20260322_175244.png";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import image_test from "../assets/product-placeholder.webp";
 import { addToCart } from "../services/cartService.js";
 import { shopPath } from "../utils/shopName.js";
+
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 2,
+});
+
+function formatPrice(price) {
+  const amount = Number(price);
+  if (!Number.isFinite(amount)) return "Price Unavailable";
+
+  return currencyFormatter.format(amount).replace(/\.00$/, "");
+}
+
+function getDiscountPercent(originalPrice, currentPrice) {
+  const original = Number(originalPrice);
+  const current = Number(currentPrice);
+  if (!Number.isFinite(original) || !Number.isFinite(current) || original <= current) return 0;
+
+  return Math.round(((original - current) / original) * 100);
+}
 
 const ProductCard = ({
   productId,
@@ -20,163 +41,162 @@ const ProductCard = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const navigate = useNavigate();
 
-  // Helper function to format price: remove .00 but keep other decimals like .50
-  const formatPrice = (price) => {
-    const num = Number(price);
-    if (num % 1 === 0) {
-      // Whole number, show without decimals
-      return num.toString();
-    }
-    // Has decimals, show with 2 decimal places
-    return num.toFixed(2);
-  };
+  const displayName = productName || "Untitled 3D Print";
+  const displayShopName = shopName || creatorName || "Independent Maker";
+  const productUrl = productId ? `/product/${productId}` : "/products";
+  const sellerUrl = shopPath(shopName);
+  const discountPercent = getDiscountPercent(originalPrice, currentPrice);
+  const stockCount = quantity === undefined || quantity === null ? null : Number(quantity);
+  const isSoldOut = Number.isFinite(stockCount) && stockCount <= 0;
+  const isLowStock = Number.isFinite(stockCount) && stockCount > 0 && stockCount <= 2;
 
-  const handleAddToCart = async (e) => {
-    e.stopPropagation(); // prevent card click
-    if (isLoading || success) return;
+  const handleAddToCart = async () => {
+    if (isLoading || success || isSoldOut || !productId) return;
+
     setIsLoading(true);
     setError(null);
     setSuccess(false);
+
     try {
-      console.log('[ProductCard] Adding to cart productId:', productId);
       await addToCart(productId, 1);
-      console.log('[ProductCard] Added to cart successfully');
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 1400);
+      window.setTimeout(() => setSuccess(false), 1400);
     } catch (err) {
-      console.error('[ProductCard] Error adding to cart:', err);
-      setError(err?.response?.data?.message || "Failed to add to cart");
-      setTimeout(() => setError(null), 3000);
+      setError(err?.response?.data?.message || "Could Not Add To Cart. Try Again.");
+      window.setTimeout(() => setError(null), 3000);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCardClick = () => {
-    if (productId) {
-      navigate(`/product/${productId}`);
-    }
-  };
-
-  const handleShopClick = (event) => {
-    event.stopPropagation();
-    const path = shopPath(shopName);
-    if (path) {
-      navigate(path);
-    }
-  };
-
-  const displayShopName = shopName || creatorName || "Unknown";
-
   return (
-    <div
-      onClick={handleCardClick}
-      className="group flex flex-col rounded-xl bg-white overflow-hidden cursor-pointer transition-transform duration-300 transform-gpu origin-center hover:scale-105 text-sm"
-    >
-      <div className="h-70 overflow-hidden bg-gray-200">
-        <img
-          src={imageUrl || image_test}
-          alt={productName}
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={(e) => {
-            e.target.onerror = null; // Prevent infinite loop if fallback also fails
-            e.target.src = image_test;
-          }}
-        />
-      </div>
-
-      <section className="p-3 flex flex-col gap-1 text-left flex-1">
-        <p
-          className="line-clamp-2 min-h-12 w-full font-medium text-left text-gray-900 transform-gpu duration-300 group-hover:scale-105 group-hover:pl-1.5"
-          title={productName}
-        >
-          {productName}
-        </p>
-
-        <span className="font-bold text-gray-800">
-          {rating ? Number(rating).toFixed(1) : "0.0"} ⭐
-        </span>
-        <div className="flex items-center gap-2 text-gray-500">
-          <span className="shrink-0">({reviewNumber || 0})</span>
-          <button
-            type="button"
-            onClick={handleShopClick}
-            disabled={!shopName}
-            className="no-button-motion flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:text-orange-600 disabled:cursor-default disabled:hover:text-gray-500"
-          >
-            <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-              {shopLogoUrl ? (
-                <img
-                  src={shopLogoUrl}
-                  alt={displayShopName}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center bg-orange-100 text-xs font-bold text-orange-700">
-                  {displayShopName.slice(0, 1).toUpperCase()}
-                </span>
-              )}
+    <article className="group flex h-full flex-col overflow-hidden rounded-[1.7rem] border border-orange-100/80 bg-white shadow-[0_16px_44px_rgba(17,24,39,0.08)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_26px_70px_rgba(17,24,39,0.14)]">
+      <Link to={productUrl} className="focus-ring block" aria-label={`View ${displayName}`}>
+        <div className="relative aspect-[4/3] overflow-hidden bg-orange-50">
+          <img
+            src={imageUrl || image_test}
+            alt={displayName}
+            width="640"
+            height="480"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.src = image_test;
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-gray-950/35 via-transparent to-transparent opacity-80" />
+          {discountPercent > 0 && (
+            <span className="absolute left-3 top-3 rounded-full bg-gray-950 px-3 py-1 text-xs font-black text-orange-200 shadow-lg">
+              {discountPercent}% Off
             </span>
-            <span className="min-w-0 truncate">By {displayShopName}</span>
-          </button>
-        </div>
-
-        <div className="mt-1">
-          <span className="font-bold text-lg text-black">${formatPrice(currentPrice)}</span>
-          {originalPrice && Number(originalPrice) > Number(currentPrice) && (
-            <>
-              <span className="line-through ml-2 text-gray-400 text-xs">${formatPrice(originalPrice)}</span>
-              <span className="text-green-600 text-xs ml-1 font-semibold">
-                {Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}% off
-              </span>
-            </>
+          )}
+          {isLowStock && (
+            <span className="absolute bottom-3 left-3 rounded-full bg-white/92 px-3 py-1 text-xs font-black text-red-700 shadow-lg">
+              Only {stockCount} Left
+            </span>
+          )}
+          {isSoldOut && (
+            <span className="absolute bottom-3 left-3 rounded-full bg-gray-950 px-3 py-1 text-xs font-black text-white shadow-lg">
+              Sold Out
+            </span>
           )}
         </div>
+      </Link>
 
-        {quantity !== undefined && quantity !== null && Number(quantity) <= 2 && (
-          <div className="mt-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">
-            Only {Number(quantity)} available in stock
+      <section className="flex flex-1 flex-col gap-3 p-4 text-left sm:p-5">
+        <div className="min-w-0">
+          <Link to={productUrl} className="focus-ring rounded-xl">
+            <h3 className="line-clamp-2 min-h-[3rem] text-pretty font-display text-base font-bold leading-6 text-gray-950 transition-colors duration-200 group-hover:text-orange-700">
+              {displayName}
+            </h3>
+          </Link>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          {sellerUrl ? (
+            <Link
+              to={sellerUrl}
+              className="focus-ring flex min-w-0 items-center gap-2 rounded-2xl text-sm font-bold text-gray-600 transition-colors duration-200 hover:text-orange-700"
+              aria-label={`Visit ${displayShopName}`}
+            >
+              <span className="h-8 w-8 shrink-0 overflow-hidden rounded-xl bg-orange-100">
+                {shopLogoUrl ? (
+                  <img
+                    src={shopLogoUrl}
+                    alt=""
+                    width="64"
+                    height="64"
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center bg-orange-100 text-xs font-black text-orange-700">
+                    {displayShopName.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </span>
+              <span className="min-w-0 truncate">{displayShopName}</span>
+            </Link>
+          ) : (
+            <div className="flex min-w-0 items-center gap-2 text-sm font-bold text-gray-600">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-xs font-black text-orange-700">
+                {displayShopName.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 truncate">{displayShopName}</span>
+            </div>
+          )}
+
+          <div className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-black text-gray-700" aria-label={`${Number(rating || 0).toFixed(1)} stars from ${reviewNumber || 0} reviews`}>
+            {Number(rating || 0).toFixed(1)} Star
           </div>
-        )}
+        </div>
+
+        <div className="mt-auto flex items-end justify-between gap-3 pt-1">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="font-display text-2xl font-black text-gray-950 tabular-nums">
+                {formatPrice(currentPrice)}
+              </span>
+              {discountPercent > 0 && (
+                <span className="text-sm font-bold text-gray-400 line-through tabular-nums">
+                  {formatPrice(originalPrice)}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs font-semibold text-gray-500">Physical prints, files, or creator-listed bundles</p>
+          </div>
+        </div>
 
         {error && (
-          <div className="mt-2 text-xs text-red-600 bg-red-50 p-1 rounded">
+          <div role="status" aria-live="polite" className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
             {error}
           </div>
         )}
 
-        <div className="mt-auto pt-3">
-          <button
-            onClick={handleAddToCart}
-            disabled={isLoading || success}
-            className={`no-button-motion relative w-full px-4 py-2 rounded-full border text-sm font-medium transition-colors duration-300 ${
-              success
-                ? "bg-green-600 border-green-600 text-white cursor-default"
-                : "border-black text-black hover:bg-black hover:text-white cursor-pointer"
-            } ${isLoading ? "opacity-70 cursor-default" : ""}`}
-          >
-            <span
-              className={`inline-block transition-all duration-200 ${
-                success ? "opacity-0" : "opacity-100"
-              }`}
-            >
-              {isLoading ? "Adding..." : "+ Add to cart"}
-            </span>
-            <span
-              className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-all duration-300 ${
-                success ? "opacity-100 scale-100" : "opacity-0 scale-75"
-              }`}
-            >
-              Added to cart
-            </span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          disabled={isLoading || success || isSoldOut}
+          className={`focus-ring relative w-full overflow-hidden rounded-2xl px-4 py-3 text-sm font-black transition-[background-color,color,transform,opacity] duration-200 active:scale-[0.98] disabled:cursor-not-allowed ${
+            success
+              ? "bg-emerald-600 text-white"
+              : isSoldOut
+                ? "bg-gray-200 text-gray-500"
+                : "bg-gray-950 text-white hover:bg-orange-600"
+          } ${isLoading ? "opacity-75" : ""}`}
+        >
+          <span className={success ? "opacity-0" : "opacity-100"}>
+            {isSoldOut ? "Sold Out" : isLoading ? "Adding…" : "Add To Cart"}
+          </span>
+          <span className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-[opacity,transform] duration-200 ${success ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            Added
+          </span>
+        </button>
       </section>
-    </div>
+    </article>
   );
 };
 

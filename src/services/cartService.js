@@ -15,12 +15,10 @@ const axiosWithCredentials = applyCsrfInterceptor(axios.create({
  */
 export async function addToCart(productId, quantity = 1) {
   try {
-    console.log('[addToCart] Adding productId:', productId, 'quantity:', quantity);
     const response = await axiosWithCredentials.post("/api/cart", {
       productId,
       quantity,
     });
-    console.log('[addToCart] Success:', response.data);
     return response.data;
   } catch (error) {
     console.error(
@@ -127,5 +125,4 @@ export async function removeFromCart(productId) {
     throw error;
   }
 }
-
 

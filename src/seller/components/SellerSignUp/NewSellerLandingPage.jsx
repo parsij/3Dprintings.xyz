@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link } from "react-router-dom";
 import { motion as Motion, stagger, useAnimate } from "framer-motion";
+import Seo from "../../../components/Seo.jsx";
 
 const NewSellerLandingPage = () => {
   const [scope, animate] = useAnimate();
@@ -10,6 +11,7 @@ const NewSellerLandingPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
     const handleUserScroll = () => {
       userScrolledRef.current = true;
@@ -40,6 +42,13 @@ const NewSellerLandingPage = () => {
     };
 
     const playSequence = async () => {
+      if (reduceMotion) {
+        await animate("#welcome", { y: 0, opacity: 1 }, { duration: 0.01 });
+        await animate("#typewriter span.part-1, #typewriter span.part-2, #typewriter span.part-3", { display: "inline" }, { duration: 0.01 });
+        await animate("#blinker", { opacity: 0 }, { duration: 0.01 });
+        return;
+      }
+
       // Act 1: Hand appears and waves
       await animate("#hand", { scale: [0, 1.2, 1], opacity: 1 }, { duration: 0.4, ease: "easeOut" });
       await animate("#hand", { rotate: [0, 25, -15, 25, -15, 0] }, { duration: 1.0, ease: "easeInOut" });
@@ -84,6 +93,12 @@ const NewSellerLandingPage = () => {
 
   return (
       <main className="bg-zinc-900 min-h-[200vh] overflow-visible">
+        <Seo
+            title="Become A Seller"
+            description="Set up a 3Dprintings.xyz seller account to list physical 3D printed products and downloadable model files."
+            path="/become-seller"
+            noIndex
+        />
 
         {/* THE HERO SECTION */}
         <section ref={scope} aria-label="Welcome Hero" className="min-h-screen flex items-center justify-center relative z-50 overflow-visible">
@@ -118,7 +133,7 @@ const NewSellerLandingPage = () => {
             >
               {/* GHOST LAYER */}
               <span className="whitespace-pre opacity-0 pointer-events-none select-none unselectable pr-2" aria-hidden="true">
-              to every Sellers dream |
+              to every maker's storefront |
             </span>
 
               {/* TYPING LAYER */}
@@ -126,16 +141,16 @@ const NewSellerLandingPage = () => {
                 {Array.from("to every ").map((letter, i) => (
                     <span key={`p1-${i}`} className="part-1 text-white" style={{ display: 'none' }}>{letter}</span>
                 ))}
-                {Array.from("Sellers").map((letter, i) => (
+                {Array.from("maker's").map((letter, i) => (
                     <span key={`p2-${i}`} className="part-2 text-orange-500" style={{ display: 'none' }}>{letter}</span>
                 ))}
-                {Array.from(" dream").map((letter, i) => (
+                {Array.from(" storefront").map((letter, i) => (
                     <span key={`p3-${i}`} className="part-3 text-white" style={{ display: 'none' }}>{letter}</span>
                 ))}
                 <Motion.span id="blinker" initial={{ opacity: 0 }} className="text-orange-500 font-light ml-0.5">|</Motion.span>
               </div>
               {/* SCREEN READER ONLY TEXT */}
-              <span className="sr-only">to every Sellers dream</span>
+              <span className="sr-only">to every maker's storefront</span>
             </h2>
           </div>
         </section>
@@ -149,11 +164,11 @@ const NewSellerLandingPage = () => {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="max-w-2xl mx-auto px-6 text-center text-sm md:text-base text-gray-400 leading-relaxed tracking-wide relative z-10"
           >
-            <p>Howdy, Creator! Welcome aboard.</p>
+            <p>Welcome, maker. Your shop starts here.</p>
             <br />
-            <p>Whether you're here to sell premium 3D files or ship custom 3D-printed products, you’ve found your new home. Our platform is designed to help you showcase your talent, monetize your skills, and connect with a passionate community of fellow makers.</p>
+            <p>List finished 3D printed products, downloadable model files, or both. Your storefront should make buyers understand what they are getting, how it is made, and why your work is worth ordering.</p>
             <br />
-            <p>Dive in, explore our platform, and start sharing your incredible 3D designs with the world today!</p>
+            <p>Set up the shop name, connect payouts, publish the first listing, and keep building from the seller dashboard.</p>
             <br />
 
             {/* FIX: Removed button wrapping the link for valid HTML */}
@@ -161,7 +176,7 @@ const NewSellerLandingPage = () => {
                 to={"/become-seller/info"}
                 className="inline-block mt-8 px-8 py-3.5 bg-linear-to-b from-orange-400 to-orange-600 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:shadow-[0_0_30px_rgba(249,115,22,0.6)] transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 active:scale-95 active:translate-y-0 border border-orange-400/50"
             >
-              Get started!
+              Set Up Seller Account
             </Link>
           </Motion.div>
         </section>

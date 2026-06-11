@@ -3,15 +3,22 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import cart from "../assets/Cart.svg"
 import Navbar from "../components/NavBar.jsx";
+import Seo from "../components/Seo.jsx";
 import MessageShopButton from "../components/MessageShopButton.jsx";
 import Reviews from "../components/Reviews.jsx";
 import StarRating from "../components/StarRating.jsx";
 import { addToCart } from "../services/cartService.js";
 import { toggleLike, toggleSave, getProductStatus, toggleReviewLike } from "../services/likesService.js";
-import image_test from "../assets/Screenshot_20260322_175244.png";
+import image_test from "../assets/product-placeholder.webp";
 
-import { API_BASE } from "../config/api.js";
+import { API_BASE, MARKETPLACE_ORIGIN } from "../config/api.js";
 import { shopPath } from "../utils/shopName.js";
+
+function buildAbsoluteAssetUrl(url) {
+  if (!url) return `${MARKETPLACE_ORIGIN}/social-preview.svg`;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${MARKETPLACE_ORIGIN}${String(url).startsWith("/") ? "" : "/"}${url}`;
+}
 
 const ProductPage = ({ user }) => {
   const { id } = useParams();
@@ -457,6 +464,7 @@ const ProductPage = ({ user }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f2f2f2]">
+        <Seo title="Loading Product" description="Loading a 3D printed product or model file listing on 3Dprintings.xyz." path={`/product/${id}`} noIndex />
         <Navbar isSignedIn={!!user} />
         <div className="flex justify-center items-center h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
@@ -468,6 +476,7 @@ const ProductPage = ({ user }) => {
   if (error || !product) {
     return (
       <div className="min-h-screen bg-[#f2f2f2]">
+        <Seo title="Product Not Found" description="This 3Dprintings.xyz listing could not be found." path={`/product/${id}`} noIndex />
         <Navbar isSignedIn={!!user} />
         <div className="flex flex-col justify-center items-center h-screen text-center px-4">
           <div className="text-center py-32 animate-fade-in-up">
@@ -485,9 +494,51 @@ const ProductPage = ({ user }) => {
   const discountPercent = hasDiscount
     ? Math.round(((Number(product.original_price) - Number(product.current_price)) / Number(product.original_price)) * 100)
     : 0;
+  const primaryImage = buildAbsoluteAssetUrl(images[0] || product.image_url);
+  const productDescription = String(product.description || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 155) || `Shop ${product.name} from ${getShopDisplayName()} on 3Dprintings.xyz.`;
+  const quantityValue = product.quantity === undefined || product.quantity === null
+    ? null
+    : Number(product.quantity);
+  const productSchema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: productDescription,
+    image: primaryImage,
+    brand: {
+      "@type": "Brand",
+      name: getShopDisplayName(),
+    },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "USD",
+      price: Number(product.current_price || 0).toFixed(2),
+      availability: quantityValue !== null && Number.isFinite(quantityValue) && quantityValue <= 0
+        ? "https://schema.org/OutOfStock"
+        : "https://schema.org/InStock",
+      url: `${MARKETPLACE_ORIGIN}/product/${id}`,
+    },
+    aggregateRating: Number(product.reviews_count || 0) > 0
+      ? {
+          "@type": "AggregateRating",
+          ratingValue: Number(product.rating || 0).toFixed(1),
+          reviewCount: Number(product.reviews_count || 0),
+        }
+      : undefined,
+  };
 
   return (
     <div className="min-h-screen bg-[#f2f2f2] pb-16">
+      <Seo
+        title={product.name}
+        description={productDescription}
+        path={`/product/${id}`}
+        image={primaryImage}
+        jsonLd={productSchema}
+      />
       <Navbar isSignedIn={!!user} />
 
       <main className="max-w-6xl mx-auto px-4 pt-24 lg:px-8 animate-fade-in-up">
@@ -629,7 +680,7 @@ const ProductPage = ({ user }) => {
               </div>
                <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                 Includes digital files & standard commercial license
+                 Listing details show whether this is a physical print, digital file, or bundle.
                </p>
 
                {product.quantity !== undefined && product.quantity !== null && Number(product.quantity) <= 2 && (
@@ -664,7 +715,7 @@ const ProductPage = ({ user }) => {
               )}
 
               <p className={`text-gray-600 text-sm leading-relaxed whitespace-pre-wrap transition-all duration-300 ${!descriptionExpanded && 'line-clamp-3'}`}>
-                {product.description || "No description provided for this 3D model."}
+                {product.description || "No description provided for this listing."}
               </p>
               {product.description && product.description.split('\n').length > 2 && (
                 <button

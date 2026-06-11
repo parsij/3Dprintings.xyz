@@ -1,12 +1,22 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import "./App.css";
-import Router from "./Router.jsx";
-import SellerRouter from "./SellerRouter.jsx";
 import axios from "axios";
 import { ensureCsrfToken } from "./services/csrf.js";
 import { API_BASE, isSellerHostname } from "./config/api.js";
 import { AuthProvider } from "./AuthContext.jsx";
 import { clearChatAuthSession, ensureChatAuthSession } from "./services/chatAuthService.js";
+
+const Router = lazy(() => import("./Router.jsx"));
+const SellerRouter = lazy(() => import("./SellerRouter.jsx"));
+
+function LoadingScreen({ label = "Loading…" }) {
+  return (
+    <div className="flex h-screen items-center justify-center bg-gray-100">
+      <div className="mx-3 text-gray-900">{label}</div>
+      <div className="m-3 h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent" />
+    </div>
+  );
+}
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -48,25 +58,24 @@ const App = () => {
   }, [user]);
 
   // Keep your exact loading animation while the backend responds
-  if (loading) return (
-      <div className={"flex bg-gray-100 h-screen items-center justify-center "}>
-        <div className={"text-gray-900 mx-3"}>Loading ...</div>
-        <div className="h-12 w-12 animate-spin m-3 rounded-full border-4 border-solid border-blue-600 border-t-transparent"></div>
-      </div>
-  );
+  if (loading) return <LoadingScreen />;
 
   // The traffic controller switch
   if (isSellerSubdomain) {
     return (
       <AuthProvider user={user} setUser={setUser}>
-        <SellerRouter user={user} setUser={setUser} />
+        <Suspense fallback={<LoadingScreen label="Loading seller portal…" />}>
+          <SellerRouter user={user} setUser={setUser} />
+        </Suspense>
       </AuthProvider>
     );
   }
 
   return (
     <AuthProvider user={user} setUser={setUser}>
-      <Router user={user} setUser={setUser} />
+      <Suspense fallback={<LoadingScreen label="Loading marketplace…" />}>
+        <Router user={user} setUser={setUser} />
+      </Suspense>
     </AuthProvider>
   );
 };

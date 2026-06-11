@@ -1,10 +1,34 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
 import Navbar from "../components/NavBar.jsx";
-import backIcon from "../assets/back.svg";
+import Seo from "../components/Seo.jsx";
 import { API_BASE } from "../config/api.js";
+
+const sortOptions = [
+  { value: "relevant", label: "Most Relevant" },
+  { value: "price_asc", label: "Price: Low To High" },
+  { value: "price_desc", label: "Price: High To Low" },
+  { value: "sales", label: "Best Selling" },
+];
+
+function getCardProps(product) {
+  return {
+    productId: product.id,
+    creatorName: product.creator_name,
+    productName: product.name,
+    rating: product.rating,
+    currentPrice: product.current_price,
+    originalPrice: product.original_price,
+    reviewNumber: product.reviews_count || 0,
+    imageUrl: product.image_url,
+    sellerId: product.seller_id || product.user_id,
+    shopName: product.shop_name,
+    shopLogoUrl: product.shop_logo_url,
+    quantity: product.quantity,
+  };
+}
 
 const SearchResults = ({ user }) => {
   const [searchParams] = useSearchParams();
@@ -15,180 +39,234 @@ const SearchResults = ({ user }) => {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState("relevant");
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [hasMore, setHasMore] = useState(true);
   const debounceTimer = useRef(null);
+  const observer = useRef(null);
 
-  const observer = useRef();
+  const lastProductElementRef = useCallback(
+    (node) => {
+      if (loading) return;
+      if (observer.current) observer.current.disconnect();
 
-  const lastProductElementRef = useCallback(node => {
-    if (loading) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        setPage(prevPage => prevPage + 1);
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore]);
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setPage((prevPage) => prevPage + 1);
+        }
+      });
 
-  const [prevQuery, setPrevQuery] = useState(query);
-  if (query !== prevQuery) {
-    setPrevQuery(query);
+      if (node) observer.current.observe(node);
+    },
+    [loading, hasMore]
+  );
+
+  useEffect(() => {
     setSearchInput(query);
     setProducts([]);
     setPage(1);
     setHasMore(true);
-  }
-
-  const handleSortChange = (event) => {
-    setSort(event.target.value);
-    setProducts([]);
-    setPage(1);
-    setHasMore(true);
-  };
+    setLoadError("");
+  }, [query, sort]);
 
   useEffect(() => {
-    const fetchSearchResults = async () => {
-      if (!query.trim()) {
-        return;
-      }
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      setProducts([]);
+      setHasMore(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function fetchSearchResults() {
+      setLoading(true);
+      setLoadError("");
 
       try {
-        setLoading(true);
-        console.log('[SearchResults] Fetching:', query, 'page:', page, 'sort:', sort);
         const response = await axios.get(`${API_BASE}/api/products/search`, {
-          params: { q: query, page, limit: 12, sort }
+          params: { q: trimmedQuery, page, limit: 12, sort },
         });
 
-        console.log('[SearchResults] Response:', response.data);
-        setProducts(prev => {
-          const existingIds = new Set(prev.map(p => p.id));
-          const newProducts = response.data.products.filter(p => !existingIds.has(p.id));
+        if (cancelled) return;
+
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map((product) => product.id));
+          const newProducts = (response.data.products || []).filter(
+            (product) => !existingIds.has(product.id)
+          );
           return [...prev, ...newProducts];
         });
-        setHasMore(response.data.hasMore);
-        setLoading(false);
+        setHasMore(Boolean(response.data.hasMore));
       } catch (error) {
-        console.error("Error fetching search results:", error);
-        setLoading(false);
+        if (!cancelled) {
+          setLoadError(error?.response?.data?.message || "Search Results Could Not Load. Try Again.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    };
+    }
 
     fetchSearchResults();
+    return () => {
+      cancelled = true;
+    };
   }, [page, query, sort]);
 
-  // Handle search input change with debounce
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(debounceTimer.current);
+      if (observer.current) observer.current.disconnect();
+    };
+  }, []);
+
+  const handleSearchChange = (event) => {
+    const value = event.target.value;
     setSearchInput(value);
 
-    // Debounce the search navigation
-    clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      if (value.trim()) {
-        navigate(`/search?q=${encodeURIComponent(value)}`);
+    window.clearTimeout(debounceTimer.current);
+    debounceTimer.current = window.setTimeout(() => {
+      const trimmedValue = value.trim();
+      if (trimmedValue) {
+        navigate(`/search?q=${encodeURIComponent(trimmedValue)}`);
       }
-    }, 150);
+    }, 250);
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const trimmedValue = searchInput.trim();
+    if (trimmedValue) {
+      navigate(`/search?q=${encodeURIComponent(trimmedValue)}`);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#f2f2f2]">
-      <Navbar isSignedIn={!!user} />
-      <main className="px-4 lg:px-[5vw] pt-24 pb-12">
-        {/* Back button */}
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-6 p-2 rounded-lg hover:bg-gray-300 transition-all duration-300 cursor-pointer hover:scale-110 active:scale-90 shadow-sm hover:shadow-md"
-        >
-          <img src={backIcon} alt="Back" className="h-9 w-9" />
-        </button>
+    <div className="site-shell min-h-screen">
+      <Seo
+        title={query ? `Search Results For ${query}` : "Search 3D Prints"}
+        description="Search physical 3D printed products and downloadable 3D model files on 3Dprintings.xyz."
+        path={query ? `/search?q=${encodeURIComponent(query)}` : "/search"}
+        noIndex={!query}
+      />
+      <Navbar isSignedIn={Boolean(user)} NoNavBarLimit />
+      <main id="main-content" className="px-4 pb-16 pt-28 sm:px-6 lg:px-[5vw]">
+        <section className="mx-auto max-w-7xl" aria-labelledby="search-heading">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="focus-ring mb-6 rounded-2xl border border-orange-100 bg-white/80 px-4 py-2 text-sm font-black text-gray-700 shadow-sm transition-colors duration-200 hover:border-orange-300 hover:text-orange-700"
+          >
+            Back
+          </button>
 
-        {/* Search box on the page */}
-        <div className="mb-8 animate-fade-in-up">
-          <div className="relative w-full max-w-2xl mx-auto mb-6 group">
-            <input
-              type="text"
-              placeholder="Search for 3D models..."
-              value={searchInput}
-              onChange={handleSearchChange}
-              className="w-full bg-white text-gray-900 placeholder:text-gray-400 px-4 py-3 rounded-xl border-2 border-gray-300 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 shadow-sm focus:shadow-lg transition-all duration-300 hover:border-gray-400"
-            />
-          </div>
+          <div className="mb-8 overflow-hidden rounded-[2rem] border border-orange-100/80 bg-white/84 p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)] backdrop-blur sm:p-7 lg:p-8">
+            <form onSubmit={handleSubmit} role="search" className="mx-auto max-w-3xl">
+              <label htmlFor="search-results-input" className="sr-only">
+                Search Marketplace
+              </label>
+              <input
+                id="search-results-input"
+                name="q"
+                type="search"
+                inputMode="search"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Search brackets, planters, props, STL files…"
+                value={searchInput}
+                onChange={handleSearchChange}
+                className="focus-ring w-full rounded-3xl border border-orange-200 bg-white px-5 py-4 text-lg font-bold text-gray-950 shadow-sm transition-colors duration-200 placeholder:text-gray-400 hover:border-orange-400"
+              />
+            </form>
 
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all duration-500 ease-in-out transform hover:translate-x-2">
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-extrabold text-gray-900 transition-colors duration-300">
-                Search Results for "<span className="text-orange-500 hover:text-orange-600 transition-colors">{query}</span>"
-              </h1>
-              <p className="text-gray-600 mt-2 animate-pulse">
-                {products.length > 0 ? `Found ${products.length} products` : "No products found"}
-              </p>
-            </div>
-            <div className="relative mt-2 sm:mt-0">
-              <select
-                value={sort}
-                onChange={handleSortChange}
-                 className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-4 pr-10 rounded-xl leading-tight focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 shadow-sm cursor-pointer transition-all duration-300"
-              >
-                <option value="relevant">Most Relevant</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="sales">Most Sales</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+            <div className="mt-7 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-700">Search</p>
+                <h1 id="search-heading" className="mt-3 text-balance font-display text-3xl font-black tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                  {query ? (
+                    <>Results For <span className="text-orange-700">{query}</span></>
+                  ) : (
+                    "Tell Us What You Need Printed"
+                  )}
+                </h1>
+                <p className="mt-3 text-sm font-semibold leading-7 text-gray-600">
+                  {query
+                    ? products.length > 0
+                      ? `${products.length} matching listings loaded.`
+                      : "Searching products, files, shops, and tags."
+                    : "Start with the object, part, style, file type, or material you have in mind."}
+                </p>
+              </div>
+
+              <div className="relative">
+                <label className="sr-only" htmlFor="search-sort">Sort Search Results</label>
+                <select
+                  id="search-sort"
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value)}
+                  className="focus-ring appearance-none rounded-2xl border border-orange-200 bg-white px-4 py-3 pr-11 text-sm font-black text-gray-800 shadow-sm transition-colors duration-200 hover:border-orange-400"
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <svg className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 fill-current text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M5.293 7.293a1 1 0 0 1 1.414 0L10 10.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-4 4a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 0-1.414z" />
+                </svg>
               </div>
             </div>
           </div>
-        </div>
 
-        {products.length === 0 && !loading ? (
-          <div className="text-center py-20 animate-bounce" style={{animationDuration: '2.0s', animationIterationCount: 1}}>
-            <p className="text-gray-500 text-lg scale-125 transition-transform duration-300">No products match your search.</p>
-            <p className="text-gray-400 text-sm mt-2 scale-110 transition-transform duration-300">Try searching for something else.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.map((product, index) => {
-              const isLastElement = products.length === index + 1;
-               const cardProps = {
-                 productId: product.id,
-                 creatorName: product.creator_name,
-                 productName: product.name,
-                 rating: product.rating,
-                 currentPrice: product.current_price,
-                 originalPrice: product.original_price,
-                 reviewNumber: product.reviews_count || 0,
-                 imageUrl: product.image_url,
-                 sellerId: product.seller_id || product.user_id,
-                 shopName: product.shop_name,
-                 shopLogoUrl: product.shop_logo_url,
-                 quantity: product.quantity,
-               };
+          {loadError && (
+            <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {loadError}
+            </div>
+          )}
 
-              return isLastElement ? (
-                <div ref={lastProductElementRef} key={product.id}>
-                  <ProductCard {...cardProps} />
-                </div>
-              ) : (
-                <ProductCard key={product.id} {...cardProps} />
-              );
-            })}
-          </div>
-        )}
+          {products.length === 0 && !loading ? (
+            <div className="rounded-[2rem] border border-dashed border-orange-200 bg-white/72 px-6 py-16 text-center shadow-sm">
+              <h2 className="font-display text-2xl font-black text-gray-950">
+                {query ? "No Matching Listings Yet" : "Search The Marketplace"}
+              </h2>
+              <p className="mx-auto mt-3 max-w-md text-sm font-semibold leading-6 text-gray-600">
+                {query
+                  ? "Try a broader term, search by object type, or check back as more sellers publish prints and files."
+                  : "Use the search box above to find physical prints, digital model files, shops, and maker goods."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-live="polite">
+              {products.map((product, index) => {
+                const isLastElement = products.length === index + 1;
+                const card = <ProductCard {...getCardProps(product)} />;
 
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="h-20 w-20 animate-spin rounded-full border-4 border-solid border-orange-500 border-t-transparent"></div>
-            <p className="mt-4 text-lg font-semibold text-gray-600">Loading...</p>
-          </div>
-        )}
+                return isLastElement ? (
+                  <div ref={lastProductElementRef} key={product.id} className="animate-fade-in-up">
+                    {card}
+                  </div>
+                ) : (
+                  <div key={product.id} className="animate-fade-in-up">
+                    {card}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-        {!hasMore && products.length > 0 && (
-          <div className="text-center py-12 text-gray-400 font-medium">
-            You've seen all the results.
-          </div>
-        )}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
+              <div className="h-14 w-14 animate-spin rounded-full border-4 border-solid border-orange-500 border-t-transparent" />
+              <p className="mt-4 text-sm font-black uppercase tracking-[0.22em] text-gray-500">Searching…</p>
+            </div>
+          )}
+
+          {!hasMore && products.length > 0 && (
+            <div className="py-12 text-center text-sm font-black uppercase tracking-[0.22em] text-gray-400">
+              End Of Search Results
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

@@ -11,8 +11,8 @@ const FirstProductStep = ({ onNext, onPrev }) => (
         className="w-full text-left"
         aria-labelledby="product-heading"
     >
-        <h3 id="product-heading" className="text-xl font-bold text-white mb-4">Add Your First Product</h3>
-        <p className="text-zinc-400 mb-6 text-sm">You can always edit this or add more products later.</p>
+        <h3 id="product-heading" className="text-xl font-bold text-white mb-4">Draft Your First Listing</h3>
+        <p className="text-zinc-400 mb-6 text-sm">Start with the item buyers will understand fastest. You can edit details and add more listings later.</p>
 
         {/* FIX: Bound label to input for accessibility */}
         <div>
@@ -22,7 +22,7 @@ const FirstProductStep = ({ onNext, onPrev }) => (
                 name="productName"
                 type="text"
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="Premium Subscription"
+                placeholder="Articulated dragon, wall bracket, planter, or STL pack"
             />
         </div>
 
@@ -31,7 +31,7 @@ const FirstProductStep = ({ onNext, onPrev }) => (
                 Back
             </button>
             <button type="button" onClick={onNext} className="w-full sm:w-auto px-8 py-3 sm:py-2.5 rounded-xl sm:rounded-full font-bold bg-blue-500 text-white hover:bg-blue-600 shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0">
-                Continue
+                Save Draft
             </button>
         </div>
     </Motion.section>
@@ -39,9 +39,9 @@ const FirstProductStep = ({ onNext, onPrev }) => (
 
 const StepperWithSetup = () => {
     const steps = [
-        { id: 1, title: 'Store Profile' },
-        { id: 2, title: 'Payout Details' },
-        { id: 3, title: 'First Product' },
+        { id: 1, title: 'Shop Profile' },
+        { id: 2, title: 'Payouts' },
+        { id: 3, title: 'First Listing' },
     ];
 
     const [currentStep, setCurrentStep] = useState(1);
@@ -55,7 +55,7 @@ const StepperWithSetup = () => {
     };
 
     const handleFinalize = () => {
-        alert("Store launched! Welcome aboard.");
+        alert("Seller setup complete. You can now keep building your shop.");
     };
 
     return (

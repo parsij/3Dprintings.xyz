@@ -1,33 +1,42 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
-
-// Route Imports
-import Home from "./routes/Home.jsx";
-import SignIn from "./routes/SignIn.jsx";
-import SignUp from "./routes/SignUp.jsx";
-import ForgotPassword from "./routes/ForgotPassword.jsx";
-import ResetPassword from "./routes/ResetPassword.jsx";
-import Products from "./routes/Products.jsx";
-import ProductPage from "./routes/ProductPage.jsx";
-import CartPage from "./routes/Cart.jsx";
-import AccountSettings from "./routes/AccountSettings.jsx";
-import SearchResults from "./routes/SearchResults.jsx";
-import LikedProducts from "./routes/LikedProducts.jsx";
-import SavedProducts from "./routes/SavedProducts.jsx";
-import YourReviews from "./routes/YourReviews.jsx";
-import Checkout from "./components/Checkout.jsx";
-import PaymentSuccess from "./routes/PaymentSuccess.jsx";
-import PaymentCancel from "./routes/PaymentCancel.jsx";
-import BecomeSellerLandingPage from "./seller/components/SellerSignUp/NewSellerLandingPage.jsx";
-import ShopInfo from "./routes/shopInfo.jsx";
-import Messages from "./routes/Messages.jsx";
-import StepperWithSetup from "./seller/components/SellerSignUp/StepperWithSetup.jsx";
 import { useTheme } from "./ThemeContext.jsx";
+
+const Home = lazy(() => import("./routes/Home.jsx"));
+const SignIn = lazy(() => import("./routes/SignIn.jsx"));
+const SignUp = lazy(() => import("./routes/SignUp.jsx"));
+const ForgotPassword = lazy(() => import("./routes/ForgotPassword.jsx"));
+const ResetPassword = lazy(() => import("./routes/ResetPassword.jsx"));
+const Products = lazy(() => import("./routes/Products.jsx"));
+const ProductPage = lazy(() => import("./routes/ProductPage.jsx"));
+const CartPage = lazy(() => import("./routes/Cart.jsx"));
+const AccountSettings = lazy(() => import("./routes/AccountSettings.jsx"));
+const SearchResults = lazy(() => import("./routes/SearchResults.jsx"));
+const LikedProducts = lazy(() => import("./routes/LikedProducts.jsx"));
+const SavedProducts = lazy(() => import("./routes/SavedProducts.jsx"));
+const YourReviews = lazy(() => import("./routes/YourReviews.jsx"));
+const Checkout = lazy(() => import("./components/Checkout.jsx"));
+const PaymentSuccess = lazy(() => import("./routes/PaymentSuccess.jsx"));
+const PaymentCancel = lazy(() => import("./routes/PaymentCancel.jsx"));
+const BecomeSellerLandingPage = lazy(() => import("./seller/components/SellerSignUp/NewSellerLandingPage.jsx"));
+const ShopInfo = lazy(() => import("./routes/shopInfo.jsx"));
+const Messages = lazy(() => import("./routes/Messages.jsx"));
+const TermsOfService = lazy(() => import("./routes/TermsOfService.jsx"));
+const PrivacyPolicy = lazy(() => import("./routes/PrivacyPolicy.jsx"));
+const StepperWithSetup = lazy(() => import("./seller/components/SellerSignUp/StepperWithSetup.jsx"));
 
 const ROUTE_BACKGROUNDS = {
   light: "#fff7ed",
   dark: "#09090b",
 };
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-orange-50 text-sm font-bold text-gray-700">
+      Loading page…
+    </div>
+  );
+}
 
 // Keeps scroll bounce and route transitions aligned with the saved site theme.
 const ThemeLayout = ({ forceDark = false }) => {
@@ -51,7 +60,6 @@ const ThemeLayout = ({ forceDark = false }) => {
 
 function SignInRoute({ user, setUser }) {
   if (user) {
-    // If user is logged in, redirect to account page or home
     return <Navigate to="/account" replace />;
   }
   return <SignIn setUser={setUser} />;
@@ -59,27 +67,20 @@ function SignInRoute({ user, setUser }) {
 
 const Router = ({ user, setUser }) => {
   return (
-      <BrowserRouter>
+    <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
         <Routes>
-
-          {/* ========================================== */}
-          {/* DARK THEME ROUTES                          */}
-          {/* ========================================== */}
           <Route element={<ThemeLayout forceDark />}>
             <Route
-                path="/become-seller"
-                element={user ? <BecomeSellerLandingPage user={user} setUser={setUser} /> : <Navigate to="/signin" replace />}
+              path="/become-seller"
+              element={user ? <BecomeSellerLandingPage user={user} setUser={setUser} /> : <Navigate to="/signin" replace />}
             />
             <Route
               path="/become-seller/info"
               element={user ? <StepperWithSetup user={user} setUser={setUser} /> : <Navigate to="/signin" replace />}
-          />
-            {/* If you build more dark pages later, just drop them in here! */}
+            />
           </Route>
 
-          {/* ========================================== */}
-          {/* LIGHT THEME ROUTES */}
-          {/* ========================================== */}
           <Route element={<ThemeLayout />}>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<Home user={user} setUser={setUser} />} />
@@ -93,6 +94,8 @@ const Router = ({ user, setUser }) => {
             <Route path="/saved-products" element={<SavedProducts user={user} />} />
             <Route path="/your-reviews" element={<YourReviews user={user} />} />
             <Route path="/messages" element={user ? <Messages user={user} /> : <Navigate to="/signin" replace />} />
+            <Route path="/terms" element={<TermsOfService user={user} />} />
+            <Route path="/privacy" element={<PrivacyPolicy user={user} />} />
             <Route path="/product/:id" element={<ProductPage user={user} />} />
             <Route path="/shop/:shopName" element={<ShopInfo user={user} />} />
             <Route path="/cart" element={<CartPage user={user} />} />
@@ -100,16 +103,14 @@ const Router = ({ user, setUser }) => {
             <Route path="/success" element={user ? <PaymentSuccess user={user} /> : <Navigate to="/signin" replace />} />
             <Route path="/cancel" element={<PaymentCancel />} />
             <Route
-                path="/account/*"
-                element={user ? <AccountSettings user={user} setUser={setUser} /> : <Navigate to="/signin" replace />}
+              path="/account/*"
+              element={user ? <AccountSettings user={user} setUser={setUser} /> : <Navigate to="/signin" replace />}
             />
-
-            {/* Catch-all for any unmatched routes */}
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Route>
-
         </Routes>
-      </BrowserRouter>
+      </Suspense>
+    </BrowserRouter>
   );
 };
 

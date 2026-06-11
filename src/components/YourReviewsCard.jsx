@@ -1,5 +1,5 @@
 import React from 'react'
-import image_test from "../assets/Screenshot_20260322_175244.png";
+import image_test from "../assets/product-placeholder.webp";
 import {Link} from "react-router-dom";
 import editIcon from "../assets/edit.svg";
 import trashIcon from "../assets/trash.svg";

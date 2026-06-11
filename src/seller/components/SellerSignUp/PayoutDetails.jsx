@@ -189,10 +189,10 @@ const PayoutDetails = ({ onNext, onPrev, mode = "embedded", onStatusChange, onRo
             className="w-full text-left"
             aria-labelledby="payout-heading"
         >
-            <h3 id="payout-heading" className="text-xl font-bold text-white mb-4">Payout Details</h3>
+            <h3 id="payout-heading" className="text-xl font-bold text-white mb-4">Connect Payouts</h3>
             <p className="text-zinc-400 mb-6 text-sm">
-                We partner with Stripe to guarantee secure, direct payouts to your bank account.
-                Your financial data is fully encrypted on Stripe’s network and is never stored on our servers.
+                Connect Stripe so marketplace orders can route payouts to your bank account.
+                Sensitive financial details are handled by Stripe and are not stored directly on our servers.
             </p>
 
             {status?.shopUrl && (
@@ -250,7 +250,7 @@ const PayoutDetails = ({ onNext, onPrev, mode = "embedded", onStatusChange, onRo
                     {isBusy ? (
                         <Motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center text-zinc-500 gap-2">
                             <Loader2 className="h-6 w-6 animate-spin text-blue-500" aria-hidden="true" />
-                            <span className="text-sm font-medium">{verifyingReturn ? "Confirming Stripe setup..." : "Checking connection status..."}</span>
+                            <span className="text-sm font-medium">{verifyingReturn ? "Confirming Stripe setup…" : "Checking connection status…"}</span>
                         </Motion.div>
                     ) : isStripeConnected ? (
                         <Motion.div key="connected" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-3 w-full max-w-sm rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6">
@@ -269,7 +269,7 @@ const PayoutDetails = ({ onNext, onPrev, mode = "embedded", onStatusChange, onRo
                                 className="group flex items-center gap-2 px-8 py-3.5 bg-linear-to-b from-orange-400 to-orange-600 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:shadow-[0_0_30px_rgba(249,115,22,0.6)] transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 active:scale-95 active:translate-y-0 border border-orange-400/50 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
                             >
                                 {redirecting ? (
-                                    <><Loader2 className="h-5 w-5 animate-spin" /> Redirecting...</>
+                                    <><Loader2 className="h-5 w-5 animate-spin" /> Redirecting…</>
                                 ) : (
                                     <><ExternalLink className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /> Connect via Stripe</>
                                 )}

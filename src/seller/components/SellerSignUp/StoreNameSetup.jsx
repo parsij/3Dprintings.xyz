@@ -1,4 +1,5 @@
 import { motion as Motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import {
     checkShopNameAvailability,
     saveSellerShopOnboarding,
@@ -100,13 +101,13 @@ const StoreNameSetup = ({ onNext }) => {
             className="w-full text-left"
             aria-labelledby="setup-heading"
         >
-            <h3 id="setup-heading" className="text-xl font-bold text-white mb-4">Set Up Your Store Profile</h3>
+            <h3 id="setup-heading" className="text-xl font-bold text-white mb-4">Name Your Public Shop</h3>
 
             <div className="space-y-4">
                 {/* Store Name Input */}
                 <div>
                     <label htmlFor="shopName" className="text-xs text-zinc-400 font-semibold uppercase block mb-2">
-                        Store Name
+                        Shop Name
                     </label>
                     <div className="relative">
                         <input
@@ -121,14 +122,14 @@ const StoreNameSetup = ({ onNext }) => {
                             className={`w-full bg-zinc-800 border ${
                                 shopNameError ? 'border-red-500' : 'border-zinc-700'
                             } rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors`}
-                            placeholder="Something Creative"
+                            placeholder="LayerLab Prints"
                             required
                         />
 
                         {/* Loading Indicator */}
                         {checkingShopName && (
                             <span className="absolute right-4 top-3.5 text-zinc-400 flex items-center">
-                                <span className="sr-only">Checking name availability...</span>
+                                <span className="sr-only">Checking name availability…</span>
                                 <svg
                                     width="20"
                                     height="20"
@@ -191,21 +192,30 @@ const StoreNameSetup = ({ onNext }) => {
                     </div>
                 </div>
 
-                {/* Terms and Conditions */}
-                <div className="flex items-center pt-2">
+                {/* Terms and policy acceptance */}
+                <div className="flex items-start pt-2">
                     <input
                         type="checkbox"
                         id="terms"
                         name="terms"
                         checked={termsAccepted}
                         onChange={(e) => setTermsAccepted(e.target.checked)}
-                        className="w-4 h-4 text-blue-500 bg-zinc-800 border-zinc-700 rounded focus:ring-blue-500 focus:ring-offset-zinc-900 cursor-pointer"
+                        className="mt-0.5 w-4 h-4 text-blue-500 bg-zinc-800 border-zinc-700 rounded focus:ring-blue-500 focus:ring-offset-zinc-900 cursor-pointer"
                         required
                         aria-required="true"
                     />
-                    <label htmlFor="terms" className="ml-2 text-sm text-zinc-400 cursor-pointer select-none">
-                        I accept the Terms and Conditions
-                    </label>
+                    <div className="ml-2 text-sm leading-6 text-zinc-400">
+                        <label htmlFor="terms" className="cursor-pointer select-none">
+                            I accept the marketplace terms for selling physical prints and digital files.
+                        </label>{" "}
+                        <Link to="/terms" className="font-bold text-blue-300 underline underline-offset-4 hover:text-blue-200">
+                            Terms
+                        </Link>{" "}
+                        <span aria-hidden="true">/</span>{" "}
+                        <Link to="/privacy" className="font-bold text-blue-300 underline underline-offset-4 hover:text-blue-200">
+                            Privacy
+                        </Link>
+                    </div>
                 </div>
             </div>
 
@@ -220,7 +230,7 @@ const StoreNameSetup = ({ onNext }) => {
                             : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
                     }`}
                 >
-                    {savingShop ? "Saving..." : "Continue"}
+                    {savingShop ? "Saving…" : "Continue"}
                 </button>
             </div>
         </Motion.form>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import trash from "../assets/trash.svg";
-import image_test from "../assets/Screenshot_20260322_175244.png";
+import image_test from "../assets/product-placeholder.webp";
 
 const CartProductCard = ({
   productId,

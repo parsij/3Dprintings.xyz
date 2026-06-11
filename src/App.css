@@ -1,7 +1,8 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 :root {
+  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Manrope", ui-sans-serif, system-ui, sans-serif;
   --page-bg: #fff7ed;
   --page-bg-muted: #f2f2f2;
   --surface: #ffffff;
@@ -18,6 +19,14 @@
   --border-soft: #f3f4f6;
   --border-accent: #fed7aa;
   --border-accent-soft: #ffedd5;
+  --brand-ink: #111827;
+  --brand-orange: #f97316;
+  --brand-orange-strong: #ea580c;
+  --brand-amber: #f59e0b;
+  --brand-cream: #fff7ed;
+  --brand-clay: #9a3412;
+  --shadow-soft: 0 24px 80px rgba(17, 24, 39, 0.12);
+  --shadow-card: 0 18px 45px rgba(17, 24, 39, 0.1);
 }
 
 html[data-theme="dark"] {
@@ -46,8 +55,50 @@ html {
 body {
   background-color: var(--page-bg);
   color: var(--text-secondary);
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   transition: background-color 180ms ease, color 180ms ease;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: rgba(249, 115, 22, 0.18);
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+}
+
+::selection {
+  background: rgba(249, 115, 22, 0.24);
+  color: #111827;
+}
+
+.site-shell {
+  background:
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.18), transparent 34rem),
+    radial-gradient(circle at 85% 10%, rgba(17, 24, 39, 0.12), transparent 24rem),
+    linear-gradient(180deg, #fff7ed 0%, #fffaf5 38%, #f7efe7 100%);
+}
+
+.maker-grid {
+  background-image:
+    linear-gradient(rgba(17, 24, 39, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 24, 39, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/30 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-50;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
 }
 
 html[data-theme="dark"] .bg-\[\#f2f2f2\],
@@ -77,6 +128,17 @@ html[data-theme="dark"] .theme-toggle-thumb {
 
 html[data-theme="dark"] .theme-light-control:hover {
   background-color: #f97316;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 html[data-theme="dark"] .bg-gray-50,

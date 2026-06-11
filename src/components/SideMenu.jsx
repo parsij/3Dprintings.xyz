@@ -7,12 +7,12 @@ import { MARKETPLACE_HOME_URL, SELLER_SITE_ORIGIN } from "../config/api.js";
 function buildCustomerMenuItems(isSeller) {
   const items = [
     { label: "Home", to: "/home" },
-    { label: "3D Printed Models", to: "/products" },
+    { label: "Shop 3D Prints", to: "/products" },
     { label: "Liked Products", to: "/liked-products" },
     { label: "Saved Products", to: "/saved-products" },
-    { label: "My Reviews", to: "/your-reviews" },
-    { label: "My Orders", to: "/account/orders" },
+    { label: "Orders", to: "/account/orders" },
     { label: "Messages", to: "/messages" },
+    { label: "Your Reviews", to: "/your-reviews" },
   ];
 
   if (isSeller) {
@@ -25,19 +25,22 @@ function buildCustomerMenuItems(isSeller) {
     items.push({ label: "Become a Seller", to: "/become-seller" });
   }
 
+  items.push({ label: "Terms", to: "/terms" });
+  items.push({ label: "Privacy", to: "/privacy" });
+
   return items;
 }
 
 const seller = [
   { label: "Dashboard", to: "/dashboard" },
   { label: "Balance", to: "/balance" },
-  { label: "Manage Products", to: "/inventory" },
-  { label: "Boxes", to: "/boxes" },
+  { label: "Inventory", to: "/inventory" },
+  { label: "Shipping Boxes", to: "/boxes" },
   { label: "Orders", to: "/orders" },
   { label: "Messages", to: "/messages" },
   { label: "Reviews", to: "/reviews" },
   { label: "Preferences", to: "/preferences" },
-  { label: "Back to Marketplace", to: MARKETPLACE_HOME_URL },
+  { label: "Back To Marketplace", to: MARKETPLACE_HOME_URL, external: true },
 ];
 
 const SideMenu = ({ title = "Menu", role = "customer" }) => {
@@ -47,39 +50,51 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
   const isSeller = String(user?.role || "").trim().toLowerCase() === "seller";
   const activeItems = role === "seller" ? seller : buildCustomerMenuItems(isSeller);
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <>
-      <div
-        onClick={() => setMenuOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/25 transition-opacity duration-300 ease-in-out ${
-          menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      />
+      {menuOpen && (
+        <button
+          type="button"
+          onClick={closeMenu}
+          className="fixed inset-0 z-40 bg-gray-950/45 backdrop-blur-[2px] transition-opacity duration-300"
+          aria-label="Close Menu Overlay"
+        />
+      )}
 
+      {menuOpen && (
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-orange-100 bg-white text-gray-800 shadow-xl transition-transform duration-300 ease-in-out ${
-          menuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className="fixed left-0 top-0 z-50 flex h-full w-[min(21rem,88vw)] flex-col overflow-hidden border-r border-orange-100/80 bg-orange-50 text-gray-900 shadow-2xl transition-transform duration-300 ease-out"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-orange-100 p-4">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button
-            type="button"
-            onClick={() => setMenuOpen(false)}
-            className="cursor-pointer text-gray-700 transition-colors duration-200 hover:text-orange-500"
-            aria-label="Close menu"
-          >
-            ✕
-          </button>
+        <div className="maker-grid relative overflow-hidden border-b border-orange-200/70 p-5">
+          <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-orange-300/35 blur-2xl" aria-hidden="true" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-700">3Dprintings</p>
+              <h2 className="mt-2 font-display text-2xl font-black tracking-tight text-gray-950">{title}</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-gray-600">
+                Find prints, manage orders, or start selling from one place.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeMenu}
+              className="rounded-2xl border border-orange-200 bg-white/80 px-3 py-2 text-sm font-black text-gray-800 transition-colors duration-200 hover:border-orange-400 hover:text-orange-700 focus-ring"
+              aria-label="Close Menu"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
           {activeItems.map((item, index) => {
-            const className = `block cursor-pointer rounded-lg px-3 py-2.5 transition-all duration-200 ease-in-out hover:translate-x-1 hover:bg-orange-50 hover:text-orange-500 ${
+            const className = `block rounded-2xl px-4 py-3 text-sm font-extrabold text-gray-700 transition-[background-color,color,transform,opacity] duration-200 hover:translate-x-1 hover:bg-white hover:text-orange-700 focus-ring ${
               menuOpen ? "translate-x-0 opacity-100" : "-translate-x-2 opacity-0"
             }`;
             const style = {
-              transitionDelay: menuOpen ? `${index * 35}ms` : "0ms",
+              transitionDelay: menuOpen ? `${index * 32}ms` : "0ms",
             };
 
             if (item.external) {
@@ -87,7 +102,7 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
                 <a
                   key={`${item.to}-${item.label}`}
                   href={item.to}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={closeMenu}
                   className={className}
                   style={style}
                 >
@@ -100,7 +115,7 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
               <Link
                 key={`${item.to}-${item.label}`}
                 to={item.to}
-                onClick={() => setMenuOpen(false)}
+                onClick={closeMenu}
                 className={className}
                 style={style}
               >
@@ -110,28 +125,28 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
           })}
         </nav>
 
-        <div className="shrink-0 border-t border-orange-100 p-4">
+        <div className="shrink-0 border-t border-orange-200/80 p-4">
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50/70 px-4 py-3 text-left transition-all duration-200 hover:border-orange-300 hover:bg-orange-100/70 active:scale-[0.99]"
+            className="flex w-full items-center justify-between gap-3 rounded-3xl border border-orange-200 bg-white/80 px-4 py-3 text-left transition-colors duration-200 hover:border-orange-400 hover:bg-white focus-ring"
             aria-pressed={isDarkMode}
-            aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
+            aria-label={`Switch To ${isDarkMode ? "Light" : "Dark"} Mode`}
           >
             <span>
-              <span className="block text-sm font-bold text-gray-900">Appearance</span>
-              <span className="block text-xs font-medium text-gray-600">
-                {isDarkMode ? "Dark mode enabled" : "Light mode enabled"}
+              <span className="block text-sm font-black text-gray-950">Appearance</span>
+              <span className="block text-xs font-bold text-gray-600">
+                {isDarkMode ? "Dark Mode Enabled" : "Light Mode Enabled"}
               </span>
             </span>
             <span
               className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition-colors duration-200 ${
-                isDarkMode ? "bg-zinc-700" : "bg-gray-300"
+                isDarkMode ? "bg-zinc-700" : "bg-orange-200"
               }`}
               aria-hidden="true"
             >
               <span
-                className={`theme-toggle-thumb flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-bold text-gray-900 shadow-sm transition-transform duration-200 ${
+                className={`theme-toggle-thumb flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-black text-gray-900 shadow-sm transition-transform duration-200 ${
                   isDarkMode ? "translate-x-6" : "translate-x-0"
                 }`}
               >
@@ -141,6 +156,7 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
           </button>
         </div>
       </aside>
+      )}
     </>
   );
 };

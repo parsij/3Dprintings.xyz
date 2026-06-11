@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import SellerNavBar from "../SellerNavBar.jsx";
 import { suggestAccountAddress } from "../../../services/accountSettingsService.js";
 import {

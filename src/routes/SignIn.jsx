@@ -4,6 +4,7 @@ import PasswordEye from "../assets/PasswordEye.svg";
 import googleLogo from "../assets/google.svg";
 import SideMenu from "../components/SideMenu.jsx";
 import SmallNavBar from "../components/SmallNavBar.jsx";
+import Seo from "../components/Seo.jsx";
 import axios from "axios";
 import { API_BASE, SELLER_SITE_ORIGIN } from "../config/api.js";
 
@@ -247,19 +248,25 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
 
   return (
     <>
+      <Seo
+        title="Sign In"
+        description="Sign in to 3Dprintings.xyz to shop physical 3D prints, download files, message sellers, and manage orders."
+        path="/signin"
+        noIndex
+      />
       <SmallNavBar />
       <SideMenu />
-      <main className="min-h-screen bg-orange-50 text-gray-900 flex items-center justify-center px-4">
-        <section className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-6 sm:p-8 shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] animate-fade-in-up">
+      <main id="main-content" className="site-shell min-h-screen text-gray-900 flex items-center justify-center px-4 py-28">
+        <section className="w-full max-w-md rounded-[2rem] border border-orange-100 bg-white/88 p-6 shadow-[0_24px_80px_rgba(17,24,39,0.12)] backdrop-blur sm:p-8 animate-fade-in-up">
           <div className="mb-6 text-center group">
-            <h1 className="text-3xl font-extrabold tracking-tight transition-all duration-300 group-hover:translate-y-[-2px]">
+            <h1 className="font-display text-3xl font-black tracking-tight">
               Welcome back to{" "}
               <span className="text-orange-500 group-hover:text-orange-600 transition-colors duration-300">
                 3Dprintings.xyz
               </span>
             </h1>
-            <p className="mt-2 text-sm text-gray-600 transition-colors duration-300 group-hover:text-gray-700">
-              Sign in to continue shopping 3D printed models.
+            <p className="mt-2 text-sm font-semibold leading-6 text-gray-600">
+              Continue shopping physical prints, downloadable files, orders, and seller messages.
             </p>
           </div>
 
@@ -353,7 +360,7 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
                   : "bg-gray-300 cursor-not-allowed opacity-70"
               }`}
             >
-              {isSubmitting ? "Signing in..." : "Sign In"}
+              {isSubmitting ? "Signing In…" : "Sign In"}
             </button>
 
             {submitMessage && (
@@ -389,7 +396,7 @@ export default function SignIn({ setUser, postLoginSellerFlow = false }) {
             />
           )}
           {googleClientId && !googleReady && (
-            <p className="mt-2 text-center text-xs text-gray-500">Loading Google sign-in...</p>
+            <p className="mt-2 text-center text-xs text-gray-500">Loading Google Sign-In…</p>
           )}
 
           <p className="mt-6 text-center text-sm text-gray-600 transition-colors duration-300 hover:text-gray-700">

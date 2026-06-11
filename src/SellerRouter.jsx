@@ -1,22 +1,23 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
-import SignIn from "./routes/SignIn.jsx";
-import SignUp from "./routes/SignUp.jsx";
-import ForgotPassword from "./routes/ForgotPassword.jsx";
-import ResetPassword from "./routes/ResetPassword.jsx";
-import SellerDashboard from "./seller/routes/SellerDashboard.jsx";
-import SellerInventory from "./seller/routes/SellerInventory.jsx";
-import SellerOrders from "./seller/routes/SellerOrders.jsx";
-import SellerPreferences from "./seller/routes/SellerPreferences.jsx";
-import SellerReviews from "./seller/routes/SellerReviews.jsx";
-import SellerBalance from "./seller/routes/SellerBalance.jsx";
-import SellerBoxes from "./seller/routes/SellerBoxes.jsx";
-import Messages from "./routes/Messages.jsx";
 import { BECOME_SELLER_URL } from "./config/api.js";
 import { getSellerOnboardingStatus } from "./seller/services/sellerOnboardingService.js";
-import SellerSetup from "./seller/components/SellerSignUp/SellerSetup.jsx";
 import { resolveSellerSetupRoute } from "./seller/components/SellerSignUp/sellerSetupRouting.js";
 import { useTheme } from "./ThemeContext.jsx";
+
+const SignIn = lazy(() => import("./routes/SignIn.jsx"));
+const SignUp = lazy(() => import("./routes/SignUp.jsx"));
+const ForgotPassword = lazy(() => import("./routes/ForgotPassword.jsx"));
+const ResetPassword = lazy(() => import("./routes/ResetPassword.jsx"));
+const SellerDashboard = lazy(() => import("./seller/routes/SellerDashboard.jsx"));
+const SellerInventory = lazy(() => import("./seller/routes/SellerInventory.jsx"));
+const SellerOrders = lazy(() => import("./seller/routes/SellerOrders.jsx"));
+const SellerPreferences = lazy(() => import("./seller/routes/SellerPreferences.jsx"));
+const SellerReviews = lazy(() => import("./seller/routes/SellerReviews.jsx"));
+const SellerBalance = lazy(() => import("./seller/routes/SellerBalance.jsx"));
+const SellerBoxes = lazy(() => import("./seller/routes/SellerBoxes.jsx"));
+const Messages = lazy(() => import("./routes/Messages.jsx"));
+const SellerSetup = lazy(() => import("./seller/components/SellerSignUp/SellerSetup.jsx"));
 
 const ROUTE_BACKGROUNDS = {
   light: "#fff7ed",
@@ -43,6 +44,14 @@ function ThemeLayout() {
 
 function hasSellerRole(user) {
   return String(user?.role || "").trim().toLowerCase() === "seller";
+}
+
+function SellerRouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 text-sm font-bold text-gray-700">
+      Loading seller page…
+    </div>
+  );
 }
 
 function ProtectedSellerRoute({ user, children, allowIncomplete = false }) {
@@ -90,7 +99,7 @@ function ProtectedSellerRoute({ user, children, allowIncomplete = false }) {
   if (!hasSellerRole(user)) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-100">
-        <div className="mx-3 text-gray-900">Loading ...</div>
+        <div className="mx-3 text-gray-900">Loading…</div>
         <div className="m-3 h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent" />
       </div>
     );
@@ -99,7 +108,7 @@ function ProtectedSellerRoute({ user, children, allowIncomplete = false }) {
   if (!allowIncomplete && checkingOnboarding) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-100">
-        <div className="mx-3 text-gray-900">Checking seller setup...</div>
+        <div className="mx-3 text-gray-900">Checking seller setup…</div>
         <div className="m-3 h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent" />
       </div>
     );
@@ -109,7 +118,7 @@ function ProtectedSellerRoute({ user, children, allowIncomplete = false }) {
     window.location.href = BECOME_SELLER_URL;
     return (
       <div className="flex h-screen items-center justify-center bg-gray-100">
-        <div className="mx-3 text-gray-900">Redirecting to seller setup...</div>
+        <div className="mx-3 text-gray-900">Redirecting to seller setup…</div>
       </div>
     );
   }
@@ -132,8 +141,9 @@ function SignInRoute({ user, setUser }) {
 const SellerRouter = ({ user, setUser }) => {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route element={<ThemeLayout />}>
+      <Suspense fallback={<SellerRouteFallback />}>
+        <Routes>
+          <Route element={<ThemeLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           <Route path="/signin" element={<SignInRoute user={user} setUser={setUser} />} />
@@ -248,8 +258,9 @@ const SellerRouter = ({ user, setUser }) => {
           />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };
