@@ -232,7 +232,7 @@ const SearchResults = ({ user }) => {
               <p className="mx-auto mt-3 max-w-md text-sm font-semibold leading-6 text-gray-600">
                 {query
                   ? "Try a broader term, search by object type, or check back as more sellers publish prints and files."
-                  : "Use the search box above to find physical prints, digital model files, shops, and maker goods."}
+                  : "Use the search box above to find physical prints, digital model files, shops, and 3D printed goods."}
               </p>
             </div>
           ) : (

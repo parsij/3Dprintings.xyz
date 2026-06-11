@@ -1,13 +1,13 @@
 # 3Dprintings.xyz
 
-3Dprintings.xyz is a marketplace for physical 3D printed products and downloadable 3D model files from independent makers.
+3Dprintings.xyz is a marketplace for physical 3D printed products and downloadable 3D model files from independent sellers.
 
 ## What the site offers
 
 - Buyers can browse physical 3D printed goods, replacement parts, decor, tools, collectibles, prototypes, and ready-to-print model files.
 - Listings should explain whether the buyer receives a shipped physical print, a downloadable file, or a bundle that includes both.
 - Buyers can message shops about materials, fit, file details, shipping expectations, and order context.
-- Makers can create seller accounts, connect payouts, configure shipping, and publish listings for finished prints, files, or creator bundles.
+- Sellers can create accounts, connect payouts, configure shipping, and publish listings for finished prints, files, or product bundles.
 
 ## Important public pages
 

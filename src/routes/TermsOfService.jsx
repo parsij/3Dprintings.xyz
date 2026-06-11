@@ -6,7 +6,7 @@ const sections = [
   {
     title: "1. What 3Dprintings.xyz Does",
     body: [
-      "3Dprintings.xyz is a marketplace where independent sellers can list physical 3D printed products, downloadable 3D model files, and related maker goods. Buyers can browse listings, message shops, place orders, and review completed purchases.",
+      "3Dprintings.xyz is a marketplace where independent sellers can list physical 3D printed products, downloadable 3D model files, and related 3D printing goods. Buyers can browse listings, message shops, place orders, and review completed purchases.",
       "Sellers are responsible for their listings, photos, descriptions, prices, shipping settings, file rights, and fulfillment. The platform provides marketplace tools, checkout, messaging, and account features.",
     ],
   },

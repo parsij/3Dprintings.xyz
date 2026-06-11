@@ -252,7 +252,7 @@ export default function SellerPreferences() {
       <div className="mx-auto max-w-4xl px-4 pb-12 pt-24">
       <div className="rounded-lg border border-gray-200 bg-white p-5">
         <h2 className="text-lg font-bold text-gray-900">Seller Preferences</h2>
-        <p className="mt-1 text-sm text-gray-600">Control storefront details and seller notifications.</p>
+        <p className="mt-1 text-sm text-gray-600">Manage your shop details and seller notifications.</p>
 
         {preferencesMessage ? <p className="mt-3 text-sm text-green-700">{preferencesMessage}</p> : null}
         {preferencesError ? <p className="mt-3 text-sm text-red-600">{preferencesError}</p> : null}

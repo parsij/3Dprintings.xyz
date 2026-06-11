@@ -10,7 +10,7 @@ const quickLinks = [
   "Home fixes",
   "STL files",
   "Cosplay bits",
-  "Maker gifts",
+  "3D printed gifts",
 ];
 
 const shopReasons = [
@@ -19,7 +19,7 @@ const shopReasons = [
     copy: "Brackets, clips, knobs, adapters, organizers, and other objects that are hard to find in regular stores.",
   },
   {
-    title: "Models from real makers",
+    title: "Models from real creators",
     copy: "Buy a finished print, grab a downloadable file, or message the seller when size, material, or fit matters.",
   },
   {
@@ -38,7 +38,7 @@ const marketplaceFaqs = [
   {
     question: "What is sold here?",
     answer:
-      "Physical 3D printed products, useful replacement parts, decor, tools, collectibles, prototypes, and downloadable model files from independent makers.",
+      "Physical 3D printed products, useful replacement parts, decor, tools, collectibles, prototypes, and downloadable model files from independent sellers.",
   },
   {
     question: "How do I know if it is a print or a file?",
@@ -107,7 +107,7 @@ const Home = ({ user }) => {
     <div className="site-shell min-h-screen overflow-hidden text-emerald-950">
       <Seo
         title="Shop 3D Prints, Parts & Model Files"
-        description="Browse physical 3D printed products, replacement parts, maker gifts, and downloadable model files from independent sellers on 3Dprintings.xyz."
+        description="Browse physical 3D printed products, replacement parts, 3D printed gifts, and downloadable model files from independent sellers on 3Dprintings.xyz."
         path="/home"
         jsonLd={homeJsonLd}
       />
@@ -128,7 +128,7 @@ const Home = ({ user }) => {
                 Find 3D models you can actually use.
               </h1>
               <p className="mt-6 max-w-2xl text-pretty text-lg font-bold leading-8 text-stone-700 sm:text-xl">
-                Shop printed parts, fun objects, repair pieces, maker gifts, and downloadable files from people who make them.
+                Shop printed parts, fun objects, repair pieces, 3D printed gifts, and downloadable files from independent sellers.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -163,7 +163,7 @@ const Home = ({ user }) => {
                 </div>
                 <div className="rounded-2xl bg-emerald-700 px-3 py-4">
                   <p className="font-display text-3xl font-bold text-white">Shops</p>
-                  <p className="text-xs font-bold text-emerald-100">maker-run</p>
+                  <p className="text-xs font-bold text-emerald-100">seller-run</p>
                 </div>
               </div>
             </aside>
@@ -177,7 +177,7 @@ const Home = ({ user }) => {
               embedded
               title="Fresh models in the shop"
               eyebrow="Start browsing"
-              description="Real listings from makers: printed parts, useful fixes, desk objects, collectibles, STL files, and bundles."
+              description="Real listings from sellers: printed parts, useful fixes, desk objects, collectibles, STL files, and bundles."
             />
           </div>
         </section>
@@ -205,7 +205,7 @@ const Home = ({ user }) => {
         <section className="px-4 py-12 sm:px-6 lg:px-[5vw]" aria-labelledby="seller-heading">
           <div className="mx-auto grid max-w-7xl gap-6 overflow-hidden rounded-[2.25rem] border border-emerald-900/15 bg-emerald-950 p-6 text-white shadow-[0_28px_80px_rgba(6,78,59,0.22)] md:grid-cols-[1fr_0.8fr] md:p-8 lg:p-10">
             <div>
-              <p className="text-sm font-bold text-red-200">For makers</p>
+              <p className="text-sm font-bold text-red-200">For sellers</p>
               <h2 id="seller-heading" className="mt-3 text-balance font-display text-4xl font-bold tracking-tight sm:text-5xl">
                 Put your models where buyers can find them.
               </h2>
@@ -213,7 +213,7 @@ const Home = ({ user }) => {
                 Open a shop for finished prints, downloadable files, or both. Keep the listing clear: photos, price, material, size, stock, and shipping.
               </p>
               <Link to="/become-seller" className="focus-ring mt-7 inline-flex rounded-full bg-red-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-950/20 transition-colors duration-150 hover:bg-red-400">
-                Open a maker shop
+                Open your shop
               </Link>
             </div>
             <div className="grid gap-3 self-center">

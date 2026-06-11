@@ -159,7 +159,7 @@ export default function SignUp({ setUser }) {
               </span>
             </h1>
             <p className="mt-2 text-sm font-semibold leading-6 text-gray-600">
-              Buy physical prints, save files, message makers, and track orders from one account.
+              Buy physical prints, save files, message sellers, and track orders from one account.
             </p>
           </div>
 

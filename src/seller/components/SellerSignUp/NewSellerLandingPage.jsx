@@ -133,24 +133,24 @@ const NewSellerLandingPage = () => {
             >
               {/* GHOST LAYER */}
               <span className="whitespace-pre opacity-0 pointer-events-none select-none unselectable pr-2" aria-hidden="true">
-              to every maker's storefront |
+              Start your 3D print shop |
             </span>
 
               {/* TYPING LAYER */}
               <div className="absolute top-0 left-0 w-full h-full flex whitespace-pre items-center justify-center" aria-hidden="true">
-                {Array.from("to every ").map((letter, i) => (
+                {Array.from("Start your ").map((letter, i) => (
                     <span key={`p1-${i}`} className="part-1 text-white" style={{ display: 'none' }}>{letter}</span>
                 ))}
-                {Array.from("maker's").map((letter, i) => (
+                {Array.from("3D print").map((letter, i) => (
                     <span key={`p2-${i}`} className="part-2 text-orange-500" style={{ display: 'none' }}>{letter}</span>
                 ))}
-                {Array.from(" storefront").map((letter, i) => (
+                {Array.from(" shop").map((letter, i) => (
                     <span key={`p3-${i}`} className="part-3 text-white" style={{ display: 'none' }}>{letter}</span>
                 ))}
                 <Motion.span id="blinker" initial={{ opacity: 0 }} className="text-orange-500 font-light ml-0.5">|</Motion.span>
               </div>
               {/* SCREEN READER ONLY TEXT */}
-              <span className="sr-only">to every maker's storefront</span>
+              <span className="sr-only">Start your 3D print shop</span>
             </h2>
           </div>
         </section>
@@ -164,11 +164,11 @@ const NewSellerLandingPage = () => {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="max-w-2xl mx-auto px-6 text-center text-sm md:text-base text-gray-400 leading-relaxed tracking-wide relative z-10"
           >
-            <p>Welcome, maker. Your shop starts here.</p>
+            <p>Welcome. Your 3D print shop starts here.</p>
             <br />
-            <p>List finished 3D printed products, downloadable model files, or both. Your storefront should make buyers understand what they are getting, how it is made, and why your work is worth ordering.</p>
+            <p>Sell finished 3D printed products, downloadable model files, or both. Help buyers understand what they are getting, how it is made, and why your work is worth ordering.</p>
             <br />
-            <p>Set up the shop name, connect payouts, publish the first listing, and keep building from the seller dashboard.</p>
+            <p>Add your shop name, connect payouts, publish your first listing, and manage everything from the seller dashboard.</p>
             <br />
 
             {/* FIX: Removed button wrapping the link for valid HTML */}
