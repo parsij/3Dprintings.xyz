@@ -437,7 +437,7 @@ module.exports = function sellerOnboardingRoutes(deps) {
           email: req.user.email,
         },
         "Shipping origin address",
-        { allowNotFoundSoftPass: false }
+        { allowNotFoundSoftPass: true }
       );
 
       await pool.query(

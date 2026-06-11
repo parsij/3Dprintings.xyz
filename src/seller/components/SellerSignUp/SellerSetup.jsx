@@ -12,6 +12,8 @@ import { resolveSellerSetupRoute } from "./sellerSetupRouting.js";
 
 const MotionDiv = motion.div;
 const ADDRESS_AUTOCOMPLETE_DEBOUNCE_MS = 100;
+const US_STATE_CODE_REGEX = /^[A-Z]{2}$/;
+const US_ZIP_CODE_REGEX = /^\d{5}(?:-\d{4})?$/;
 
 const EMPTY_ADDRESS = {
   line1: "",
@@ -22,6 +24,34 @@ const EMPTY_ADDRESS = {
   country: "US",
   residential: true,
 };
+
+function normalizeShippingAddress(address) {
+  return {
+    line1: String(address.line1 || "").replace(/\s+/g, " ").trim(),
+    line2: String(address.line2 || "").replace(/\s+/g, " ").trim(),
+    city: String(address.city || "").replace(/\s+/g, " ").trim(),
+    state: String(address.state || "").trim().toUpperCase(),
+    zip: String(address.zip || "").trim(),
+    country: "US",
+    residential: true,
+  };
+}
+
+function validateShippingAddress(address) {
+  if (!address.line1 || !address.city || !address.state || !address.zip) {
+    return "Enter a complete US shipping origin address.";
+  }
+  if (!/\d/.test(address.line1)) {
+    return "Street address must include a building number.";
+  }
+  if (!US_STATE_CODE_REGEX.test(address.state)) {
+    return "State must be a 2-letter US code, like CA.";
+  }
+  if (!US_ZIP_CODE_REGEX.test(address.zip)) {
+    return "ZIP code must be 5 digits, or ZIP+4 like 94107-1234.";
+  }
+  return "";
+}
 
 export default function SellerSetup({ step }) {
   const navigate = useNavigate();
@@ -108,10 +138,18 @@ export default function SellerSetup({ step }) {
 
   const handleShippingSubmit = async (event) => {
     event.preventDefault();
+    const normalizedAddress = normalizeShippingAddress(shippingAddress);
+    const validationError = validateShippingAddress(normalizedAddress);
+    setShippingAddress(normalizedAddress);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     try {
-      const result = await saveSellerShippingOrigin({ sellerAddress: shippingAddress });
+      const result = await saveSellerShippingOrigin({ sellerAddress: normalizedAddress });
       setStatus((prev) => ({ ...prev, ...result }));
       navigate(result?.isComplete ? "/boxes?new=1" : resolveSellerSetupRoute(result?.completionStep), { replace: true });
     } catch (err) {
