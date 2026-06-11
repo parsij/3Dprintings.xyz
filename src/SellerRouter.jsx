@@ -9,12 +9,13 @@ import SellerInventory from "./seller/routes/SellerInventory.jsx";
 import SellerOrders from "./seller/routes/SellerOrders.jsx";
 import SellerPreferences from "./seller/routes/SellerPreferences.jsx";
 import SellerReviews from "./seller/routes/SellerReviews.jsx";
-import SellerOnboarding from "./seller/routes/SellerOnboarding.jsx";
 import SellerBalance from "./seller/routes/SellerBalance.jsx";
 import SellerBoxes from "./seller/routes/SellerBoxes.jsx";
 import Messages from "./routes/Messages.jsx";
 import { BECOME_SELLER_URL } from "./config/api.js";
 import { getSellerOnboardingStatus } from "./seller/services/sellerOnboardingService.js";
+import SellerSetup from "./seller/components/SellerSignUp/SellerSetup.jsx";
+import { resolveSellerSetupRoute } from "./seller/components/SellerSignUp/sellerSetupRouting.js";
 import { useTheme } from "./ThemeContext.jsx";
 
 const ROUTE_BACKGROUNDS = {
@@ -43,13 +44,6 @@ function ThemeLayout() {
 function hasSellerRole(user) {
   return String(user?.role || "").trim().toLowerCase() === "seller";
 }
-
-const ONBOARDING_ROUTE_BY_STEP = {
-  stripe_connect: "/onboarding/stripe",
-  shipping_origin: "/onboarding/shipping",
-  first_box: "/boxes?new=1",
-  completed: null,
-};
 
 function ProtectedSellerRoute({ user, children, allowIncomplete = false }) {
   const [onboardingStep, setOnboardingStep] = useState(null);
@@ -121,7 +115,7 @@ function ProtectedSellerRoute({ user, children, allowIncomplete = false }) {
   }
 
   if (!allowIncomplete && onboardingStep && onboardingStep !== "completed") {
-    const redirectPath = ONBOARDING_ROUTE_BY_STEP[onboardingStep] || "/onboarding/stripe";
+    const redirectPath = resolveSellerSetupRoute(onboardingStep);
     return <Navigate to={redirectPath} replace />;
   }
 
@@ -159,7 +153,7 @@ const SellerRouter = ({ user, setUser }) => {
             path="/onboarding/stripe"
             element={
               <ProtectedSellerRoute user={user} allowIncomplete>
-                <SellerOnboarding step="stripe_connect" />
+                <SellerSetup step="stripe_connect" />
               </ProtectedSellerRoute>
             }
           />
@@ -167,7 +161,7 @@ const SellerRouter = ({ user, setUser }) => {
             path="/onboarding/shipping"
             element={
               <ProtectedSellerRoute user={user} allowIncomplete>
-                <SellerOnboarding step="shipping_origin" />
+                <SellerSetup step="shipping_origin" />
               </ProtectedSellerRoute>
             }
           />
@@ -183,7 +177,7 @@ const SellerRouter = ({ user, setUser }) => {
             path="/onboarding/complete"
             element={
               <ProtectedSellerRoute user={user} allowIncomplete>
-                <SellerOnboarding step="complete" />
+                <SellerSetup step="complete" />
               </ProtectedSellerRoute>
             }
           />
