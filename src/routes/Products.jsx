@@ -3,7 +3,7 @@ import axios from "axios";
 import ProductCard from "../components/ProductCard.jsx";
 import Navbar from "../components/NavBar.jsx";
 import Seo from "../components/Seo.jsx";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, MARKETPLACE_ORIGIN } from "../config/api.js";
 
 const sortOptions = [
   { value: "relevant", label: "Most Relevant" },
@@ -104,6 +104,38 @@ const Products = ({
 
   const ContentTag = embedded ? "div" : "main";
   const HeadingTag = embedded ? "h2" : "h1";
+  const productsJsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "3D Printed Products And Files",
+      description,
+      url: `${MARKETPLACE_ORIGIN}/products`,
+      isPartOf: {
+        "@type": "WebSite",
+        name: "3Dprintings.xyz",
+        url: MARKETPLACE_ORIGIN,
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: `${MARKETPLACE_ORIGIN}/home`,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Products",
+          item: `${MARKETPLACE_ORIGIN}/products`,
+        },
+      ],
+    },
+  ];
 
   const content = (
     <ContentTag id={embedded ? undefined : "main-content"} className={`${embedded ? "" : "px-4 pb-16 pt-28 sm:px-6 lg:px-[5vw]"}`}>
@@ -204,13 +236,7 @@ const Products = ({
         title="Shop 3D Prints & Model Files"
         description="Browse physical 3D printed products and downloadable files from independent creators on 3Dprintings.xyz."
         path="/products"
-        jsonLd={{
-          "@context": "https://schema.org",
-          "@type": "CollectionPage",
-          name: "3D Printed Products And Files",
-          description,
-          url: "https://3dprintings.xyz/products",
-        }}
+        jsonLd={productsJsonLd}
       />
       <Navbar isSignedIn={Boolean(user)} NoNavBarLimit={NoNavBarLimit} />
       {content}

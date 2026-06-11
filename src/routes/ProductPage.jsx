@@ -505,9 +505,14 @@ const ProductPage = ({ user }) => {
   const productSchema = {
     "@context": "https://schema.org",
     "@type": "Product",
+    "@id": `${MARKETPLACE_ORIGIN}/product/${id}#product`,
     name: product.name,
     description: productDescription,
     image: primaryImage,
+    url: `${MARKETPLACE_ORIGIN}/product/${id}`,
+    sku: String(product.id || id),
+    productID: String(product.id || id),
+    category: product.category || undefined,
     brand: {
       "@type": "Brand",
       name: getShopDisplayName(),
@@ -520,6 +525,11 @@ const ProductPage = ({ user }) => {
         ? "https://schema.org/OutOfStock"
         : "https://schema.org/InStock",
       url: `${MARKETPLACE_ORIGIN}/product/${id}`,
+      itemCondition: "https://schema.org/NewCondition",
+      seller: {
+        "@type": "Organization",
+        name: getShopDisplayName(),
+      },
     },
     aggregateRating: Number(product.reviews_count || 0) > 0
       ? {
@@ -529,6 +539,30 @@ const ProductPage = ({ user }) => {
         }
       : undefined,
   };
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: `${MARKETPLACE_ORIGIN}/home`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Products",
+        item: `${MARKETPLACE_ORIGIN}/products`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: product.name,
+        item: `${MARKETPLACE_ORIGIN}/product/${id}`,
+      },
+    ],
+  };
 
   return (
     <div className="min-h-screen bg-[#f2f2f2] pb-16">
@@ -536,8 +570,10 @@ const ProductPage = ({ user }) => {
         title={product.name}
         description={productDescription}
         path={`/product/${id}`}
+        type="product"
         image={primaryImage}
-        jsonLd={productSchema}
+        imageAlt={`${product.name} listing from ${getShopDisplayName()} on 3Dprintings.xyz`}
+        jsonLd={[productSchema, breadcrumbSchema]}
       />
       <Navbar isSignedIn={!!user} />
 

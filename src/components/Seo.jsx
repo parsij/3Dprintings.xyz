@@ -17,6 +17,7 @@ export default function Seo({
   title,
   description = DEFAULT_DESCRIPTION,
   path = "/home",
+  type = "website",
   image = `${MARKETPLACE_ORIGIN}/social-preview.svg`,
   imageAlt = "3Dprintings.xyz marketplace for physical 3D prints and downloadable model files",
   keywords = DEFAULT_KEYWORDS,
@@ -43,7 +44,7 @@ export default function Seo({
       <meta property="og:locale" content="en_US" />
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
-      <meta property="og:type" content="website" />
+      <meta property="og:type" content={type} />
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:image" content={image} />
       <meta property="og:image:alt" content={imageAlt} />

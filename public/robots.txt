@@ -1,4 +1,23 @@
 User-agent: *
 Allow: /
+Allow: /assets/
+Allow: /api/imgUploads/
+Disallow: /api/
+Disallow: /account/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /messages
+Disallow: /liked-products
+Disallow: /saved-products
+Disallow: /your-reviews
+Disallow: /signin
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password/
+Disallow: /success
+Disallow: /cancel
+Disallow: /search
+Disallow: /become-seller
 
+# AI search crawlers are intentionally not blocked; they inherit the same public-page policy.
 Sitemap: https://3dprintings.xyz/sitemap.xml

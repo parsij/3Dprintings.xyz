@@ -54,6 +54,29 @@ const sellerCards = [
   "Manage orders, messages, payouts, and reviews.",
 ];
 
+const marketplaceFaqs = [
+  {
+    question: "What can I buy on 3Dprintings.xyz?",
+    answer:
+      "You can buy physical 3D printed products, useful replacement parts, decor, tools, collectibles, prototypes, and downloadable 3D model files from independent makers.",
+  },
+  {
+    question: "Are listings physical products, digital files, or both?",
+    answer:
+      "Each listing should explain whether it is a shipped physical print, a downloadable model file, or a bundle that includes both. Check the listing details before checkout.",
+  },
+  {
+    question: "Can I message a seller before buying?",
+    answer:
+      "Yes. Product and shop messaging helps buyers ask about materials, fit, files, shipping expectations, and other listing-specific details before or after an order.",
+  },
+  {
+    question: "How do makers sell on the marketplace?",
+    answer:
+      "Makers can create a seller account, set up their shop, connect payouts, configure shipping details, and publish listings for physical prints, model files, or creator bundles.",
+  },
+];
+
 const homeJsonLd = [
   {
     "@context": "https://schema.org",
@@ -72,6 +95,30 @@ const homeJsonLd = [
     name: "3Dprintings.xyz",
     url: MARKETPLACE_ORIGIN,
     logo: `${MARKETPLACE_ORIGIN}/favicon.svg`,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: marketplaceFaqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: `${MARKETPLACE_ORIGIN}/home`,
+      },
+    ],
   },
 ];
 
@@ -101,7 +148,7 @@ const Home = ({ user }) => {
                 You Need It. A Maker Can Print It.
               </Motion.h1>
               <Motion.p variants={revealItem} className="mt-6 max-w-2xl text-pretty text-lg font-semibold leading-8 text-gray-600 sm:text-xl">
-                Shop real 3D printed products and ready-to-print files from independent creators. From practical replacement parts to display-worthy objects, the marketplace helps you move from “I need that” to “it’s on the way.”
+                Shop real 3D printed products and ready-to-print files from independent creators. From practical replacement parts to displayable objects, the marketplace helps you move from “I need that” to “it’s on the way.”
               </Motion.p>
 
               <Motion.div variants={revealItem} className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -208,6 +255,36 @@ const Home = ({ user }) => {
                 >
                   {item}
                 </Motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 py-12 sm:px-6 lg:px-[5vw]" aria-labelledby="faq-heading">
+          <div className="mx-auto max-w-7xl">
+            <div className="max-w-3xl">
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-700">Marketplace Questions</p>
+              <h2 id="faq-heading" className="mt-3 text-balance font-display text-4xl font-black tracking-tight text-gray-950 sm:text-5xl">
+                Clear Answers Before You Buy Or Sell.
+              </h2>
+              <p className="mt-4 text-pretty text-base font-semibold leading-8 text-gray-600">
+                The marketplace is built for both finished 3D printed goods and digital model files, so the important details should be visible before a user commits.
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {marketplaceFaqs.map((item, index) => (
+                <Motion.article
+                  key={item.question}
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-80px" }}
+                  transition={{ duration: 0.45, delay: index * 0.06, ease: "easeOut" }}
+                  className="rounded-[2rem] border border-orange-100 bg-white/82 p-6 shadow-[0_18px_60px_rgba(17,24,39,0.08)] backdrop-blur"
+                >
+                  <h3 className="font-display text-2xl font-black tracking-tight text-gray-950">{item.question}</h3>
+                  <p className="mt-3 text-sm font-semibold leading-7 text-gray-600">{item.answer}</p>
+                </Motion.article>
               ))}
             </div>
           </div>

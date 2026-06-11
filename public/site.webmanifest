@@ -1,0 +1,18 @@
+{
+  "name": "3Dprintings.xyz",
+  "short_name": "3Dprintings",
+  "description": "Marketplace for physical 3D printed products and downloadable 3D model files.",
+  "start_url": "/home",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff7ed",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

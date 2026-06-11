@@ -145,8 +145,8 @@ const SearchResults = ({ user }) => {
       <Seo
         title={query ? `Search Results For ${query}` : "Search 3D Prints"}
         description="Search physical 3D printed products and downloadable 3D model files on 3Dprintings.xyz."
-        path={query ? `/search?q=${encodeURIComponent(query)}` : "/search"}
-        noIndex={!query}
+        path="/search"
+        noIndex
       />
       <Navbar isSignedIn={Boolean(user)} NoNavBarLimit />
       <main id="main-content" className="px-4 pb-16 pt-28 sm:px-6 lg:px-[5vw]">
