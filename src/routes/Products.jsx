@@ -6,10 +6,10 @@ import Seo from "../components/Seo.jsx";
 import { API_BASE, MARKETPLACE_ORIGIN } from "../config/api.js";
 
 const sortOptions = [
-  { value: "relevant", label: "Most Relevant" },
-  { value: "price_asc", label: "Price: Low To High" },
-  { value: "price_desc", label: "Price: High To Low" },
-  { value: "sales", label: "Best Selling" },
+  { value: "relevant", label: "Fresh finds" },
+  { value: "price_asc", label: "Lowest price" },
+  { value: "price_desc", label: "Highest price" },
+  { value: "sales", label: "Most ordered" },
 ];
 
 function getCardProps(product) {
@@ -33,9 +33,9 @@ const Products = ({
   user,
   NoNavBarLimit,
   embedded = false,
-  title = "Shop 3D Prints & Files",
+  title = "Browse 3D prints and files",
   eyebrow = "Marketplace",
-  description = "Browse physical 3D printed goods, replacement parts, display pieces, and downloadable files listed by independent makers.",
+  description = "Find printed parts, desk objects, replacement pieces, gifts, and downloadable model files from independent makers.",
 }) => {
   const [products, setProducts] = useState([]);
   const [page, setPage] = useState(1);
@@ -140,21 +140,21 @@ const Products = ({
   const content = (
     <ContentTag id={embedded ? undefined : "main-content"} className={`${embedded ? "" : "px-4 pb-16 pt-28 sm:px-6 lg:px-[5vw]"}`}>
       <section className={`${embedded ? "" : "mx-auto max-w-7xl"}`} aria-labelledby="products-heading">
-        <div className="mb-8 overflow-hidden rounded-[2rem] border border-orange-100/80 bg-white/82 p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)] backdrop-blur sm:p-7 lg:p-8">
+        <div className="mb-8 overflow-hidden rounded-[2rem] border border-emerald-950/10 bg-white/84 p-5 shadow-[0_18px_60px_rgba(6,78,59,0.08)] backdrop-blur sm:p-7 lg:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-700">{eyebrow}</p>
-              <HeadingTag id="products-heading" className="mt-3 text-balance font-display text-3xl font-black tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+              <p className="text-sm font-black text-red-700">{eyebrow}</p>
+              <HeadingTag id="products-heading" className="mt-3 text-balance font-display text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl lg:text-5xl">
                 {title}
               </HeadingTag>
-              <p className="mt-4 max-w-2xl text-pretty text-base font-semibold leading-7 text-gray-600">
+              <p className="mt-4 max-w-2xl text-pretty text-base font-bold leading-7 text-stone-600">
                 {description}
               </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="rounded-2xl bg-orange-50 px-4 py-3 text-sm font-black text-orange-900">
-                {products.length > 0 ? `${products.length} Loaded` : "Fresh Listings"}
+              <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-950">
+                {products.length > 0 ? `${products.length} shown` : "Fresh listings"}
               </div>
               <label className="sr-only" htmlFor={embedded ? "home-product-sort" : "product-sort"}>
                 Sort Products
@@ -164,7 +164,7 @@ const Products = ({
                   id={embedded ? "home-product-sort" : "product-sort"}
                   value={sort}
                   onChange={(event) => setSort(event.target.value)}
-                  className="focus-ring appearance-none rounded-2xl border border-orange-200 bg-white px-4 py-3 pr-11 text-sm font-black text-gray-800 shadow-sm transition-colors duration-200 hover:border-orange-400"
+                  className="focus-ring appearance-none rounded-2xl border border-emerald-900/20 bg-white px-4 py-3 pr-11 text-sm font-black text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-400"
                 >
                   {sortOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -192,11 +192,11 @@ const Products = ({
             const card = <ProductCard {...getCardProps(product)} />;
 
             return isLastElement ? (
-              <div ref={lastProductElementRef} key={product.id} className="animate-fade-in-up">
+              <div ref={lastProductElementRef} key={product.id}>
                 {card}
               </div>
             ) : (
-              <div key={product.id} className="animate-fade-in-up">
+              <div key={product.id}>
                 {card}
               </div>
             );
@@ -205,23 +205,23 @@ const Products = ({
 
         {loading && (
           <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
-            <div className="h-14 w-14 animate-spin rounded-full border-4 border-solid border-orange-500 border-t-transparent" />
-            <p className="mt-4 text-sm font-black uppercase tracking-[0.22em] text-gray-500">Loading Listings…</p>
+            <div className="h-12 w-12 rounded-full border-4 border-solid border-emerald-800/25 border-t-emerald-800" />
+            <p className="mt-4 text-sm font-black text-stone-500">Loading listings...</p>
           </div>
         )}
 
         {!loading && products.length === 0 && !loadError && (
-          <div className="rounded-[2rem] border border-dashed border-orange-200 bg-white/70 px-6 py-16 text-center">
-            <h2 className="font-display text-2xl font-black text-gray-950">No Listings Yet</h2>
-            <p className="mx-auto mt-3 max-w-md text-sm font-semibold leading-6 text-gray-600">
+          <div className="rounded-[2rem] border border-dashed border-emerald-900/20 bg-white/70 px-6 py-16 text-center">
+            <h2 className="font-display text-2xl font-black text-emerald-950">No listings yet</h2>
+            <p className="mx-auto mt-3 max-w-md text-sm font-bold leading-6 text-stone-600">
               Listings will appear here as sellers publish physical prints and downloadable files.
             </p>
           </div>
         )}
 
         {!hasMore && products.length > 0 && (
-          <div className="py-12 text-center text-sm font-black uppercase tracking-[0.22em] text-gray-400">
-            End Of Current Listings
+          <div className="py-12 text-center text-sm font-black text-stone-400">
+            End of current listings
           </div>
         )}
       </section>

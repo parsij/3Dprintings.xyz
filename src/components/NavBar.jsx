@@ -61,41 +61,41 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
           showNavbar ? "translate-y-0" : "-translate-y-full"
         }`}
       >
-        <nav className="mx-auto flex max-w-7xl items-center gap-3 rounded-[1.75rem] border border-white/55 bg-gray-950/78 px-3 py-2.5 text-white shadow-[0_18px_60px_rgba(17,24,39,0.2)] backdrop-blur-xl sm:px-4">
+        <nav className="mx-auto flex max-w-7xl items-center gap-3 rounded-[1.75rem] border border-white/55 bg-emerald-950/86 px-3 py-2.5 text-white shadow-[0_18px_60px_rgba(17,24,39,0.2)] backdrop-blur-xl sm:px-4">
           <button
             type="button"
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-orange-300/70 hover:bg-orange-500/15 focus-ring"
+            className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-red-300/70 hover:bg-red-500/15 focus-ring"
             aria-label="Open Menu"
           >
             <span className="flex flex-col gap-1.5" aria-hidden="true">
-              <span className="h-0.5 w-5 rounded-full bg-white transition-transform duration-200 group-hover:translate-x-1 group-hover:bg-orange-300" />
+              <span className="h-0.5 w-5 rounded-full bg-white transition-colors duration-150 group-hover:bg-red-300" />
               <span className="h-0.5 w-5 rounded-full bg-white/80 transition-colors duration-200 group-hover:bg-white" />
-              <span className="h-0.5 w-5 rounded-full bg-white transition-transform duration-200 group-hover:-translate-x-1 group-hover:bg-orange-300" />
+              <span className="h-0.5 w-5 rounded-full bg-white transition-colors duration-150 group-hover:bg-red-300" />
             </span>
           </button>
 
           <Link
             to="/home"
-            className="group flex min-w-0 shrink-0 items-center gap-2 rounded-2xl px-1 py-1 transition-transform duration-200 hover:-translate-y-0.5 focus-ring"
+            className="group flex min-w-0 shrink-0 items-center gap-2 rounded-2xl px-1 py-1 focus-ring"
             aria-label="3Dprintings.xyz Home"
             translate="no"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br from-orange-400 to-orange-700 text-sm font-black text-white shadow-lg shadow-orange-950/25">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br from-red-500 to-emerald-800 text-sm font-black text-white shadow-lg shadow-emerald-950/25">
               3D
             </span>
             <span className="hidden leading-none sm:block">
               <span className="block font-display text-base font-bold tracking-tight">3Dprintings</span>
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-orange-200">Marketplace</span>
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-red-100">Models</span>
             </span>
           </Link>
 
           <div className="hidden items-center gap-1 text-sm font-bold text-white/80 lg:flex">
             <Link to="/products" className="rounded-full px-4 py-2 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-ring">
-              Shop Prints
+              Browse
             </Link>
             <Link to="/become-seller" className="rounded-full px-4 py-2 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-ring">
-              Sell Designs
+              Sell
             </Link>
           </div>
 
@@ -103,7 +103,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             <label htmlFor="site-search" className="sr-only">
               Search 3D printed products and files
             </label>
-            <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 transition-colors duration-200 focus-within:border-orange-300/80 focus-within:bg-white/15">
+            <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 transition-colors duration-200 focus-within:border-red-300/80 focus-within:bg-white/15">
               <input
                 id="site-search"
                 name="q"
@@ -111,14 +111,14 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 inputMode="search"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Search useful parts, decor, STL files…"
+                placeholder="Search models, parts, STL files..."
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 className="w-full bg-transparent px-4 py-3 pr-13 text-sm font-semibold text-white placeholder:text-white/52 focus:outline-none"
               />
               <button
                 type="submit"
-                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-white text-gray-950 transition-colors duration-200 hover:bg-orange-400 focus-ring"
+                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-white text-gray-950 transition-colors duration-200 hover:bg-red-400 focus-ring"
                 aria-label="Search"
               >
                 <img src={Search} alt="" className="h-4 w-4" aria-hidden="true" />
@@ -130,7 +130,7 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             {isSignedIn ? (
               <Link
                 to="/account"
-                className="group relative hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-orange-300/70 hover:bg-orange-500/15 focus-ring sm:inline-flex"
+                className="group relative hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-red-300/70 hover:bg-red-500/15 focus-ring sm:inline-flex"
                 aria-label="Account"
               >
                 <img
@@ -149,15 +149,15 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
             ) : (
               <Link
                 to="/signup"
-                className="hidden rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-gray-950 transition-colors duration-200 hover:bg-orange-300 focus-ring sm:inline-flex"
+                className="hidden rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-gray-950 transition-colors duration-200 hover:bg-red-300 focus-ring sm:inline-flex"
               >
-                Join
+                Sign up
               </Link>
             )}
 
             <Link
               to="/cart"
-              className="group relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-orange-300/70 hover:bg-orange-500/15 focus-ring"
+              className="group relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-red-300/70 hover:bg-red-500/15 focus-ring"
               aria-label="Cart"
             >
               <img
