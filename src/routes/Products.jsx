@@ -138,7 +138,7 @@ const Products = ({
   ];
 
   const headerClassName = embedded
-    ? "mb-8 overflow-hidden rounded-[2.75rem] border border-white/70 bg-white/70 p-5 text-emerald-950 shadow-[0_18px_60px_rgba(6,78,59,0.10)] backdrop-blur sm:p-7 lg:p-8"
+    ? "mb-8 overflow-hidden rounded-[3rem] border border-white/80 bg-white/72 p-5 text-emerald-950 shadow-[0_18px_60px_rgba(6,78,59,0.08)] backdrop-blur sm:p-7 lg:p-8"
     : "mb-8 overflow-hidden rounded-[2rem] border border-emerald-950/15 bg-emerald-950 p-5 text-white shadow-[0_18px_60px_rgba(6,78,59,0.18)] sm:p-7 lg:p-8";
   const eyebrowClassName = embedded ? "text-sm font-bold text-red-700" : "text-sm font-bold text-red-200";
   const headingClassName = embedded
@@ -148,7 +148,7 @@ const Products = ({
     ? "mt-4 max-w-2xl text-pretty text-base font-semibold leading-7 text-stone-600"
     : "mt-4 max-w-2xl text-pretty text-base font-bold leading-7 text-emerald-50/80";
   const countClassName = embedded
-    ? "rounded-full bg-emerald-950 px-4 py-3 text-sm font-bold text-white"
+    ? "rounded-full bg-red-500 px-4 py-3 text-sm font-bold text-white"
     : "rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white";
   const selectClassName = embedded
     ? "focus-ring appearance-none rounded-full border border-emerald-900/10 bg-white px-4 py-3 pr-11 text-sm font-bold text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-300"
