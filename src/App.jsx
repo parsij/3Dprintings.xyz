@@ -1,4 +1,8 @@
 import { Suspense, lazy, useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import "./App.css";
 import axios from "axios";
 import { ensureCsrfToken } from "./services/csrf.js";
@@ -11,10 +15,21 @@ const SellerRouter = lazy(() => import("./SellerRouter.jsx"));
 
 function LoadingScreen({ label = "Loading…" }) {
   return (
-    <div className="flex h-screen items-center justify-center bg-gray-100">
-      <div className="mx-3 text-gray-900">{label}</div>
-      <div className="m-3 h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent" />
-    </div>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        bgcolor: "background.default",
+      }}
+    >
+      <Stack alignItems="center" spacing={2.25}>
+        <CircularProgress color="secondary" thickness={4.5} size={52} />
+        <Typography color="text.primary" fontWeight={800}>
+          {label}
+        </Typography>
+      </Stack>
+    </Box>
   );
 }
 

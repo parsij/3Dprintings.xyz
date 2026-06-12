@@ -1,13 +1,30 @@
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Divider from "@mui/material/Divider";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
 export default function ListingFormSection({ title, description, children, className = "" }) {
   return (
-    <section className={`rounded-2xl border border-gray-200 bg-white p-5 shadow-sm ${className}`}>
-      {title ? (
-        <div className="mb-4 border-b border-gray-100 pb-3">
-          <h3 className="text-base font-bold text-gray-900">{title}</h3>
-          {description ? <p className="mt-1 text-sm text-gray-600">{description}</p> : null}
-        </div>
-      ) : null}
-      {children}
-    </section>
+    <Card component="section" className={className} sx={{ boxShadow: "0 14px 36px rgba(17,24,39,0.08)" }}>
+      <CardContent sx={{ p: { xs: 2, sm: 2.5 }, "&:last-child": { pb: { xs: 2, sm: 2.5 } } }}>
+        {title ? (
+          <>
+            <Stack spacing={0.5} sx={{ mb: 2 }}>
+              <Typography variant="h6" component="h3">
+                {title}
+              </Typography>
+              {description ? (
+                <Typography color="text.secondary" fontSize={14}>
+                  {description}
+                </Typography>
+              ) : null}
+            </Stack>
+            <Divider sx={{ mb: 2 }} />
+          </>
+        ) : null}
+        {children}
+      </CardContent>
+    </Card>
   );
 }

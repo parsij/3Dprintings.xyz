@@ -19,6 +19,10 @@
   },
   "dependencies": {
     "@easypost/api": "^8.8.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.1.1",
+    "@mui/material": "^9.1.1",
     "@tailwindcss/vite": "^4.3.0",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",

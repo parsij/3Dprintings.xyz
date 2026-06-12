@@ -1,5 +1,18 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import Alert from "@mui/material/Alert";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardActionArea from "@mui/material/CardActionArea";
+import CardContent from "@mui/material/CardContent";
+import CardMedia from "@mui/material/CardMedia";
+import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { alpha } from "@mui/material/styles";
+import { Link as RouterLink } from "react-router-dom";
 import image_test from "../assets/product-placeholder.webp";
 import { addToCart } from "../services/cartService.js";
 import { shopPath } from "../utils/shopName.js";
@@ -71,132 +84,160 @@ const ProductCard = ({
   };
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[1.7rem] border border-emerald-950/15 bg-white shadow-[0_14px_42px_rgba(6,78,59,0.1)] transition-[box-shadow,border-color] duration-150 hover:border-red-500/35 hover:shadow-[0_20px_56px_rgba(6,78,59,0.16)]">
-      <Link to={productUrl} className="focus-ring block" aria-label={`View ${displayName}`}>
-        <div className="relative aspect-[4/3] overflow-hidden bg-emerald-50">
-          <img
-            src={imageUrl || image_test}
+    <Card
+      component="article"
+      sx={(theme) => ({
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        transition: theme.transitions.create(["box-shadow", "border-color", "transform"], { duration: 160 }),
+        "&:hover": {
+          transform: "translateY(-3px)",
+          borderColor: alpha(theme.palette.secondary.main, 0.38),
+          boxShadow: theme.palette.mode === "dark" ? "0 24px 60px rgba(0,0,0,0.5)" : "0 24px 64px rgba(6,78,59,0.18)",
+        },
+      })}
+    >
+      <CardActionArea component={RouterLink} to={productUrl} aria-label={`View ${displayName}`} sx={{ display: "block" }}>
+        <Box sx={{ position: "relative", aspectRatio: "4 / 3", overflow: "hidden", bgcolor: "primary.50" }}>
+          <CardMedia
+            component="img"
+            image={imageUrl || image_test}
             alt={displayName}
-            width="640"
-            height="480"
-            className="h-full w-full object-cover"
             loading="lazy"
+            sx={{ width: "100%", height: "100%", objectFit: "cover" }}
             onError={(event) => {
               event.currentTarget.onerror = null;
               event.currentTarget.src = image_test;
             }}
           />
-          <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-emerald-950/35 via-transparent to-transparent opacity-80" />
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              background: "linear-gradient(180deg, transparent 35%, rgba(5,46,34,0.44) 100%)",
+            }}
+          />
           {discountPercent > 0 && (
-            <span className="absolute left-3 top-3 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-lg">
-              {discountPercent}% off
-            </span>
+            <Chip
+              label={`${discountPercent}% off`}
+              color="secondary"
+              size="small"
+              sx={{ position: "absolute", left: 12, top: 12, color: "common.white" }}
+            />
           )}
           {isLowStock && (
-            <span className="absolute bottom-3 left-3 rounded-full bg-white/92 px-3 py-1 text-xs font-bold text-red-700 shadow-lg">
-              Only {stockCount} left
-            </span>
+            <Chip
+              label={`Only ${stockCount} left`}
+              size="small"
+              sx={{ position: "absolute", left: 12, bottom: 12, bgcolor: "background.paper", color: "secondary.dark" }}
+            />
           )}
           {isSoldOut && (
-            <span className="absolute bottom-3 left-3 rounded-full bg-emerald-950 px-3 py-1 text-xs font-bold text-white shadow-lg">
-              Sold out
-            </span>
+            <Chip
+              label="Sold out"
+              color="primary"
+              size="small"
+              sx={{ position: "absolute", left: 12, bottom: 12, color: "common.white" }}
+            />
           )}
-        </div>
-      </Link>
+        </Box>
+      </CardActionArea>
 
-      <section className="flex flex-1 flex-col gap-3 p-4 text-left sm:p-5">
-        <div className="min-w-0">
-          <Link to={productUrl} className="focus-ring rounded-xl">
-            <h3 className="line-clamp-2 min-h-[3rem] text-pretty font-display text-base font-bold leading-6 text-emerald-950 transition-colors duration-150 group-hover:text-red-700">
-              {displayName}
-            </h3>
-          </Link>
-        </div>
+      <CardContent sx={{ display: "flex", flex: 1, flexDirection: "column", gap: 1.75, p: { xs: 2, sm: 2.25 } }}>
+        <Typography
+          component={RouterLink}
+          to={productUrl}
+          variant="h6"
+          sx={{
+            minHeight: "3rem",
+            color: "primary.dark",
+            textDecoration: "none",
+            lineHeight: 1.35,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            "&:hover": { color: "secondary.main" },
+          }}
+        >
+          {displayName}
+        </Typography>
 
-        <div className="flex min-w-0 items-center justify-between gap-3">
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
           {sellerUrl ? (
-            <Link
+            <Stack
+              component={RouterLink}
               to={sellerUrl}
-              className="focus-ring flex min-w-0 items-center gap-2 rounded-2xl text-sm font-bold text-stone-600 transition-colors duration-150 hover:text-red-700"
+              direction="row"
+              alignItems="center"
+              spacing={1}
               aria-label={`Visit ${displayShopName}`}
+              sx={{ minWidth: 0, color: "text.secondary", textDecoration: "none", "&:hover": { color: "secondary.main" } }}
             >
-              <span className="h-8 w-8 shrink-0 overflow-hidden rounded-xl bg-emerald-100">
-                {shopLogoUrl ? (
-                  <img
-                    src={shopLogoUrl}
-                    alt=""
-                    width="64"
-                    height="64"
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center bg-emerald-100 text-xs font-bold text-emerald-900">
-                    {displayShopName.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-              </span>
-              <span className="min-w-0 truncate">{displayShopName}</span>
-            </Link>
-          ) : (
-            <div className="flex min-w-0 items-center gap-2 text-sm font-bold text-stone-600">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-bold text-emerald-900">
+              <Avatar src={shopLogoUrl || undefined} alt="" variant="rounded" sx={{ width: 32, height: 32, borderRadius: 2, bgcolor: "primary.light", fontSize: 13, fontWeight: 900 }}>
                 {displayShopName.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="min-w-0 truncate">{displayShopName}</span>
-            </div>
+              </Avatar>
+              <Typography noWrap fontSize={14} fontWeight={800} sx={{ minWidth: 0 }}>
+                {displayShopName}
+              </Typography>
+            </Stack>
+          ) : (
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, color: "text.secondary" }}>
+              <Avatar variant="rounded" sx={{ width: 32, height: 32, borderRadius: 2, bgcolor: "primary.light", fontSize: 13, fontWeight: 900 }}>
+                {displayShopName.slice(0, 1).toUpperCase()}
+              </Avatar>
+              <Typography noWrap fontSize={14} fontWeight={800} sx={{ minWidth: 0 }}>
+                {displayShopName}
+              </Typography>
+            </Stack>
           )}
 
-          <div className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700" aria-label={`${Number(rating || 0).toFixed(1)} stars from ${reviewNumber || 0} reviews`}>
-            {Number(rating || 0).toFixed(1)} stars
-          </div>
-        </div>
+          <Chip
+            size="small"
+            label={`${Number(rating || 0).toFixed(1)} stars`}
+            aria-label={`${Number(rating || 0).toFixed(1)} stars from ${reviewNumber || 0} reviews`}
+            sx={(theme) => ({ bgcolor: alpha(theme.palette.secondary.main, 0.1), color: "secondary.dark", flexShrink: 0 })}
+          />
+        </Stack>
 
-        <div className="mt-auto flex items-end justify-between gap-3 pt-1">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-baseline gap-2">
-              <span className="font-display text-2xl font-bold text-emerald-950 tabular-nums">
-                {formatPrice(currentPrice)}
-              </span>
-              {discountPercent > 0 && (
-                <span className="text-sm font-bold text-stone-400 line-through tabular-nums">
-                  {formatPrice(originalPrice)}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs font-bold text-stone-500">Printed item, model file, or maker bundle</p>
-          </div>
-        </div>
+        <Box sx={{ mt: "auto" }}>
+          <Stack direction="row" alignItems="baseline" spacing={1} flexWrap="wrap">
+            <Typography variant="h5" color="primary.dark" sx={{ fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>
+              {formatPrice(currentPrice)}
+            </Typography>
+            {discountPercent > 0 && (
+              <Typography color="text.disabled" fontWeight={800} sx={{ textDecoration: "line-through", fontVariantNumeric: "tabular-nums" }}>
+                {formatPrice(originalPrice)}
+              </Typography>
+            )}
+          </Stack>
+          <Typography color="text.secondary" fontSize={12} fontWeight={800} sx={{ mt: 0.25 }}>
+            Printed item, model file, or maker bundle
+          </Typography>
+        </Box>
 
         {error && (
-          <div role="status" aria-live="polite" className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+          <Alert severity="error" variant="outlined" sx={{ py: 0.5, fontSize: 12, fontWeight: 700 }}>
             {error}
-          </div>
+          </Alert>
         )}
 
-        <button
+        <Button
           type="button"
           onClick={handleAddToCart}
           disabled={isLoading || success || isSoldOut}
-          className={`focus-ring relative w-full overflow-hidden rounded-2xl px-4 py-3 text-sm font-bold transition-[background-color,color,opacity] duration-150 disabled:cursor-not-allowed ${
-            success
-              ? "bg-emerald-600 text-white"
-              : isSoldOut
-                ? "bg-stone-200 text-stone-500"
-                : "bg-emerald-950 text-white hover:bg-red-600"
-          } ${isLoading ? "opacity-75" : ""}`}
+          variant="contained"
+          color={success ? "success" : isSoldOut ? "inherit" : "primary"}
+          startIcon={isLoading ? <CircularProgress color="inherit" size={16} /> : null}
+          sx={{ mt: 0.25, borderRadius: 3, py: 1.25 }}
         >
-          <span className={success ? "opacity-0" : "opacity-100"}>
-            {isSoldOut ? "Sold out" : isLoading ? "Adding..." : "Add to cart"}
-          </span>
-          <span className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-150 ${success ? "opacity-100" : "opacity-0"}`}>
-            Added
-          </span>
-        </button>
-      </section>
-    </article>
+          {isSoldOut ? "Sold out" : success ? "Added" : isLoading ? "Adding..." : "Add to cart"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 };
 

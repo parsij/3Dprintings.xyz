@@ -1,4 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { BECOME_SELLER_URL } from "./config/api.js";
 import { getSellerOnboardingStatus } from "./seller/services/sellerOnboardingService.js";
@@ -48,9 +52,20 @@ function hasSellerRole(user) {
 
 function SellerRouteFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 text-sm font-bold text-gray-700">
-      Loading seller page…
-    </div>
+    <FullPageStatus label="Loading seller page…" />
+  );
+}
+
+function FullPageStatus({ label, withSpinner = true }) {
+  return (
+    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", bgcolor: "background.default" }}>
+      <Stack alignItems="center" spacing={2}>
+        {withSpinner ? <CircularProgress color="secondary" size={44} /> : null}
+        <Typography color="text.primary" fontWeight={800}>
+          {label}
+        </Typography>
+      </Stack>
+    </Box>
   );
 }
 
@@ -97,30 +112,16 @@ function ProtectedSellerRoute({ user, children, allowIncomplete = false }) {
   }
 
   if (!hasSellerRole(user)) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-100">
-        <div className="mx-3 text-gray-900">Loading…</div>
-        <div className="m-3 h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent" />
-      </div>
-    );
+    return <FullPageStatus label="Loading…" />;
   }
 
   if (!allowIncomplete && checkingOnboarding) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-100">
-        <div className="mx-3 text-gray-900">Checking seller setup…</div>
-        <div className="m-3 h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent" />
-      </div>
-    );
+    return <FullPageStatus label="Checking seller setup…" />;
   }
 
   if (!allowIncomplete && onboardingStep === "shop_url") {
     window.location.href = BECOME_SELLER_URL;
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-100">
-        <div className="mx-3 text-gray-900">Redirecting to seller setup…</div>
-      </div>
-    );
+    return <FullPageStatus label="Redirecting to seller setup…" withSpinner={false} />;
   }
 
   if (!allowIncomplete && onboardingStep && onboardingStep !== "completed") {

@@ -5,13 +5,16 @@ import './services/csrf.js'
 import App from './App.jsx'
 import { MenuProvider } from './MenuContext.jsx'
 import { ThemeProvider } from './ThemeContext.jsx'
+import MaterialThemeProvider from './theme/MaterialThemeProvider.jsx'
 
 createRoot(document.getElementById('root')).render(
   <HelmetProvider>
     <ThemeProvider>
-      <MenuProvider>
-        <App />
-      </MenuProvider>
+      <MaterialThemeProvider>
+        <MenuProvider>
+          <App />
+        </MenuProvider>
+      </MaterialThemeProvider>
     </ThemeProvider>
   </HelmetProvider>,
 )

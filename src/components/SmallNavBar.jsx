@@ -1,36 +1,80 @@
-import { Link } from "react-router-dom";
+import AppBar from "@mui/material/AppBar";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Stack from "@mui/material/Stack";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import { alpha } from "@mui/material/styles";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import { Link as RouterLink } from "react-router-dom";
 import { useMenu } from "../MenuContext.jsx";
 
 export const SmallNavBar = () => {
   const { setMenuOpen } = useMenu();
 
   return (
-    <header className="fixed left-0 top-0 z-50 w-full px-3 pt-3 sm:px-5">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between rounded-[1.5rem] border border-orange-100/80 bg-white/88 px-4 py-3 text-gray-900 shadow-[0_14px_42px_rgba(17,24,39,0.1)] backdrop-blur-xl">
-        <Link to="/home" className="focus-ring flex items-center gap-2 rounded-2xl" aria-label="3Dprintings.xyz Home" translate="no">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-950 font-display text-sm font-black text-orange-300">
+    <AppBar position="fixed" color="transparent" elevation={0} sx={{ px: { xs: 1.5, sm: 2.5 }, pt: 1.5 }}>
+      <Toolbar
+        component="nav"
+        disableGutters
+        sx={(theme) => ({
+          mx: "auto",
+          width: "100%",
+          maxWidth: 1280,
+          minHeight: "64px !important",
+          justifyContent: "space-between",
+          borderRadius: 4,
+          border: `1px solid ${theme.palette.divider}`,
+          bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === "dark" ? 0.9 : 0.88),
+          color: "text.primary",
+          px: 2,
+          py: 1,
+          boxShadow: "0 14px 42px rgba(17,24,39,0.12)",
+          backdropFilter: "blur(18px)",
+        })}
+      >
+        <Stack
+          component={RouterLink}
+          to="/home"
+          direction="row"
+          alignItems="center"
+          spacing={1.25}
+          aria-label="3Dprintings.xyz Home"
+          translate="no"
+          sx={{ color: "inherit", textDecoration: "none" }}
+        >
+          <Avatar variant="rounded" sx={{ borderRadius: 3, bgcolor: "primary.dark", color: "secondary.light", fontWeight: 900 }}>
             3D
-          </span>
-          <span>
-            <span className="block font-display text-base font-black tracking-tight">3Dprintings</span>
-            <span className="block text-[11px] font-black uppercase tracking-[0.22em] text-orange-700">Marketplace</span>
-          </span>
-        </Link>
+          </Avatar>
+          <Box>
+            <Typography component="span" display="block" fontWeight={900} letterSpacing="-0.02em">
+              3Dprintings
+            </Typography>
+            <Typography component="span" display="block" fontSize={11} fontWeight={900} letterSpacing="0.2em" color="secondary.main">
+              MARKETPLACE
+            </Typography>
+          </Box>
+        </Stack>
 
-        <button
+        <IconButton
           type="button"
           onClick={() => setMenuOpen((prev) => !prev)}
-          className="group flex h-11 w-11 items-center justify-center rounded-2xl border border-orange-100 bg-orange-50 transition-colors duration-200 hover:border-orange-300 hover:bg-orange-100 focus-ring"
           aria-label="Open Menu"
+          sx={(theme) => ({
+            width: 44,
+            height: 44,
+            borderRadius: 3,
+            border: `1px solid ${theme.palette.divider}`,
+            bgcolor: alpha(theme.palette.secondary.main, 0.08),
+            color: "text.primary",
+            "&:hover": { bgcolor: alpha(theme.palette.secondary.main, 0.16) },
+          })}
         >
-          <span className="flex flex-col gap-1.5" aria-hidden="true">
-            <span className="h-0.5 w-5 rounded-full bg-gray-900 transition-transform duration-200 group-hover:translate-x-1" />
-            <span className="h-0.5 w-5 rounded-full bg-gray-700" />
-            <span className="h-0.5 w-5 rounded-full bg-gray-900 transition-transform duration-200 group-hover:-translate-x-1" />
-          </span>
-        </button>
-      </nav>
-    </header>
+          <MenuRoundedIcon />
+        </IconButton>
+      </Toolbar>
+    </AppBar>
   );
 };
 

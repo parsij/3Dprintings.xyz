@@ -1,38 +1,51 @@
-import React from 'react'
-import { useMenu } from '../../MenuContext.jsx'
+import AppBar from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import { alpha } from "@mui/material/styles";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import { useMenu } from "../../MenuContext.jsx";
 
-const SellerNavBar = ({pageName}) => {
-    const { setMenuOpen } = useMenu();
-    return (
-        <div className="fixed top-0 left-0 w-full z-50 bg-black/65 backdrop-blur-xs shadow-sm border-b border-white/20 text-white">
-            {/* Added full width layout and fluid padding to align beautifully on all viewports */}
-            <nav className="flex items-center justify-between w-full px-4 lg:px-[5vw] py-3">
+const SellerNavBar = ({ pageName }) => {
+  const { setMenuOpen } = useMenu();
 
-                {/* 1. LEFT BLOCK: Menu Button isolated and locked to the far left */}
-                <div className="flex items-center flex-1 min-w-0">
-                    <button
-                        type="button"
-                        onClick={() => setMenuOpen((prev) => !prev)}
-                        className="group flex cursor-pointer flex-col gap-1"
-                        aria-label="Open menu"
-                    >
-                        {/* Swapped bg-gray-800 to bg-white so your bars are visible on the dark background */}
-                        <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-                        <span className="h-0.5 w-6 bg-white transition group-hover:bg-white"></span>
-                        <span className="h-0.5 w-6 bg-white transition group-hover:bg-orange-500"></span>
-                    </button>
-                </div>
+  return (
+    <AppBar
+      position="fixed"
+      color="transparent"
+      elevation={0}
+      sx={(theme) => ({
+        borderBottom: `1px solid ${alpha(theme.palette.common.white, 0.16)}`,
+        bgcolor: alpha(theme.palette.grey[950] || "#030712", 0.72),
+        color: "common.white",
+        backdropFilter: "blur(12px)",
+      })}
+    >
+      <Toolbar component="nav" sx={{ px: { xs: 2, lg: "5vw" }, minHeight: "56px !important" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <IconButton
+            type="button"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-label="Open menu"
+            sx={{
+              borderRadius: 3,
+              color: "common.white",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.1)", color: "secondary.light" },
+            }}
+          >
+            <MenuRoundedIcon />
+          </IconButton>
+        </Box>
 
-                {/* 2. CENTER BLOCK: Page Name stays centered */}
-                <div className="flex items-center justify-center font-bold text-lg max-w-4xl min-w-0">
-                    {pageName}
-                </div>
+        <Typography component="div" fontWeight={900} noWrap sx={{ maxWidth: { xs: "60vw", sm: "70vw" }, textAlign: "center" }}>
+          {pageName}
+        </Typography>
 
-                {/* 3. RIGHT BLOCK: Invisible spacer to force perfect center symmetry */}
-                <div className="flex-1 shrink-0 invisible" aria-hidden="true" />
+        <Box sx={{ flex: 1 }} aria-hidden="true" />
+      </Toolbar>
+    </AppBar>
+  );
+};
 
-            </nav>
-        </div>
-    )
-}
-export default SellerNavBar
+export default SellerNavBar;

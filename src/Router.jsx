@@ -1,4 +1,8 @@
 import { lazy, Suspense, useEffect } from "react";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useTheme } from "./ThemeContext.jsx";
 
@@ -32,9 +36,14 @@ const ROUTE_BACKGROUNDS = {
 
 function RouteFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-orange-50 text-sm font-bold text-gray-700">
-      Loading page…
-    </div>
+    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", bgcolor: "background.default" }}>
+      <Stack alignItems="center" spacing={2}>
+        <CircularProgress color="secondary" size={42} />
+        <Typography color="text.secondary" fontWeight={800}>
+          Loading page…
+        </Typography>
+      </Stack>
+    </Box>
   );
 }
 

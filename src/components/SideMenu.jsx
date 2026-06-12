@@ -1,4 +1,18 @@
-import { Link } from "react-router-dom";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Divider from "@mui/material/Divider";
+import Drawer from "@mui/material/Drawer";
+import IconButton from "@mui/material/IconButton";
+import List from "@mui/material/List";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemText from "@mui/material/ListItemText";
+import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
+import Typography from "@mui/material/Typography";
+import { alpha } from "@mui/material/styles";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
+import { Link as RouterLink } from "react-router-dom";
 import { useMenu } from "../MenuContext.jsx";
 import { useAuth } from "../AuthContext.jsx";
 import { useTheme } from "../ThemeContext.jsx";
@@ -53,111 +67,122 @@ const SideMenu = ({ title = "Menu", role = "customer" }) => {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <>
-      {menuOpen && (
-        <button
-          type="button"
-          onClick={closeMenu}
-          className="fixed inset-0 z-40 bg-gray-950/45 backdrop-blur-[2px] transition-opacity duration-300"
-          aria-label="Close Menu Overlay"
-        />
-      )}
-
-      {menuOpen && (
-      <aside
-        className="fixed left-0 top-0 z-50 flex h-full w-[min(21rem,88vw)] flex-col overflow-hidden border-r border-orange-100/80 bg-orange-50 text-gray-900 shadow-2xl transition-transform duration-300 ease-out"
-      >
-        <div className="maker-grid relative overflow-hidden border-b border-orange-200/70 p-5">
-          <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-orange-300/35 blur-2xl" aria-hidden="true" />
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-orange-700">3Dprintings</p>
-              <h2 className="mt-2 font-display text-2xl font-black tracking-tight text-gray-950">{title}</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-gray-600">
-                Find prints, manage orders, or start selling from one place.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={closeMenu}
-              className="rounded-2xl border border-orange-200 bg-white/80 px-3 py-2 text-sm font-black text-gray-800 transition-colors duration-200 hover:border-orange-400 hover:text-orange-700 focus-ring"
-              aria-label="Close Menu"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-
-        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
-          {activeItems.map((item, index) => {
-            const className = `block rounded-2xl px-4 py-3 text-sm font-extrabold text-gray-700 transition-[background-color,color,transform,opacity] duration-200 hover:translate-x-1 hover:bg-white hover:text-orange-700 focus-ring ${
-              menuOpen ? "translate-x-0 opacity-100" : "-translate-x-2 opacity-0"
-            }`;
-            const style = {
-              transitionDelay: menuOpen ? `${index * 32}ms` : "0ms",
-            };
-
-            if (item.external) {
-              return (
-                <a
-                  key={`${item.to}-${item.label}`}
-                  href={item.to}
-                  onClick={closeMenu}
-                  className={className}
-                  style={style}
-                >
-                  {item.label}
-                </a>
-              );
-            }
-
-            return (
-              <Link
-                key={`${item.to}-${item.label}`}
-                to={item.to}
-                onClick={closeMenu}
-                className={className}
-                style={style}
-              >
-                {item.label}
-              </Link>
-            );
+    <Drawer
+      anchor="left"
+      open={menuOpen}
+      onClose={closeMenu}
+      ModalProps={{ keepMounted: true }}
+      slotProps={{
+        backdrop: {
+          sx: {
+            bgcolor: "rgba(3,7,18,0.48)",
+            backdropFilter: "blur(3px)",
+          },
+        },
+      }}
+      PaperProps={{
+        sx: (theme) => ({
+          width: "min(21.5rem, 88vw)",
+          borderRight: `1px solid ${theme.palette.divider}`,
+          bgcolor: "background.paper",
+          color: "text.primary",
+          overflow: "hidden",
+        }),
+      }}
+    >
+      <Stack sx={{ height: "100%" }}>
+        <Box
+          sx={(theme) => ({
+            position: "relative",
+            overflow: "hidden",
+            p: 2.5,
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            backgroundImage: `linear-gradient(${alpha(theme.palette.primary.main, 0.07)} 1px, transparent 1px), linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.07)} 1px, transparent 1px)`,
+            backgroundSize: "44px 44px",
           })}
-        </nav>
+        >
+          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2} sx={{ position: "relative" }}>
+            <Stack spacing={1.25}>
+              <Stack direction="row" alignItems="center" spacing={1.25}>
+                <Avatar variant="rounded" sx={{ bgcolor: "secondary.main", borderRadius: 3 }}>
+                  <StorefrontRoundedIcon />
+                </Avatar>
+                <Box>
+                  <Typography fontSize={12} fontWeight={900} letterSpacing="0.24em" color="secondary.main">
+                    3DPRINTINGS
+                  </Typography>
+                  <Typography variant="h5" component="h2">
+                    {title}
+                  </Typography>
+                </Box>
+              </Stack>
+              <Typography color="text.secondary" fontSize={14} fontWeight={650} lineHeight={1.65}>
+                Find prints, manage orders, or start selling from one place.
+              </Typography>
+            </Stack>
+            <IconButton onClick={closeMenu} aria-label="Close Menu" sx={{ borderRadius: 3 }}>
+              <CloseRoundedIcon />
+            </IconButton>
+          </Stack>
+        </Box>
 
-        <div className="shrink-0 border-t border-orange-200/80 p-4">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="flex w-full items-center justify-between gap-3 rounded-3xl border border-orange-200 bg-white/80 px-4 py-3 text-left transition-colors duration-200 hover:border-orange-400 hover:bg-white focus-ring"
-            aria-pressed={isDarkMode}
-            aria-label={`Switch To ${isDarkMode ? "Light" : "Dark"} Mode`}
-          >
-            <span>
-              <span className="block text-sm font-black text-gray-950">Appearance</span>
-              <span className="block text-xs font-bold text-gray-600">
-                {isDarkMode ? "Dark Mode Enabled" : "Light Mode Enabled"}
-              </span>
-            </span>
-            <span
-              className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition-colors duration-200 ${
-                isDarkMode ? "bg-zinc-700" : "bg-orange-200"
-              }`}
-              aria-hidden="true"
+        <List sx={{ flex: 1, minHeight: 0, overflowY: "auto", p: 1.5 }}>
+          {activeItems.map((item) => (
+            <ListItemButton
+              key={`${item.to}-${item.label}`}
+              component={item.external ? "a" : RouterLink}
+              href={item.external ? item.to : undefined}
+              to={item.external ? undefined : item.to}
+              onClick={closeMenu}
+              sx={{
+                borderRadius: 3,
+                mb: 0.5,
+                px: 2,
+                py: 1.25,
+                transition: "transform 160ms ease, background-color 160ms ease, color 160ms ease",
+                "&:hover": {
+                  transform: "translateX(4px)",
+                  bgcolor: "action.hover",
+                  color: "secondary.main",
+                },
+              }}
             >
-              <span
-                className={`theme-toggle-thumb flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-black text-gray-900 shadow-sm transition-transform duration-200 ${
-                  isDarkMode ? "translate-x-6" : "translate-x-0"
-                }`}
-              >
-                {isDarkMode ? "D" : "L"}
-              </span>
-            </span>
-          </button>
-        </div>
-      </aside>
-      )}
-    </>
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{ fontSize: 14, fontWeight: 850 }}
+              />
+            </ListItemButton>
+          ))}
+        </List>
+
+        <Divider />
+
+        <Box sx={{ p: 2 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            spacing={2}
+            sx={(theme) => ({
+              border: `1px solid ${theme.palette.divider}`,
+              borderRadius: 4,
+              p: 1.5,
+              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.08 : 0.04),
+            })}
+          >
+            <Box>
+              <Typography fontSize={14} fontWeight={900}>
+                Appearance
+              </Typography>
+              <Typography color="text.secondary" fontSize={12} fontWeight={700}>
+                {isDarkMode ? "Dark mode enabled" : "Light mode enabled"}
+              </Typography>
+            </Box>
+            <Switch checked={isDarkMode} onChange={toggleTheme} inputProps={{ "aria-label": `Switch to ${isDarkMode ? "light" : "dark"} mode` }} />
+          </Stack>
+        </Box>
+      </Stack>
+    </Drawer>
   );
 };
 

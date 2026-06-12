@@ -1,10 +1,19 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import accountLogo from "../assets/accountLogo.svg";
-import accountLogoHover from "../assets/accountLogoHover.svg";
-import Search from "../assets/search.svg";
-import Cart from "../assets/Cart.svg";
-import CartHover from "../assets/CartHover.svg";
+import AppBar from "@mui/material/AppBar";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import InputBase from "@mui/material/InputBase";
+import Stack from "@mui/material/Stack";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import { alpha } from "@mui/material/styles";
+import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import SideMenu from "./SideMenu.jsx";
 import { useMenu } from "../MenuContext.jsx";
 
@@ -56,55 +65,114 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
         Skip To Content
       </a>
 
-      <header
-        className={`fixed left-0 top-0 z-50 w-full px-3 pt-3 transition-transform duration-300 sm:px-5 lg:px-[5vw] ${
-          showNavbar ? "translate-y-0" : "-translate-y-full"
-        }`}
+      <AppBar
+        position="fixed"
+        color="transparent"
+        elevation={0}
+        sx={(theme) => ({
+          px: { xs: 1.5, sm: 2.5, lg: "5vw" },
+          pt: 1.5,
+          transform: showNavbar ? "translateY(0)" : "translateY(-120%)",
+          transition: theme.transitions.create("transform", { duration: 260 }),
+          pointerEvents: showNavbar ? "auto" : "none",
+        })}
       >
-        <nav className="mx-auto flex max-w-7xl items-center gap-3 rounded-[1.75rem] border border-white/55 bg-emerald-950/86 px-3 py-2.5 text-white shadow-[0_18px_60px_rgba(17,24,39,0.2)] backdrop-blur-xl sm:px-4">
-          <button
-            type="button"
+        <Toolbar
+          component="nav"
+          disableGutters
+          sx={(theme) => ({
+            mx: "auto",
+            width: "100%",
+            maxWidth: 1280,
+            minHeight: "64px !important",
+            gap: { xs: 1, sm: 1.5 },
+            border: `1px solid ${alpha(theme.palette.common.white, 0.14)}`,
+            borderRadius: 4,
+            bgcolor: alpha(theme.palette.primary.dark, theme.palette.mode === "dark" ? 0.9 : 0.88),
+            color: "common.white",
+            px: { xs: 1.25, sm: 1.75 },
+            py: 1,
+            boxShadow: "0 18px 60px rgba(17,24,39,0.22)",
+            backdropFilter: "blur(18px)",
+          })}
+        >
+          <IconButton
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-red-300/70 hover:bg-red-500/15 focus-ring"
             aria-label="Open Menu"
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: 3,
+              color: "common.white",
+              border: "1px solid rgba(255,255,255,0.12)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": { bgcolor: "rgba(217,58,47,0.18)", borderColor: "rgba(255,255,255,0.3)" },
+            }}
           >
-            <span className="flex flex-col gap-1.5" aria-hidden="true">
-              <span className="h-0.5 w-5 rounded-full bg-white transition-colors duration-150 group-hover:bg-red-300" />
-              <span className="h-0.5 w-5 rounded-full bg-white/80 transition-colors duration-200 group-hover:bg-white" />
-              <span className="h-0.5 w-5 rounded-full bg-white transition-colors duration-150 group-hover:bg-red-300" />
-            </span>
-          </button>
+            <MenuRoundedIcon />
+          </IconButton>
 
-          <Link
+          <Stack
+            component={RouterLink}
             to="/home"
-            className="group flex min-w-0 shrink-0 items-center gap-2 rounded-2xl px-1 py-1 focus-ring"
+            direction="row"
+            alignItems="center"
+            spacing={1}
             aria-label="3Dprintings.xyz Home"
             translate="no"
+            sx={{ color: "inherit", textDecoration: "none", minWidth: 0, flexShrink: 0 }}
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br from-red-500 to-emerald-800 text-sm font-bold text-white shadow-lg shadow-emerald-950/25">
+            <Avatar
+              variant="rounded"
+              sx={{
+                width: 42,
+                height: 42,
+                borderRadius: 3,
+                bgcolor: "secondary.main",
+                color: "common.white",
+                fontWeight: 900,
+                boxShadow: "0 12px 30px rgba(0,0,0,0.22)",
+              }}
+            >
               3D
-            </span>
-            <span className="hidden leading-none sm:block">
-              <span className="block font-display text-base font-bold tracking-tight">3Dprintings</span>
-              <span className="block text-[11px] font-medium uppercase tracking-[0.24em] text-red-100">Models</span>
-            </span>
-          </Link>
+            </Avatar>
+            <Box sx={{ display: { xs: "none", sm: "block" }, lineHeight: 1 }}>
+              <Typography component="span" display="block" fontWeight={900} letterSpacing="-0.02em">
+                3Dprintings
+              </Typography>
+              <Typography component="span" display="block" fontSize={11} fontWeight={800} letterSpacing="0.22em" color="secondary.light">
+                MODELS
+              </Typography>
+            </Box>
+          </Stack>
 
-          <div className="hidden items-center gap-1 text-sm font-bold text-white/80 lg:flex">
-            <Link to="/products" className="rounded-full px-4 py-2 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-ring">
+          <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", lg: "flex" } }}>
+            <Button component={RouterLink} to="/products" color="inherit" sx={{ borderRadius: 999, px: 2 }}>
               Browse
-            </Link>
-            <Link to="/become-seller" className="rounded-full px-4 py-2 transition-colors duration-200 hover:bg-white/10 hover:text-white focus-ring">
+            </Button>
+            <Button component={RouterLink} to="/become-seller" color="inherit" sx={{ borderRadius: 999, px: 2 }}>
               Sell
-            </Link>
-          </div>
+            </Button>
+          </Stack>
 
-          <form onSubmit={handleSearch} role="search" className="min-w-0 flex-1">
-            <label htmlFor="site-search" className="sr-only">
-              Search 3D printed products and files
-            </label>
-            <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 transition-colors duration-200 focus-within:border-red-300/80 focus-within:bg-white/15">
-              <input
+          <Box component="form" role="search" onSubmit={handleSearch} sx={{ minWidth: 0, flex: 1 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                borderRadius: 3,
+                border: "1px solid rgba(255,255,255,0.12)",
+                bgcolor: "rgba(255,255,255,0.11)",
+                px: 1,
+                transition: "background-color 160ms ease, border-color 160ms ease",
+                "&:focus-within": {
+                  bgcolor: "rgba(255,255,255,0.17)",
+                  borderColor: "rgba(255,255,255,0.34)",
+                },
+              }}
+            >
+              <InputBase
                 id="site-search"
                 name="q"
                 type="search"
@@ -114,68 +182,91 @@ export default function Navbar({ isSignedIn, NoNavBarLimit }) {
                 placeholder="Search models, parts, STL files..."
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                className="w-full bg-transparent px-4 py-3 pr-13 text-sm font-medium text-white placeholder:text-white/52 focus:outline-none"
+                sx={{
+                  flex: 1,
+                  color: "common.white",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  px: { xs: 1, sm: 1.5 },
+                  py: 0.75,
+                  "& input::placeholder": { color: "rgba(255,255,255,0.58)", opacity: 1 },
+                }}
+                inputProps={{ "aria-label": "Search 3D printed products and files" }}
               />
-              <button
+              <IconButton
                 type="submit"
-                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-white text-gray-950 transition-colors duration-200 hover:bg-red-400 focus-ring"
                 aria-label="Search"
+                sx={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 2.5,
+                  bgcolor: "common.white",
+                  color: "grey.950",
+                  "&:hover": { bgcolor: "secondary.light" },
+                }}
               >
-                <img src={Search} alt="" className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-          </form>
+                <SearchRoundedIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
             {isSignedIn ? (
-              <Link
+              <IconButton
+                component={RouterLink}
                 to="/account"
-                className="group relative hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-red-300/70 hover:bg-red-500/15 focus-ring sm:inline-flex"
                 aria-label="Account"
+                sx={{
+                  display: { xs: "none", sm: "inline-flex" },
+                  width: 44,
+                  height: 44,
+                  borderRadius: 3,
+                  color: "common.white",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  bgcolor: "rgba(255,255,255,0.06)",
+                  "&:hover": { bgcolor: "rgba(217,58,47,0.18)", borderColor: "rgba(255,255,255,0.3)" },
+                }}
               >
-                <img
-                  src={accountLogo}
-                  alt=""
-                  className="absolute h-7 w-7 object-contain opacity-100 transition-opacity duration-200 group-hover:opacity-0"
-                  aria-hidden="true"
-                />
-                <img
-                  src={accountLogoHover}
-                  alt=""
-                  className="absolute h-7 w-7 object-contain opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                  aria-hidden="true"
-                />
-              </Link>
+                <AccountCircleOutlinedIcon />
+              </IconButton>
             ) : (
-              <Link
+              <Button
+                component={RouterLink}
                 to="/signup"
-                className="hidden rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-gray-950 transition-colors duration-200 hover:bg-red-300 focus-ring sm:inline-flex"
+                variant="contained"
+                color="inherit"
+                sx={{
+                  display: { xs: "none", sm: "inline-flex" },
+                  bgcolor: "common.white",
+                  color: "grey.950",
+                  borderRadius: 3,
+                  px: 2,
+                  "&:hover": { bgcolor: "secondary.light" },
+                }}
               >
                 Sign up
-              </Link>
+              </Button>
             )}
 
-            <Link
+            <IconButton
+              component={RouterLink}
               to="/cart"
-              className="group relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition-colors duration-200 hover:border-red-300/70 hover:bg-red-500/15 focus-ring"
               aria-label="Cart"
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 3,
+                color: "common.white",
+                border: "1px solid rgba(255,255,255,0.12)",
+                bgcolor: "rgba(255,255,255,0.06)",
+                "&:hover": { bgcolor: "rgba(217,58,47,0.18)", borderColor: "rgba(255,255,255,0.3)" },
+              }}
             >
-              <img
-                src={Cart}
-                alt=""
-                className="absolute h-7 w-7 object-contain opacity-100 transition-opacity duration-200 group-hover:opacity-0"
-                aria-hidden="true"
-              />
-              <img
-                src={CartHover}
-                alt=""
-                className="absolute h-7 w-7 object-contain opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                aria-hidden="true"
-              />
-            </Link>
-          </div>
-        </nav>
-      </header>
+              <ShoppingCartOutlinedIcon />
+            </IconButton>
+          </Stack>
+        </Toolbar>
+      </AppBar>
 
       <SideMenu />
     </>
