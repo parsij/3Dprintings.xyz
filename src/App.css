@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --font-body: "Ubuntu", ui-sans-serif, system-ui, sans-serif;

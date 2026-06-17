@@ -3,12 +3,13 @@ const path = require("path");
 const sharp = require("sharp");
 
 const MAX_EDGE_PX = 1600;
+const MAX_INPUT_PIXELS = 40_000_000;
 const INITIAL_WEBP_QUALITY = 78;
 const MIN_WEBP_QUALITY = 42;
 const TARGET_MAX_BYTES = 450 * 1024;
 
 async function renderOptimizedWebp(inputPath, quality) {
-  return sharp(inputPath, { failOn: "none" })
+  return sharp(inputPath, { failOn: "none", limitInputPixels: MAX_INPUT_PIXELS })
     .rotate()
     .resize({
       width: MAX_EDGE_PX,
@@ -41,5 +42,6 @@ async function optimizeUploadedProductPhoto(inputPath, outputPath) {
 
 module.exports = {
   MAX_EDGE_PX,
+  MAX_INPUT_PIXELS,
   optimizeUploadedProductPhoto,
 };

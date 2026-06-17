@@ -1,4 +1,5 @@
 const EasyPostClient = require("@easypost/api");
+const net = require("net");
 const { createUserError, logInternalError } = require("../apiErrorShared.cjs");
 const { listSellerBoxes } = require("./sellerBoxesShared.cjs");
 const {
@@ -19,6 +20,8 @@ const DEFAULT_PARCEL = {
 const US_STATE_CODE_REGEX = /^[A-Z]{2}$/;
 const US_POSTAL_CODE_REGEX = /^\d{5}(?:-\d{4})?$/;
 const TEST_TRACKING_TIMELINE_MS = 3 * 60 * 1000;
+const LABEL_FETCH_TIMEOUT_MS = 10_000;
+const MAX_LABEL_BYTES = 5 * 1024 * 1024;
 const scheduledTestTrackingOrders = new Set();
 const TEST_TRACKING_STEPS = [
   {
@@ -334,6 +337,8 @@ function snapshotEasyPostErrorForDebug(error) {
 }
 
 function logAddressVerificationDebug(phase, payload = {}) {
+  if (!shouldLogAddressVerificationVerbose()) return;
+
   console.error(
     `[address-verify-debug] ${phase}`,
     JSON.stringify(payload, null, 2)
@@ -1625,15 +1630,141 @@ async function ensureSellerOrderLabel(pool, orderId, sellerId) {
   };
 }
 
-async function fetchLabelBinary(labelUrl) {
-  const normalizedUrl = normalizeText(labelUrl);
-  if (!normalizedUrl || !/^https?:\/\//i.test(normalizedUrl)) {
+function isPrivateIpv4(hostname) {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [first, second] = parts;
+  return first === 10
+    || first === 127
+    || (first === 169 && second === 254)
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168)
+    || first === 0;
+}
+
+function isPrivateIpv6(hostname) {
+  const normalized = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return normalized === "::1"
+    || normalized.startsWith("fe80:")
+    || normalized.startsWith("fc")
+    || normalized.startsWith("fd");
+}
+
+function assertSafeLabelUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(normalizeText(rawUrl));
+  } catch {
     const error = new Error("Shipping label URL is unavailable.");
     error.statusCode = 404;
     throw error;
   }
 
-  const response = await fetch(normalizedUrl);
+  if (parsed.protocol !== "https:") {
+    const error = new Error("Shipping label URL is unavailable.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const hostForIpCheck = hostname.replace(/^\[|\]$/g, "");
+  const ipVersion = net.isIP(hostForIpCheck);
+  const isLocalHostname = hostname === "localhost" || hostname.endsWith(".localhost");
+  const isPrivateIp = ipVersion === 4
+    ? isPrivateIpv4(hostForIpCheck)
+    : ipVersion === 6 && isPrivateIpv6(hostForIpCheck);
+  if (isLocalHostname || isPrivateIp) {
+    const error = new Error("Shipping label URL is unavailable.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return parsed.toString();
+}
+
+async function fetchWithTimeout(url, redirectsRemaining = 3) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LABEL_FETCH_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, {
+      redirect: "manual",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (response.status >= 300 && response.status < 400) {
+    if (redirectsRemaining <= 0) {
+      const error = new Error("Too many shipping label redirects.");
+      error.statusCode = 502;
+      throw error;
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      const error = new Error("Shipping label redirect is missing a location.");
+      error.statusCode = 502;
+      throw error;
+    }
+
+    const nextUrl = assertSafeLabelUrl(new URL(location, url).toString());
+    return fetchWithTimeout(nextUrl, redirectsRemaining - 1);
+  }
+
+  return response;
+}
+
+async function readResponseBodyWithLimit(response) {
+  const contentLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_LABEL_BYTES) {
+    const error = new Error("Shipping label file is too large.");
+    error.statusCode = 502;
+    throw error;
+  }
+
+  if (!response.body?.getReader) {
+    const fallbackBuffer = Buffer.from(await response.arrayBuffer());
+    if (fallbackBuffer.length > MAX_LABEL_BYTES) {
+      const error = new Error("Shipping label file is too large.");
+      error.statusCode = 502;
+      throw error;
+    }
+    return fallbackBuffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = Buffer.from(value);
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_LABEL_BYTES) {
+        const error = new Error("Shipping label file is too large.");
+        error.statusCode = 502;
+        throw error;
+      }
+      chunks.push(chunk);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => null);
+    throw error;
+  }
+
+  return Buffer.concat(chunks, totalBytes);
+}
+
+async function fetchLabelBinary(labelUrl) {
+  const normalizedUrl = assertSafeLabelUrl(labelUrl);
+  const response = await fetchWithTimeout(normalizedUrl);
   if (!response.ok) {
     const error = new Error("Failed to retrieve shipping label.");
     error.statusCode = 502;
@@ -1641,7 +1772,7 @@ async function fetchLabelBinary(labelUrl) {
   }
 
   const contentType = normalizeText(response.headers.get("content-type")) || "application/pdf";
-  const buffer = Buffer.from(await response.arrayBuffer());
+  const buffer = await readResponseBodyWithLimit(response);
   if (!buffer.length) {
     const error = new Error("Shipping label file is empty.");
     error.statusCode = 502;

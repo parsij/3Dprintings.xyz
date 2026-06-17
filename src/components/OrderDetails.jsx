@@ -5,6 +5,7 @@ import TrackingSection from "./TrackingSection.jsx";
 import MessageSellerOrderButton from "./MessageSellerOrderButton.jsx";
 import { fetchOrderMessageTargets } from "../services/orderMessagingService.js";
 import { getOrderItemsArray, getTrackingForItem, orderHasMultipleSellers } from "../utils/orderShipping.js";
+import { redirectToAllowedUrl } from "../utils/safeRedirect.js";
 
 function toMoney(value) {
   const numeric = Number(value);
@@ -155,7 +156,7 @@ export default function OrderDetails({ user }) {
 
       // Redirect to Stripe checkout URL if provided
       if (payload.checkout_url) {
-        window.location.href = payload.checkout_url;
+        redirectToAllowedUrl(payload.checkout_url, { allowedHostnames: ["checkout.stripe.com"] });
       } else {
         // Reload order to reflect status change
         window.location.reload();

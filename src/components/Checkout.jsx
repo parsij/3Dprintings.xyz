@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { getUserFacingError } from '../utils/userFacingError.js';
 import { formatAddressSummary, sanitizeStreetLine } from '../utils/address.js';
 import { formatUsd, readCheckoutUsdAmount } from '../utils/money.js';
+import { redirectToAllowedUrl } from '../utils/safeRedirect.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
@@ -371,7 +372,7 @@ const Checkout = () => {
             }
 
             if (data.url) {
-                window.location.assign(data.url);
+                redirectToAllowedUrl(data.url, { allowedHostnames: ['checkout.stripe.com'] });
                 return;
             }
 

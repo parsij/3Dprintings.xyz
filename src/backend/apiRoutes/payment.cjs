@@ -716,8 +716,6 @@ module.exports = function paymentController(deps) {
                     userId: authUserId,
                     shippingTier: req.body?.shippingTier || null,
                     itemCount: Array.isArray(req.body?.items) ? req.body.items.length : 0,
-                    items: Array.isArray(req.body?.items) ? req.body.items : null,
-                    address: req.body?.address || null,
                     errorMessage: error?.message || null,
                     statusCode: error?.statusCode || error?.status || null,
                     exposeToClient: error?.exposeToClient === true,

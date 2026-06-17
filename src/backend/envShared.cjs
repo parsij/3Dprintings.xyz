@@ -13,6 +13,12 @@ function normalizeOrigin(origin) {
     .toLowerCase();
 }
 
+const PRODUCTION_FRONTEND_ORIGINS = new Set([
+  "https://3dprintings.xyz",
+  "https://www.3dprintings.xyz",
+  "https://seller.3dprintings.xyz",
+]);
+
 function getFrontendUrl() {
   const configured = normalizeOrigin(process.env.FRONTEND_URL);
   if (configured) return configured;
@@ -79,14 +85,7 @@ function isLocalDevOrigin(origin) {
 
 function isProductionSiteOrigin(origin) {
   if (!origin) return false;
-
-  try {
-    const parsed = new URL(origin);
-    if (parsed.protocol !== "https:") return false;
-    return parsed.hostname === "3dprintings.xyz" || parsed.hostname.endsWith(".3dprintings.xyz");
-  } catch {
-    return false;
-  }
+  return PRODUCTION_FRONTEND_ORIGINS.has(normalizeOrigin(origin));
 }
 
 function isAllowedAppOrigin(origin, allowedOriginsSet) {

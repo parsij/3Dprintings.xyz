@@ -145,6 +145,7 @@ function accountRoutes(deps) {
     getAuthUserFromRequest,
     createAuthToken,
     setAuthCookie,
+    setCsrfCookie,
     EMAIL_REGEX,
     PASSWORD_REGEX,
     accountPasswordRateLimiter = noopMiddleware,
@@ -386,9 +387,21 @@ function accountRoutes(deps) {
        if (normalizedUsername.length < 3) {
          return res.status(400).json({ message: 'Username must be at least 3 characters' });
        }
+       if (normalizedUsername.length > 50) {
+         return res.status(400).json({ message: 'Username is too long' });
+       }
+       if (!/^[a-zA-Z0-9._-]+$/.test(normalizedUsername)) {
+         return res.status(400).json({ message: 'Username can only contain letters, numbers, dots, underscores, and hyphens' });
+       }
 
        if (!EMAIL_REGEX.test(normalizedEmail)) {
          return res.status(400).json({ message: 'Invalid email format' });
+       }
+       if (normalizedEmail.length > 254) {
+         return res.status(400).json({ message: 'Email is too long' });
+       }
+       if (normalizedPhone && normalizedPhone.length > 30) {
+         return res.status(400).json({ message: 'Phone number is too long' });
        }
 
        const existingEmail = await pool.query('SELECT id FROM users WHERE email = $1 AND id <> $2', [
@@ -417,6 +430,9 @@ function accountRoutes(deps) {
        const updatedUser = updatedUserResult.rows[0];
        const token = createAuthToken(updatedUser);
        setAuthCookie(res, token);
+       if (typeof setCsrfCookie === 'function') {
+         setCsrfCookie(res);
+       }
 
        return res.json({
          message: 'Account profile updated.',
@@ -439,10 +455,14 @@ function accountRoutes(deps) {
         return res.status(401).json({ message: 'Not signed in' });
       }
 
-      const { oldPassword, newPassword } = req.body;
+      const oldPassword = typeof req.body?.oldPassword === 'string' ? req.body.oldPassword : '';
+      const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
 
       if (!oldPassword || !newPassword) {
         return res.status(400).json({ message: 'Current and new password are required' });
+      }
+      if (oldPassword.length > 128 || newPassword.length > 128) {
+        return res.status(400).json({ message: 'Password is too long' });
       }
 
       if (!PASSWORD_REGEX.test(newPassword)) {

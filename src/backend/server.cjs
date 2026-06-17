@@ -5,7 +5,23 @@ const { randomUUID } = require("crypto");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
-app.set("trust proxy", 1);
+
+function resolveTrustProxySetting() {
+  const rawValue = String(process.env.TRUST_PROXY || "").trim().toLowerCase();
+  if (!rawValue) {
+    return process.env.NODE_ENV === "production" ? 1 : false;
+  }
+
+  if (["false", "off", "no", "0"].includes(rawValue)) return false;
+  if (["true", "on", "yes"].includes(rawValue)) return true;
+
+  const numericValue = Number(rawValue);
+  if (Number.isInteger(numericValue) && numericValue >= 0) return numericValue;
+
+  return rawValue;
+}
+
+app.set("trust proxy", resolveTrustProxySetting());
 const pool = require("./db.cjs");
 const cors = require('cors');
 const helmet = require("helmet");
@@ -185,9 +201,6 @@ async function calculateTaxAndAuthentication(req, res) {
 
     const tax = calculation.tax_amount_exclusive;
     const subtotal = itemPrice + tax;
-    console.log(calculation);
-    console.log(calculation.tax_breakdown);
-
     // Make the customer pay the exact fee (2.9% + 30c)
     const grandTotal = Math.ceil((subtotal + 30) / (1 - 0.029));
     const fee = grandTotal - subtotal;
@@ -296,7 +309,7 @@ const upload = multer({
       const originalExt = path.extname(file.originalname || "").toLowerCase();
       const safeName = sanitizeFileName(path.basename(file.originalname || "photo", originalExt)) || "photo";
       const ext = originalExt || ".jpg";
-      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}${ext}`;
+      const uniqueName = `${Date.now()}-${randomUUID()}-${safeName}${ext}`;
       cb(null, uniqueName);
     },
   }),
@@ -325,7 +338,7 @@ const listingMediaUpload = multer({
       const originalExt = path.extname(file.originalname || "").toLowerCase();
       const safeName = sanitizeFileName(path.basename(file.originalname || "media", originalExt)) || "media";
       const ext = originalExt || (file.fieldname === "videos" ? ".mp4" : ".jpg");
-      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}${ext}`;
+      const uniqueName = `${Date.now()}-${randomUUID()}-${safeName}${ext}`;
       cb(null, uniqueName);
     },
   }),
@@ -413,6 +426,12 @@ const apiRateLimiter = createJsonRateLimiter({
   message: "Too many requests. Please wait a few minutes and try again.",
 });
 
+const webhookRateLimiter = createJsonRateLimiter({
+  windowMs: 5 * 60 * 1000,
+  limit: readPositiveIntegerEnv("WEBHOOK_RATE_LIMIT_MAX", 300),
+  message: "Too many webhook requests. Please try again later.",
+});
+
 const authRateLimiter = createJsonRateLimiter({
   windowMs: 15 * 60 * 1000,
   limit: readPositiveIntegerEnv("AUTH_RATE_LIMIT_MAX", 20),
@@ -424,14 +443,21 @@ const authRateLimiter = createJsonRateLimiter({
   },
 });
 
-const passwordResetRateLimiter = createJsonRateLimiter({
+const passwordResetRequestRateLimiter = createJsonRateLimiter({
   windowMs: 15 * 60 * 1000,
   limit: readPositiveIntegerEnv("PASSWORD_RESET_RATE_LIMIT_MAX", 5),
   message: "Too many password reset attempts. Please wait a few minutes and try again.",
   keyGenerator: (req) => {
-    const email = String(req.body?.email || req.body?.token || req.body?.resetSessionToken || "").toLowerCase().trim();
+    const email = String(req.body?.email || "").toLowerCase().trim();
     return `${ipKeyGenerator(req.ip)}:${email || "password-reset"}`;
   },
+});
+
+const passwordResetTokenRateLimiter = createJsonRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: readPositiveIntegerEnv("PASSWORD_RESET_TOKEN_RATE_LIMIT_MAX", 10),
+  message: "Too many password reset attempts. Please wait a few minutes and try again.",
+  keyGenerator: (req) => `${ipKeyGenerator(req.ip)}:password-reset-token`,
 });
 
 const accountPasswordRateLimiter = createJsonRateLimiter({
@@ -503,7 +529,7 @@ app.use((req, res, next) => {
 });
 
 // We must apply the webhook route BEFORE express.json() because Stripe needs the raw body
-app.post('/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
+app.post('/webhook', webhookRateLimiter, express.raw({ type: 'application/json', limit: '1mb' }), async (request, response) => {
   const sig = request.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   let event;
@@ -616,7 +642,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (request, 
   }
 });
 
-app.post('/api/webhooks/easypost', express.raw({ type: 'application/json' }), async (request, response) => {
+app.post('/api/webhooks/easypost', webhookRateLimiter, express.raw({ type: 'application/json', limit: '1mb' }), async (request, response) => {
   const rawBody = Buffer.isBuffer(request.body) ? request.body.toString("utf8") : String(request.body || "");
   const signature = validateEasyPostWebhookSignature({
     headers: request.headers,
@@ -662,12 +688,22 @@ app.post('/api/webhooks/easypost', express.raw({ type: 'application/json' }), as
   }
 });
 
+app.use("/api", apiRateLimiter);
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use("/api", csrfProtection);
-app.use("/imgUploads", express.static(uploadDir));
-app.use("/api/imgUploads", express.static(uploadDir));
-app.use("/api", apiRateLimiter);
+const uploadStaticOptions = {
+  dotfiles: "deny",
+  index: false,
+  setHeaders(res) {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+  },
+};
+
+app.use("/imgUploads", express.static(uploadDir, uploadStaticOptions));
+app.use("/api/imgUploads", express.static(uploadDir, uploadStaticOptions));
 
 function createAuthToken(user) {
   return jwt.sign(
@@ -848,7 +884,9 @@ require(path.join(__dirname, "apiRoutes", "index.cjs"))({
   EMAIL_REGEX,
   PASSWORD_REGEX,
   authRateLimiter,
-  passwordResetRateLimiter,
+  passwordResetRateLimiter: passwordResetRequestRateLimiter,
+  passwordResetRequestRateLimiter,
+  passwordResetTokenRateLimiter,
   accountPasswordRateLimiter,
   MAX_PHOTOS,
   MAX_PHOTO_SIZE,

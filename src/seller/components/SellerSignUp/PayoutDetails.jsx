@@ -10,6 +10,7 @@ import {
     verifyStripeConnectOnboardingWithRetry,
 } from "../../services/sellerOnboardingService.js";
 import { SELLER_SITE_ORIGIN } from "../../../config/api.js";
+import { redirectToAllowedUrl } from "../../../utils/safeRedirect.js";
 import { getUserFacingError } from "../../../utils/userFacingError.js";
 
 function getStripeActionRequirement(data) {
@@ -141,7 +142,11 @@ const PayoutDetails = ({ onNext, onPrev, mode = "embedded", onStatusChange, onRo
     const handleStripeRemediation = () => {
         const actionUrl = stripeRequiresAction?.actionUrl || stripeActionUrl;
         if (actionUrl) {
-            window.location.assign(actionUrl);
+            try {
+                redirectToAllowedUrl(actionUrl, { allowedHostnames: ["connect.stripe.com"] });
+            } catch {
+                setError("Stripe returned an invalid redirect URL.");
+            }
         }
     };
 
@@ -158,7 +163,7 @@ const PayoutDetails = ({ onNext, onPrev, mode = "embedded", onStatusChange, onRo
             if (isRouteMode) {
                 const result = await createStripeConnectLink();
                 if (result?.url) {
-                    window.location.assign(result.url);
+                    redirectToAllowedUrl(result.url, { allowedHostnames: ["connect.stripe.com"] });
                     return;
                 }
                 setError("Stripe Connect link was not returned.");
@@ -167,7 +172,7 @@ const PayoutDetails = ({ onNext, onPrev, mode = "embedded", onStatusChange, onRo
 
             const portalUrl = status?.sellerPortalUrl;
             const redirectUrl = portalUrl || `${SELLER_SITE_ORIGIN}/onboarding/stripe`;
-            window.location.assign(redirectUrl);
+            redirectToAllowedUrl(redirectUrl, { allowedOrigins: [SELLER_SITE_ORIGIN] });
         } catch (err) {
             setError(getUserFacingError(err, "Failed to start Stripe Connect."));
         } finally {

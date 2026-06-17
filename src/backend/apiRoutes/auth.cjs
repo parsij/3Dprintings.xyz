@@ -144,12 +144,14 @@ module.exports = function authRoutes(deps) {
     EMAIL_REGEX,
     authRateLimiter = noopMiddleware,
     passwordResetRateLimiter = noopMiddleware,
+    passwordResetRequestRateLimiter = passwordResetRateLimiter,
+    passwordResetTokenRateLimiter = passwordResetRateLimiter,
   } = deps;
   const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
   const googleOAuthClient = googleClientId ? new OAuth2Client(googleClientId) : null;
   const frontendOrigin = normalizeOrigin(process.env.FRONTEND_URL);
 
-  app.post('/api/password-reset/request', passwordResetRateLimiter, async (req, res) => {
+  app.post('/api/password-reset/request', passwordResetRequestRateLimiter, async (req, res) => {
     try {
       const validation = validateBody(passwordResetRequestSchema, req.body);
       if (!validation.ok) {
@@ -186,7 +188,7 @@ module.exports = function authRoutes(deps) {
     }
   });
 
-  app.post('/api/password-reset/consume', passwordResetRateLimiter, async (req, res) => {
+  app.post('/api/password-reset/consume', passwordResetTokenRateLimiter, async (req, res) => {
     const client = await pool.connect();
 
     try {
@@ -234,7 +236,7 @@ module.exports = function authRoutes(deps) {
     }
   });
 
-  app.post('/api/password-reset/confirm', passwordResetRateLimiter, async (req, res) => {
+  app.post('/api/password-reset/confirm', passwordResetTokenRateLimiter, async (req, res) => {
     const client = await pool.connect();
 
     try {
@@ -290,6 +292,7 @@ module.exports = function authRoutes(deps) {
         role: user.role,
       };
       setAuthCookie(res, createAuthToken(authUser));
+      setCsrfCookie(res);
 
       return res.json({
         message: 'Password reset successfully',

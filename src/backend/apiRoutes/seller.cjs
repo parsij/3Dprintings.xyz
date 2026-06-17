@@ -42,9 +42,11 @@ const {
   validateListingTitle,
   validateTags,
 } = require("./listingExtrasShared.cjs");
+const { optimizeUploadedProductPhoto } = require("./imageProcessingShared.cjs");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
+const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://3dprintings.xyz/api/imgUploads";
 
 function normalizeTagList(tags) {
   if (!Array.isArray(tags)) return [];
@@ -81,11 +83,11 @@ function normalizeSellerPreferences(input) {
   };
 }
 
-function buildImageUrl(req, fileName) {
+function buildImageUrl(_req, fileName) {
   if (!fileName) return null;
-  const protocol = req.protocol || "https";
-  const host = req.get("host");
-  return `${protocol}://${host}/api/imgUploads/${fileName}`;
+  const safeFileName = path.basename(String(fileName));
+  if (!safeFileName) return null;
+  return `${IMAGE_BASE_URL.replace(/\/+$/, "")}/${encodeURIComponent(safeFileName)}`;
 }
 
 module.exports = function sellerRoutes(deps) {
@@ -609,22 +611,20 @@ module.exports = function sellerRoutes(deps) {
           return res.status(400).json({ message: "Upload a profile image." });
         }
 
-        const originalExt = path.extname(uploadedFile.originalname || uploadedFile.filename || "").toLowerCase();
-        const mimeExtMap = {
-          "image/jpeg": ".jpg",
-          "image/png": ".png",
-          "image/webp": ".webp",
-        };
-        const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
-        const normalizedExt = allowedExtensions.has(originalExt)
-          ? originalExt.replace(".jpeg", ".jpg")
-          : mimeExtMap[uploadedFile.mimetype] || ".jpg";
-        const fileName = `seller-${req.user.id}-profile-${Date.now()}${normalizedExt}`;
+        const fileName = `seller-${req.user.id}-profile-${Date.now()}.webp`;
         const nextPath = path.join(path.dirname(uploadedFile.path), fileName);
 
-        await fs.promises.rename(uploadedFile.path, nextPath);
+        try {
+          await optimizeUploadedProductPhoto(uploadedFile.path, nextPath);
+        } catch (imageError) {
+          await cleanupUploadedFiles([uploadedFile]);
+          console.warn("Rejected invalid seller profile image:", imageError?.message || imageError);
+          return res.status(400).json({ message: "Upload a valid image file." });
+        }
+
         uploadedFile.filename = fileName;
         uploadedFile.path = nextPath;
+        uploadedFile.mimetype = "image/webp";
         const imageUrl = buildImageUrl(req, fileName);
 
         await pool.query(

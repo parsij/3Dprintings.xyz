@@ -4,20 +4,20 @@ module.exports = function productRoutes(deps) {
   const { resolveShopLogoFromSources } = require("./sellerProfileShared.cjs");
   const { ensureSellerAvatarIfNeeded } = require("./sellerAvatar.cjs");
   const { ensureChatUserPocketBaseId } = require("./chatShared.cjs");
-  const IMAGE_BASE_URL = 'https://3dprintings.xyz/api/imgUploads';
+  const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || 'https://3dprintings.xyz/api/imgUploads';
   const sellerUploadDir = path.join(__dirname, "..", "imgUploads");
   const SHOP_LOGO_SQL = `COALESCE(NULLIF(sp.shop_logo_url, ''), NULLIF(u.seller_preferences->>'shopLogoUrl', '')) AS shop_logo_url`;
 
-  const buildImageUrl = (req, fileName) => {
+  const buildImageUrl = (_req, fileName) => {
     if (!fileName) return null;
-    const protocol = req.protocol || "https";
-    const host = req.get("host");
-    return `${protocol}://${host}/api/imgUploads/${fileName}`;
+    const safeFileName = path.basename(String(fileName));
+    if (!safeFileName) return null;
+    return `${IMAGE_BASE_URL.replace(/\/+$/, "")}/${encodeURIComponent(safeFileName)}`;
   };
 
   const normalizeProductRow = (p, includeImages = false) => {
     const images = Array.isArray(p.img_path) && p.img_path.length > 0
-      ? p.img_path.map(img => `${IMAGE_BASE_URL}/${img}`)
+      ? p.img_path.map((img) => buildImageUrl(null, img)).filter(Boolean)
       : [];
     const firstImage = images.length > 0 ? images[0] : null;
 
@@ -78,7 +78,7 @@ module.exports = function productRoutes(deps) {
   }
 
   const parsePagination = (query) => {
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const page = Math.min(1000, Math.max(1, parseInt(query.page, 10) || 1));
     const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 12));
     return { page, limit, offset: (page - 1) * limit };
   };

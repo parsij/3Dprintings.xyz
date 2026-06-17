@@ -22,6 +22,10 @@ const DEFAULT_SITE_ORIGIN = process.env.SITE_ORIGIN || "https://3dprintings.xyz"
 const { normalizeAddressPayload, validateUsAddress } = require("./shippingShared.cjs");
 const { validateShopName } = require("./shopNameShared.cjs");
 
+function hasAllowedImageExtension(value) {
+  return /\.(png|jpg|jpeg|webp)(\?.*)?$/i.test(String(value || ""));
+}
+
 function resolveShopLogoUrl(rawUrl, options = {}) {
   const imageBaseUrl = options.imageBaseUrl || DEFAULT_IMAGE_BASE_URL;
   const siteOrigin = options.siteOrigin || DEFAULT_SITE_ORIGIN;
@@ -200,6 +204,35 @@ function isAllowedPortfolioUrl(rawUrl) {
   }
 }
 
+function isAllowedShopLogoUrl(rawUrl, options = {}) {
+  const raw = String(rawUrl || "").trim();
+  if (!raw) return true;
+  if (!hasAllowedImageExtension(raw)) return false;
+
+  const imageBaseUrl = String(options.imageBaseUrl || DEFAULT_IMAGE_BASE_URL).replace(/\/+$/, "");
+  const siteOrigin = String(options.siteOrigin || DEFAULT_SITE_ORIGIN).replace(/\/+$/, "");
+
+  if (/^[A-Za-z0-9._-]+$/.test(raw)) return true;
+  if (raw.startsWith("/api/imgUploads/") || raw.startsWith("/imgUploads/")) return true;
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:") return false;
+
+    const allowedBases = [imageBaseUrl, siteOrigin]
+      .filter(Boolean)
+      .map((base) => new URL(base));
+
+    return allowedBases.some((base) => {
+      const basePath = base.pathname.replace(/\/+$/, "");
+      return parsed.origin === base.origin
+        && (!basePath || parsed.pathname === basePath || parsed.pathname.startsWith(`${basePath}/`));
+    });
+  } catch {
+    return false;
+  }
+}
+
 function validateSellerProfile(profile) {
   const shopNameError = validateShopName(profile.shopName);
   if (shopNameError) {
@@ -208,8 +241,8 @@ function validateSellerProfile(profile) {
   if (profile.shopBio.length > 500) {
     return "Shop bio must be 500 characters or less.";
   }
-  if (profile.shopLogoUrl && !/\.(png|jpg|jpeg|webp)(\?.*)?$/i.test(profile.shopLogoUrl)) {
-    return "Shop logo must be a PNG, JPG, JPEG, or WEBP image.";
+  if (!isAllowedShopLogoUrl(profile.shopLogoUrl)) {
+    return "Shop logo must be an uploaded PNG, JPG, JPEG, or WEBP image.";
   }
   if (!PRINTER_SPECIALIZATIONS.has(profile.primaryPrinterSpecialization)) {
     return "Select a primary printer specialization.";
@@ -244,6 +277,7 @@ module.exports = {
   DEFAULT_SITE_ORIGIN,
   ensureSellerProfilesTable,
   normalizeSellerProfile,
+  isAllowedShopLogoUrl,
   resolveShopLogoFromSources,
   resolveShopLogoUrl,
   sellerProfileFromRow,
