@@ -143,7 +143,7 @@ function splitMenuItems(items, role) {
 }
 
 function BrandHeader({ title, role }) {
-  const subtitle = role === "seller" ? "Seller workspace" : "Marketplace suite";
+  const subtitle = role === "seller" ? "Seller workspace" : "Your favorite marketplace";
 
   return (
     <div className="flex items-center gap-3 px-1">
