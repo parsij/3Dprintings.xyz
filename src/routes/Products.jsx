@@ -138,20 +138,20 @@ const Products = ({
   ];
 
   const headerClassName = embedded
-    ? "mb-8 overflow-hidden rounded-[3rem] border border-white/80 bg-white/72 p-5 text-emerald-950 shadow-[0_18px_60px_rgba(6,78,59,0.08)] backdrop-blur sm:p-7 lg:p-8"
+    ? "mb-8 overflow-hidden rounded-[3rem] border border-white/80 bg-white/72 p-5 text-emerald-950 shadow-[0_18px_60px_rgba(6,78,59,0.08)] backdrop-blur dark:border-white/10 dark:bg-zinc-900/88 dark:text-white sm:p-7 lg:p-8"
     : "mb-8 overflow-hidden rounded-[2rem] border border-emerald-950/15 bg-emerald-950 p-5 text-white shadow-[0_18px_60px_rgba(6,78,59,0.18)] sm:p-7 lg:p-8";
-  const eyebrowClassName = embedded ? "text-sm font-bold text-red-700" : "text-sm font-bold text-red-200";
+  const eyebrowClassName = embedded ? "text-sm font-bold text-red-700 dark:text-orange-300" : "text-sm font-bold text-red-200";
   const headingClassName = embedded
-    ? "mt-3 text-balance font-display text-3xl font-bold tracking-tight text-emerald-950 sm:text-4xl lg:text-5xl"
+    ? "mt-3 text-balance font-display text-3xl font-bold tracking-tight text-emerald-950 dark:text-white sm:text-4xl lg:text-5xl"
     : "mt-3 text-balance font-display text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl";
   const descriptionClassName = embedded
-    ? "mt-4 max-w-2xl text-pretty text-base font-semibold leading-7 text-stone-600"
+    ? "mt-4 max-w-2xl text-pretty text-base font-semibold leading-7 text-stone-600 dark:text-zinc-300"
     : "mt-4 max-w-2xl text-pretty text-base font-bold leading-7 text-emerald-50/80";
   const countClassName = embedded
     ? "rounded-full bg-red-500 px-4 py-3 text-sm font-bold text-white"
     : "rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white";
   const selectClassName = embedded
-    ? "focus-ring appearance-none rounded-full border border-emerald-900/10 bg-white px-4 py-3 pr-11 text-sm font-bold text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-300"
+    ? "focus-ring appearance-none rounded-full border border-emerald-900/10 bg-white px-4 py-3 pr-11 text-sm font-bold text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-300 dark:border-white/10 dark:bg-zinc-950 dark:text-white dark:hover:border-orange-300"
     : "focus-ring appearance-none rounded-2xl border border-white/20 bg-white px-4 py-3 pr-11 text-sm font-bold text-emerald-950 shadow-sm transition-colors duration-150 hover:border-red-400";
 
   const content = (
@@ -223,21 +223,21 @@ const Products = ({
         {loading && (
           <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
             <div className="h-12 w-12 rounded-full border-4 border-solid border-emerald-800/25 border-t-emerald-800" />
-            <p className="mt-4 text-sm font-bold text-stone-500">Loading listings...</p>
+            <p className="mt-4 text-sm font-bold text-stone-500 dark:text-zinc-400">Loading listings...</p>
           </div>
         )}
 
         {!loading && products.length === 0 && !loadError && (
-          <div className="rounded-[2rem] border border-dashed border-emerald-900/20 bg-white/70 px-6 py-16 text-center">
-            <h2 className="font-display text-2xl font-bold text-emerald-950">No listings yet</h2>
-            <p className="mx-auto mt-3 max-w-md text-sm font-bold leading-6 text-stone-600">
+          <div className="rounded-[2rem] border border-dashed border-emerald-900/20 bg-white/70 px-6 py-16 text-center dark:border-white/10 dark:bg-zinc-900/80">
+            <h2 className="font-display text-2xl font-bold text-emerald-950 dark:text-white">No listings yet</h2>
+            <p className="mx-auto mt-3 max-w-md text-sm font-bold leading-6 text-stone-600 dark:text-zinc-300">
               Listings will appear here as sellers publish physical prints and downloadable files.
             </p>
           </div>
         )}
 
         {!hasMore && products.length > 0 && (
-          <div className="py-12 text-center text-sm font-bold text-stone-400">
+          <div className="py-12 text-center text-sm font-bold text-stone-400 dark:text-zinc-500">
             End of current listings
           </div>
         )}

@@ -40,7 +40,12 @@ function AddVariationModal({ open, onClose, onSelectPreset, onCreateCustom }) {
               Choose a variation listed here for the best results and usability, or make your own.
             </p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close variation picker"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-900 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-white dark:hover:border-orange-400 dark:hover:bg-zinc-800 dark:hover:text-orange-300"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -108,7 +113,12 @@ function CustomVariationModal({ open, initialVariation, onClose, onDone, onDelet
       <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h4 className="text-lg font-bold text-gray-900">Custom variation</h4>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close custom variation"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-900 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-white dark:hover:border-orange-400 dark:hover:bg-zinc-800 dark:hover:text-orange-300"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>

@@ -246,7 +246,7 @@ export default function SellerOrdersCard({ order }) {
                 type="button"
                 onClick={closeLabelModal}
                 aria-label="Close label preview"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-900 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-white dark:hover:border-orange-400 dark:hover:bg-zinc-800 dark:hover:text-orange-300"
               >
                 <X className="h-5 w-5" />
               </button>

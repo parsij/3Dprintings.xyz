@@ -424,7 +424,7 @@ export default function SellerInventory() {
                 setListingStep("details");
                 setListingDetails(DEFAULT_LISTING_DETAILS);
               }}
-              className="absolute top-4 left-4 text-gray-400 hover:text-orange-500 transition-colors cursor-pointer p-1.5 rounded-xl hover:bg-gray-100 flex items-center justify-center"
+              className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-900 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-white dark:hover:border-orange-400 dark:hover:bg-zinc-800 dark:hover:text-orange-300"
               aria-label="Close form popup"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -467,7 +467,7 @@ export default function SellerInventory() {
                 setEditingProduct(null);
                 setEditSubmitted(false);
               }}
-              className="absolute top-4 left-4 text-gray-400 hover:text-orange-500 transition-colors cursor-pointer p-1.5 rounded-xl hover:bg-gray-100 flex items-center justify-center"
+              className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-900 shadow-sm transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-white dark:hover:border-orange-400 dark:hover:bg-zinc-800 dark:hover:text-orange-300"
               aria-label="Close editor popup"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
